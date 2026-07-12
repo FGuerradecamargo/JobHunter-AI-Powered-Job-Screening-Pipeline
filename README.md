@@ -1,1 +1,1 @@
-where git
+Built as a real-world portfolio project.
