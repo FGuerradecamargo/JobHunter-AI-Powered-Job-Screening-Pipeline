@@ -23,3 +23,6 @@ __pycache__/
 # SQLite Database
 # ==========================
 *.db
+
+credentials.json
+token.json
