@@ -1,5 +1,10 @@
+import base64
+import json
 from pathlib import Path
+from models.job import Job
+from dataclasses import asdict
 
+from bs4 import BeautifulSoup
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -11,8 +16,10 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 BASE_DIR = Path(__file__).resolve().parent
 CREDENTIALS_FILE = BASE_DIR / "credentials.json"
 TOKEN_FILE = BASE_DIR / "token.json"
+OUTPUT_FILE = BASE_DIR / "latest_email.html"
 
 
+# Autentica o usuário no Google e retorna as credenciais necessárias para acessar a Gmail API.
 def authenticate() -> Credentials:
     credentials = None
 
@@ -32,13 +39,22 @@ def authenticate() -> Credentials:
             )
             credentials = flow.run_local_server(port=0)
 
-        TOKEN_FILE.write_text(credentials.to_json(), encoding="utf-8")
+        TOKEN_FILE.write_text(
+            credentials.to_json(),
+            encoding="utf-8",
+        )
 
     return credentials
 
 
+# Procura uma label pelo nome e retorna o ID usado internamente pela Gmail API.
 def find_label_id(service, label_name: str) -> str | None:
-    response = service.users().labels().list(userId="me").execute()
+    response = (
+        service.users()
+        .labels()
+        .list(userId="me")
+        .execute()
+    )
 
     for label in response.get("labels", []):
         if label["name"] == label_name:
@@ -47,14 +63,33 @@ def find_label_id(service, label_name: str) -> str | None:
     return None
 
 
-def list_jobhunter_emails(service, label_id: str) -> None:
+# Procura a parte HTML dentro da estrutura do e-mail, decodifica o conteúdo e retorna uma string.
+def extract_html(payload: dict) -> str | None:
+    mime_type = payload.get("mimeType")
+    body_data = payload.get("body", {}).get("data")
+
+    if mime_type == "text/html" and body_data:
+        decoded = base64.urlsafe_b64decode(body_data)
+        return decoded.decode("utf-8")
+
+    for part in payload.get("parts", []):
+        html = extract_html(part)
+
+        if html:
+            return html
+
+    return None
+
+
+# Busca o e-mail mais recente da label, extrai o HTML, lista seus links e salva o HTML em um arquivo local.
+def save_latest_email_html(service, label_id: str) -> None:
     response = (
         service.users()
         .messages()
         .list(
             userId="me",
             labelIds=[label_id],
-            maxResults=10,
+            maxResults=6,
         )
         .execute()
     )
@@ -62,46 +97,101 @@ def list_jobhunter_emails(service, label_id: str) -> None:
     messages = response.get("messages", [])
 
     if not messages:
-        print("Nenhum e-mail encontrado com a label JobHunter.")
+        print("Nenhum e-mail encontrado.")
         return
 
-    print(f"{len(messages)} e-mail(s) encontrado(s):\n")
+    job_links = {}
 
-    for message in messages:
-        email = (
+    for message_reference in messages:
+        message = (
             service.users()
             .messages()
             .get(
                 userId="me",
-                id=message["id"],
-                format="metadata",
-                metadataHeaders=["Subject", "From", "Date"],
+                id=message_reference["id"],
+                format="full",
             )
             .execute()
         )
 
-        headers = {
-            header["name"]: header["value"]
-            for header in email["payload"].get("headers", [])
-        }
+        html = extract_html(message["payload"])
 
-        print(f"Subject: {headers.get('Subject', 'Sem assunto')}")
-        print(f"From: {headers.get('From', 'Remetente desconhecido')}")
-        print(f"Date: {headers.get('Date', 'Data desconhecida')}")
+        if not html:
+            continue
+
+        soup = BeautifulSoup(html, "html.parser")
+        links = soup.find_all("a")
+
+        for link in links:
+            href = link.get("href")
+            text = link.get_text(" ", strip=True)
+
+            if not href or "/jobs/view/" not in href:
+                continue
+
+            job_id = href.split("/jobs/view/")[1].split("?")[0]
+            clean_url = f"https://www.linkedin.com/jobs/view/{job_id}"
+
+            if (
+                    job_id not in job_links
+                    or len(text) > len(job_links[job_id].raw_text)
+            ):
+                job_links[job_id] = Job(
+                    id=job_id,
+                    raw_text=text,
+                    url=clean_url,
+                )
+
+        OUTPUT_FILE.write_text(
+            html,
+            encoding="utf-8",
+        )
+
+    print(f"{len(job_links)} vagas únicas encontradas:\n")
+
+    for job in job_links.values():
+        print(f"ID: {job.id}")
+        print(f"Texto bruto: {job.raw_text}")
+        print(f"URL: {job.url}")
         print("-" * 60)
 
+    output_jobs = BASE_DIR / "jobs_raw.json"
 
+    output_jobs.write_text(
+        json.dumps(
+    [asdict(job) for job in job_links.values()],
+    ensure_ascii=False,
+    indent=2,
+),
+        encoding="utf-8",
+    )
+
+    print(f"Vagas salvas em: {output_jobs}")
+
+
+# Coordena o fluxo principal: autenticação, conexão com o Gmail, localização da label e leitura do e-mail.
 def main() -> None:
     credentials = authenticate()
-    service = build("gmail", "v1", credentials=credentials)
 
-    label_id = find_label_id(service, "JobHunter")
+    service = build(
+        "gmail",
+        "v1",
+        credentials=credentials,
+    )
+
+    label_id = find_label_id(
+        service,
+        "JobHunter",
+    )
 
     if not label_id:
         print("Label JobHunter não encontrada.")
         return
 
-    list_jobhunter_emails(service, label_id)
+    save_latest_email_html(
+        service,
+        label_id,
+    )
 
 
 if __name__ == "__main__":
