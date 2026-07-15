@@ -1,14 +1,14 @@
 import base64
 import json
-from pathlib import Path
-from models.job import Job
 from dataclasses import asdict
+from pathlib import Path
 
-from parser.job_parser import extract_jobs_from_html
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+
+from parser.job_parser import extract_jobs_from_html
 
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
@@ -16,7 +16,6 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 BASE_DIR = Path(__file__).resolve().parent
 CREDENTIALS_FILE = BASE_DIR / "credentials.json"
 TOKEN_FILE = BASE_DIR / "token.json"
-OUTPUT_FILE = BASE_DIR / "latest_email.html"
 
 
 # Autentica o usuário no Google e retorna as credenciais necessárias para acessar a Gmail API.
@@ -81,8 +80,8 @@ def extract_html(payload: dict) -> str | None:
     return None
 
 
-# Busca o e-mail mais recente da label, extrai o HTML, lista seus links e salva o HTML em um arquivo local.
-def save_latest_email_html(service, label_id: str) -> None:
+# Busca os e-mails da label, extrai vagas únicas e salva os dados brutos em JSON.
+def collect_jobs(service, label_id: str) -> None:
     response = (
         service.users()
         .messages()
@@ -128,15 +127,11 @@ def save_latest_email_html(service, label_id: str) -> None:
             ):
                 job_links[job_id] = job
 
-                OUTPUT_FILE.write_text(
-                    html,
-                    encoding="utf-8",
-        )
-
     print(f"{len(job_links)} vagas únicas encontradas:\n")
 
     for job in job_links.values():
         print(f"ID: {job.id}")
+        print(f"Título: {job.title}")
         print(f"Texto bruto: {job.raw_text}")
         print(f"URL: {job.url}")
         print("-" * 60)
@@ -145,10 +140,10 @@ def save_latest_email_html(service, label_id: str) -> None:
 
     output_jobs.write_text(
         json.dumps(
-    [asdict(job) for job in job_links.values()],
-    ensure_ascii=False,
-    indent=2,
-),
+            [asdict(job) for job in job_links.values()],
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
@@ -174,7 +169,7 @@ def main() -> None:
         print("Label JobHunter não encontrada.")
         return
 
-    save_latest_email_html(
+    collect_jobs(
         service,
         label_id,
     )
