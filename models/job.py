@@ -14,3 +14,4 @@ class Job:
     salary: str | None = None
     easy_apply: bool = False
     score: float | None = None
+    description: str | None = None

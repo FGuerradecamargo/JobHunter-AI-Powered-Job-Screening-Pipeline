@@ -31,3 +31,5 @@ jobs_raw.json
 
 jobs_matched.json
 latest_email.html
+jobs_analyzed.json
+jobs_review.json

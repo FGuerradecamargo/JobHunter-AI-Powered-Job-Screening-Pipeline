@@ -1,10 +1,16 @@
 import re
 
 from models.job import Job
+from services.analyzers.description_analyzer import DescriptionAnalyzer
 
 
 class JobMatcher:
     MIN_RELEVANT_SCORE = 30
+    MIN_REVIEW_SCORE = 20
+
+    RELEVANT = "relevant"
+    REVIEW = "review"
+    NOT_RELEVANT = "not_relevant"
 
     POSITIVE_TITLE_RULES = {
         "technical": 20,
@@ -60,13 +66,25 @@ class JobMatcher:
                     f"Title contains '{keyword}': {points}"
                 )
 
+        description_analyzer = DescriptionAnalyzer()
+        description_analysis = description_analyzer.analyze(
+            job.description
+        )
+
+        score += description_analysis["score"]
+        reasons.extend(description_analysis["reasons"])
+
         if score > 0 and "limerick" in location:
             score += 15
-            reasons.append("Relevant job located in Limerick: +15")
+            reasons.append(
+                "Relevant job located in Limerick: +15"
+            )
 
         if score > 0 and job.remote is True:
             score += 10
-            reasons.append("Job is remote: +10")
+            reasons.append(
+                "Relevant job is remote: +10"
+            )
 
         return {
             "score": score,
@@ -78,6 +96,18 @@ class JobMatcher:
             return False
 
         return job.score >= self.MIN_RELEVANT_SCORE
+
+    def classify(self, job: Job) -> str:
+        if job.score is None:
+            return self.NOT_RELEVANT
+
+        if job.score >= self.MIN_RELEVANT_SCORE:
+            return self.RELEVANT
+
+        if job.score >= self.MIN_REVIEW_SCORE:
+            return self.REVIEW
+
+        return self.NOT_RELEVANT
 
 
 if __name__ == "__main__":
@@ -126,7 +156,9 @@ if __name__ == "__main__":
 
     for job in jobs:
         result = matcher.analyze(job)
+        job.score = result["score"]
 
         print(job.title)
         print(result)
+        print(f"Classification: {matcher.classify(job)}")
         print("-" * 60)

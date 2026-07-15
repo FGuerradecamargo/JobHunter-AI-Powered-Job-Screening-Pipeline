@@ -4,11 +4,14 @@ from pathlib import Path
 
 from models.job import Job
 from services.job_matcher import JobMatcher
+from services.job_enricher import JobEnricher
 
 
 BASE_DIR = Path(__file__).resolve().parent
 RAW_JOBS_FILE = BASE_DIR / "jobs_raw.json"
 MATCHED_JOBS_FILE = BASE_DIR / "jobs_matched.json"
+ANALYZED_JOBS_FILE = BASE_DIR / "jobs_analyzed.json"
+REVIEW_JOBS_FILE = BASE_DIR / "jobs_review.json"
 
 
 def load_jobs() -> list[Job]:
@@ -29,11 +32,14 @@ def load_jobs() -> list[Job]:
 
 def main() -> None:
     matcher = JobMatcher()
+    enricher = JobEnricher()
     jobs = load_jobs()
 
     analyses: dict[str, dict] = {}
 
     for job in jobs:
+        enricher.enrich(job)
+
         analysis = matcher.analyze(job)
         job.score = analysis["score"]
         analyses[job.id] = analysis
@@ -50,20 +56,25 @@ def main() -> None:
         if matcher.is_relevant(job)
     ]
 
-    for job in sorted_jobs:
-        analysis = analyses[job.id]
+    review_jobs = [
+        job
+        for job in sorted_jobs
+        if matcher.classify(job) == matcher.REVIEW
+    ]
 
-        print(f"Título: {job.title}")
-        print(f"Score: {job.score}")
-        print(
-            f"Relevante: "
-            f"{'Sim' if matcher.is_relevant(job) else 'Não'}"
-        )
+    ANALYZED_JOBS_FILE.write_text(
+        json.dumps(
+            [asdict(job) for job in sorted_jobs],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
-        for reason in analysis["reasons"]:
-            print(f"  - {reason}")
-
-        print("-" * 60)
+    print(
+        f"{len(sorted_jobs)} vagas analisadas salvas em: "
+        f"{ANALYZED_JOBS_FILE}"
+    )
 
     MATCHED_JOBS_FILE.write_text(
         json.dumps(
@@ -77,6 +88,20 @@ def main() -> None:
     print(
         f"{len(relevant_jobs)} vagas relevantes salvas em: "
         f"{MATCHED_JOBS_FILE}"
+    )
+
+    REVIEW_JOBS_FILE.write_text(
+        json.dumps(
+            [asdict(job) for job in review_jobs],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    print(
+        f"{len(review_jobs)} vagas para revisão salvas em: "
+        f"{REVIEW_JOBS_FILE}"
     )
 
 
