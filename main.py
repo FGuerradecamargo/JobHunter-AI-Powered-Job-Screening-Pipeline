@@ -4,7 +4,7 @@ from pathlib import Path
 from models.job import Job
 from dataclasses import asdict
 
-from bs4 import BeautifulSoup
+from parser.job_parser import extract_jobs_from_html
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -119,32 +119,18 @@ def save_latest_email_html(service, label_id: str) -> None:
         if not html:
             continue
 
-        soup = BeautifulSoup(html, "html.parser")
-        links = soup.find_all("a")
+        jobs_from_email = extract_jobs_from_html(html)
 
-        for link in links:
-            href = link.get("href")
-            text = link.get_text(" ", strip=True)
-
-            if not href or "/jobs/view/" not in href:
-                continue
-
-            job_id = href.split("/jobs/view/")[1].split("?")[0]
-            clean_url = f"https://www.linkedin.com/jobs/view/{job_id}"
-
+        for job_id, job in jobs_from_email.items():
             if (
-                    job_id not in job_links
-                    or len(text) > len(job_links[job_id].raw_text)
+                job_id not in job_links
+                or len(job.raw_text) > len(job_links[job_id].raw_text)
             ):
-                job_links[job_id] = Job(
-                    id=job_id,
-                    raw_text=text,
-                    url=clean_url,
-                )
+                job_links[job_id] = job
 
-        OUTPUT_FILE.write_text(
-            html,
-            encoding="utf-8",
+                OUTPUT_FILE.write_text(
+                    html,
+                    encoding="utf-8",
         )
 
     print(f"{len(job_links)} vagas únicas encontradas:\n")
