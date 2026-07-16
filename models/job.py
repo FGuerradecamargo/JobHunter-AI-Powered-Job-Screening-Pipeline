@@ -15,3 +15,5 @@ class Job:
     easy_apply: bool = False
     score: float | None = None
     description: str | None = None
+    reasons: list[str] | None = None
+    classification: str | None = None

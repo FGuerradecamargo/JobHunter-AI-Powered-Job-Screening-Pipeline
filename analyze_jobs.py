@@ -1,23 +1,28 @@
 import json
+import time
 from dataclasses import asdict
 from pathlib import Path
 
 from models.job import Job
-from services.job_matcher import JobMatcher
 from services.job_enricher import JobEnricher
+from services.job_matcher import JobMatcher
 
 
 BASE_DIR = Path(__file__).resolve().parent
+
 RAW_JOBS_FILE = BASE_DIR / "jobs_raw.json"
-MATCHED_JOBS_FILE = BASE_DIR / "jobs_matched.json"
 ANALYZED_JOBS_FILE = BASE_DIR / "jobs_analyzed.json"
+MATCHED_JOBS_FILE = BASE_DIR / "jobs_matched.json"
 REVIEW_JOBS_FILE = BASE_DIR / "jobs_review.json"
+
+REQUEST_DELAY_SECONDS = 2
 
 
 def load_jobs() -> list[Job]:
     if not RAW_JOBS_FILE.exists():
         raise FileNotFoundError(
-            "jobs_raw.json não encontrado. Execute primeiro: python main.py"
+            "jobs_raw.json não encontrado. "
+            "Execute primeiro: python main.py"
         )
 
     jobs_data = json.loads(
@@ -30,30 +35,89 @@ def load_jobs() -> list[Job]:
     ]
 
 
+def load_cached_descriptions() -> dict[str, str]:
+    if not ANALYZED_JOBS_FILE.exists():
+        return {}
+
+    cached_jobs = json.loads(
+        ANALYZED_JOBS_FILE.read_text(encoding="utf-8")
+    )
+
+    return {
+        job_data["id"]: job_data["description"]
+        for job_data in cached_jobs
+        if job_data.get("description")
+    }
+
+
+def save_jobs(
+    file_path: Path,
+    jobs: list[Job],
+) -> None:
+    file_path.write_text(
+        json.dumps(
+            [asdict(job) for job in jobs],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     matcher = JobMatcher()
     enricher = JobEnricher()
+
     jobs = load_jobs()
+    cached_descriptions = load_cached_descriptions()
 
     analyses: dict[str, dict] = {}
 
+    cached_count = 0
+    fetched_count = 0
+    failed_count = 0
+
     for job in jobs:
-        enricher.enrich(job)
+        cached_description = cached_descriptions.get(job.id)
+
+        if cached_description:
+            job.description = cached_description
+            cached_count += 1
+
+        else:
+            print(f"Buscando descrição: {job.title}")
+
+            enricher.enrich(job)
+
+            if job.description is None:
+                failed_count += 1
+            else:
+                fetched_count += 1
+
+            time.sleep(REQUEST_DELAY_SECONDS)
 
         analysis = matcher.analyze(job)
+
         job.score = analysis["score"]
+        job.reasons = analysis["reasons"]
+        job.classification = matcher.classify(job)
+
         analyses[job.id] = analysis
 
     sorted_jobs = sorted(
         jobs,
-        key=lambda job: job.score if job.score is not None else 0,
+        key=lambda job: (
+            job.score
+            if job.score is not None
+            else 0
+        ),
         reverse=True,
     )
 
     relevant_jobs = [
         job
         for job in sorted_jobs
-        if matcher.is_relevant(job)
+        if matcher.classify(job) == matcher.RELEVANT
     ]
 
     review_jobs = [
@@ -62,41 +126,35 @@ def main() -> None:
         if matcher.classify(job) == matcher.REVIEW
     ]
 
-    ANALYZED_JOBS_FILE.write_text(
-        json.dumps(
-            [asdict(job) for job in sorted_jobs],
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
+    save_jobs(
+        ANALYZED_JOBS_FILE,
+        sorted_jobs,
     )
+
+    save_jobs(
+        MATCHED_JOBS_FILE,
+        relevant_jobs,
+    )
+
+    save_jobs(
+        REVIEW_JOBS_FILE,
+        review_jobs,
+    )
+
+    print()
+    print(f"Descrições reutilizadas: {cached_count}")
+    print(f"Descrições obtidas agora: {fetched_count}")
+    print(f"Descrições não obtidas: {failed_count}")
+    print()
 
     print(
         f"{len(sorted_jobs)} vagas analisadas salvas em: "
         f"{ANALYZED_JOBS_FILE}"
     )
 
-    MATCHED_JOBS_FILE.write_text(
-        json.dumps(
-            [asdict(job) for job in relevant_jobs],
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
     print(
         f"{len(relevant_jobs)} vagas relevantes salvas em: "
         f"{MATCHED_JOBS_FILE}"
-    )
-
-    REVIEW_JOBS_FILE.write_text(
-        json.dumps(
-            [asdict(job) for job in review_jobs],
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
     )
 
     print(

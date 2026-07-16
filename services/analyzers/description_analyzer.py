@@ -2,13 +2,25 @@ import re
 
 
 class DescriptionAnalyzer:
-    POSITIVE_RULES = {
-        "python": 20,
-    }
+    MAX_POSITIVE_SCORE = 15
 
+    POSITIVE_RULES = {
+        "python": 10,
+        "sql": 10,
+        "linux": 10,
+        "root cause": 15,
+        "troubleshooting": 15,
+        "incident management": 15,
+        "technical support": 15,
+        "workflow automation": 15,
+    }
 
     NEGATIVE_RULES = {
         "biopharmaceutical manufacturing": -40,
+        "manufacturing engineering": -30,
+        "lean manufacturing": -30,
+        "mechanical engineering": -25,
+        "assembly fixtures": -25,
     }
 
     @staticmethod
@@ -16,43 +28,66 @@ class DescriptionAnalyzer:
         pattern = rf"\b{re.escape(keyword)}\b"
         return re.search(pattern, text) is not None
 
-    def analyze(self, description: str | None) -> dict:
-        normalized = (description or "").lower()
-
+    def apply_rules(
+        self,
+        text: str,
+        rules: dict[str, int],
+    ) -> tuple[int, list[str]]:
         score = 0
         reasons = []
 
+        for keyword, points in rules.items():
+            if self.contains_keyword(text, keyword):
+                score += points
+                reasons.append(
+                    f"Description contains '{keyword}': {points:+d}"
+                )
+
+        return score, reasons
+
+    def analyze(self, description: str | None) -> dict:
+        normalized_description = (description or "").lower()
+
         positive_score, positive_reasons = self.apply_rules(
-            normalized,
+            normalized_description,
             self.POSITIVE_RULES,
-            "Description",
         )
 
         negative_score, negative_reasons = self.apply_rules(
-            normalized,
+            normalized_description,
             self.NEGATIVE_RULES,
-            "Description",
         )
 
-        score += positive_score
-        score += negative_score
+        capped_positive_score = min(
+            positive_score,
+            self.MAX_POSITIVE_SCORE,
+        )
 
-        reasons.extend(positive_reasons)
-        reasons.extend(negative_reasons)
+        if positive_score > self.MAX_POSITIVE_SCORE:
+            positive_reasons.append(
+                "Description positive score capped at +15"
+            )
 
         return {
-            "score": score,
-            "reasons": reasons,
+            "score": capped_positive_score + negative_score,
+            "reasons": positive_reasons + negative_reasons,
         }
 
-
-# ← DAQUI PARA BAIXO NÃO HÁ MAIS INDENTAÇÃO
 
 if __name__ == "__main__":
     analyzer = DescriptionAnalyzer()
 
-    result = analyzer.analyze(
-        "Automation Engineer in biopharmaceutical manufacturing."
-    )
+    descriptions = [
+        "Automation Engineer in biopharmaceutical manufacturing.",
+        (
+            "Python, SQL and Linux support environment with "
+            "troubleshooting and root cause analysis."
+        ),
+    ]
 
-    print(result)
+    for description in descriptions:
+        result = analyzer.analyze(description)
+
+        print(description)
+        print(result)
+        print("-" * 60)
