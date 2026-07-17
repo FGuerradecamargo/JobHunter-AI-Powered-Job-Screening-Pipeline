@@ -81,7 +81,14 @@ def extract_html(payload: dict) -> str | None:
 
 
 # Busca os e-mails da label, extrai vagas únicas e salva os dados brutos em JSON.
-def collect_jobs(service, label_id: str) -> None:
+# Busca os e-mails da label, extrai vagas únicas e salva os dados brutos em JSON.
+def collect_jobs(
+    service,
+    label_id: str,
+    verbose: bool = True,
+) -> dict:
+    output_jobs = BASE_DIR / "jobs_raw.json"
+
     response = (
         service.users()
         .messages()
@@ -96,8 +103,9 @@ def collect_jobs(service, label_id: str) -> None:
     messages = response.get("messages", [])
 
     if not messages:
-        print("Nenhum e-mail encontrado.")
-        return
+        raise RuntimeError(
+            "Nenhum e-mail encontrado na label JobHunter."
+        )
 
     job_links = {}
 
@@ -127,31 +135,44 @@ def collect_jobs(service, label_id: str) -> None:
             ):
                 job_links[job_id] = job
 
-    print(f"{len(job_links)} vagas únicas encontradas:\n")
+    jobs_data = [
+        asdict(job)
+        for job in job_links.values()
+    ]
 
-    for job in job_links.values():
-        print(f"ID: {job.id}")
-        print(f"Título: {job.title}")
-        print(f"Texto bruto: {job.raw_text}")
-        print(f"URL: {job.url}")
-        print("-" * 60)
+    if verbose:
+        print(f"{len(job_links)} vagas únicas encontradas:\n")
 
-    output_jobs = BASE_DIR / "jobs_raw.json"
+        for job in job_links.values():
+            print(f"ID: {job.id}")
+            print(f"Título: {job.title}")
+            print(f"Texto bruto: {job.raw_text}")
+            print(f"URL: {job.url}")
+            print("-" * 60)
 
-    output_jobs.write_text(
-        json.dumps(
-            [asdict(job) for job in job_links.values()],
+    with open(
+        output_jobs,
+        "w",
+        encoding="utf-8",
+    ) as file:
+        json.dump(
+            jobs_data,
+            file,
             ensure_ascii=False,
             indent=2,
-        ),
-        encoding="utf-8",
-    )
+        )
 
     print(f"Vagas salvas em: {output_jobs}")
 
+    return {
+        "jobs": jobs_data,
+        "output_file": output_jobs,
+    }
 
-# Coordena o fluxo principal: autenticação, conexão com o Gmail, localização da label e leitura do e-mail.
-def main() -> None:
+
+def main(
+    verbose: bool = True,
+) -> dict:
     credentials = authenticate()
 
     service = build(
@@ -166,12 +187,14 @@ def main() -> None:
     )
 
     if not label_id:
-        print("Label JobHunter não encontrada.")
-        return
+        raise RuntimeError(
+            "Label JobHunter não encontrada."
+        )
 
-    collect_jobs(
-        service,
-        label_id,
+    return collect_jobs(
+        service=service,
+        label_id=label_id,
+        verbose=verbose,
     )
 
 

@@ -65,7 +65,9 @@ def build_recommendation(
     }
 
 
-def main() -> None:
+def main(
+    verbose: bool = True,
+) -> list[dict]:
     jobs = load_matched_jobs()
 
     profile = load_candidate_profile(
@@ -114,30 +116,33 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    for recommendation in recommendations:
-        print(recommendation["title"])
-        print(f"Empresa: {recommendation['company']}")
-        print(
-            f"Current fit: "
-            f"{recommendation['current_fit']}"
-        )
-        print(
-            f"Growth value: "
-            f"{recommendation['growth_value']}"
-        )
-        print(
-            f"Recomendação: "
-            f"{recommendation['recommendation']}"
-        )
-        print(
-            recommendation["recommendation_message"]
-        )
-        print("-" * 60)
+    if verbose:
+        for recommendation in recommendations:
+            print(recommendation["title"])
+            print(f"Empresa: {recommendation['company']}")
+            print(
+                f"Current fit: "
+                f"{recommendation['current_fit']}"
+            )
+            print(
+                f"Growth value: "
+                f"{recommendation['growth_value']}"
+            )
+            print(
+                f"Recomendação: "
+                f"{recommendation['recommendation']}"
+            )
+            print(
+                recommendation["recommendation_message"]
+            )
+            print("-" * 60)
 
-    print(
-        f"{len(recommendations)} recomendações salvas em: "
-        f"{RECOMMENDED_JOBS_FILE}"
-    )
+        print(
+            f"{len(recommendations)} recomendações salvas em: "
+            f"{RECOMMENDED_JOBS_FILE}"
+        )
+
+    return recommendations
 
 
 if __name__ == "__main__":
