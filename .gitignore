@@ -13,6 +13,8 @@ __pycache__/
 # PyCharm
 # ==========================
 .idea/
+.pytest_cache/
+__pycache_
 
 # ==========================
 # Environment Variables
@@ -35,3 +37,5 @@ jobs_analyzed.json
 jobs_review.json
 candidate_profile.json
 jobs_recommended.json
+
+
