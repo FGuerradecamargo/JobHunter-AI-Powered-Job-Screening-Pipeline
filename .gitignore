@@ -37,5 +37,6 @@ jobs_analyzed.json
 jobs_review.json
 candidate_profile.json
 jobs_recommended.json
+jobs_ai_recommended.json
 
 
