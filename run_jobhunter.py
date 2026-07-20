@@ -1,9 +1,14 @@
 import argparse
 import sys
+import traceback
+from pathlib import Path
 
+import ai_recommend_jobs
 import analyze_jobs
 import main as collect_jobs
 import recommend_jobs
+
+from services.report_builder import ReportBuilder
 
 
 # =========================
@@ -13,6 +18,8 @@ import recommend_jobs
 DEFAULT_VERBOSE = False
 DEFAULT_FILTER = "relevant"
 DEFAULT_LIMIT = 10
+
+REPORT_FILE = Path("job_report.md")
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -85,9 +92,6 @@ def print_filtered_jobs(
     if limit is not None:
         filtered_jobs = filtered_jobs[:limit]
 
-    if limit is not None:
-        filtered_jobs = filtered_jobs[:limit]
-
     if not filtered_jobs:
         print("\nNenhuma vaga para exibir.")
         return
@@ -98,6 +102,19 @@ def print_filtered_jobs(
 
     for job in filtered_jobs:
         print_job(job)
+
+
+def generate_report(
+    recommendations: list[dict],
+) -> Path:
+    report = ReportBuilder().build(recommendations)
+
+    REPORT_FILE.write_text(
+        report,
+        encoding="utf-8",
+    )
+
+    return REPORT_FILE
 
 
 def print_summary(
@@ -152,10 +169,20 @@ def main() -> None:
             verbose=False,
         )
 
+        ai_recommendations = ai_recommend_jobs.main(
+            verbose=False,
+        )
+
+        report_file = generate_report(
+            recommendations=ai_recommendations,
+        )
+
+        print(f"\nRelatório gerado: {report_file}")
+
         print_summary(
             collection_result=collection_result,
             analysis_result=analysis_result,
-            recommendations=recommendations,
+            recommendations=ai_recommendations,
         )
 
         if args.verbose:
@@ -165,11 +192,17 @@ def main() -> None:
                 limit=args.limit,
             )
 
-    except Exception as error:
+
+    except Exception:
+
         print("\n" + "=" * 60)
+
         print("PIPELINE INTERROMPIDO")
+
         print("=" * 60)
-        print(error)
+
+        traceback.print_exc()
+
         print("=" * 60)
 
         sys.exit(1)
