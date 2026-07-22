@@ -41,6 +41,7 @@ def test_ai_recommendation_service_returns_recommendation():
     )
 
     assert result.job_id == "test-001"
-    assert result.recommendation == "apply"
-    assert result.current_fit == 80
-    assert result.growth_value == 15
+    assert result.recommendation == "recommended_apply"
+    assert result.competitive_status == "competitive_now"
+    assert result.current_fit == 82
+    assert result.growth_value == 78

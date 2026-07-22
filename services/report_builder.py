@@ -1,23 +1,47 @@
 class ReportBuilder:
     RECOMMENDATION_ORDER = [
-        "apply",
-        "consider",
-        "stretch",
+        "recommended_apply",
+        "worth_second_look",
+        "interview_practice_only",
+        "not_competitive_now",
+        "personally_unsuitable",
     ]
 
-    def build(self, recommendations: list[dict]) -> str:
+    RECOMMENDATION_TITLES = {
+        "recommended_apply": "Recommended Applications",
+        "worth_second_look": "Worth a Second Look",
+        "interview_practice_only": "Interview Practice Only",
+        "not_competitive_now": "Not Competitive Now",
+        "personally_unsuitable": "Personally Unsuitable",
+    }
+
+    def build(
+        self,
+        recommendations: list[dict],
+    ) -> str:
         sections = [
-            "# Today's Opportunities",
+            "# JobHunter Decision Report",
             "",
-            f"Generated from {len(recommendations)} AI-reviewed jobs.",
+            (
+                f"Generated from {len(recommendations)} "
+                "AI-reviewed jobs."
+            ),
+            "",
+            (
+                "> This report provides decision-support "
+                "recommendations. It does not guarantee "
+                "candidate suitability, interview selection "
+                "or hiring outcome. The final decision always "
+                "belongs to the candidate."
+            ),
         ]
 
-        grouped_recommendations = self._group_by_recommendation(
+        grouped = self._group_by_recommendation(
             recommendations
         )
 
         for recommendation_name in self.RECOMMENDATION_ORDER:
-            grouped_jobs = grouped_recommendations.get(
+            grouped_jobs = grouped.get(
                 recommendation_name,
                 [],
             )
@@ -25,16 +49,22 @@ class ReportBuilder:
             if not grouped_jobs:
                 continue
 
+            title = self.RECOMMENDATION_TITLES[
+                recommendation_name
+            ]
+
             sections.extend(
                 [
                     "",
-                    f"## {recommendation_name.title()}",
+                    f"## {title}",
                 ]
             )
 
             for recommendation in grouped_jobs:
                 sections.extend(
-                    self._build_job_section(recommendation)
+                    self._build_job_section(
+                        recommendation
+                    )
                 )
 
         return "\n".join(sections).strip() + "\n"
@@ -46,9 +76,9 @@ class ReportBuilder:
         grouped: dict[str, list[dict]] = {}
 
         for recommendation in recommendations:
-            recommendation_name = recommendation["analysis"][
-                "recommendation"
-            ]
+            recommendation_name = recommendation[
+                "analysis"
+            ]["recommendation"]
 
             grouped.setdefault(
                 recommendation_name,
@@ -57,9 +87,48 @@ class ReportBuilder:
 
         return grouped
 
+    @staticmethod
+    def _append_text_section(
+        sections: list[str],
+        title: str,
+        value: str | None,
+    ) -> None:
+        if not value:
+            return
+
+        sections.extend(
+            [
+                "",
+                f"**{title}**",
+                "",
+                value,
+            ]
+        )
+
+    @staticmethod
+    def _append_list_section(
+        sections: list[str],
+        title: str,
+        values: list[str] | None,
+    ) -> None:
+        if not values:
+            return
+
+        sections.extend(
+            [
+                "",
+                f"**{title}**",
+                "",
+                *[
+                    f"- {value}"
+                    for value in values
+                ],
+            ]
+        )
+
     def _build_job_section(
-            self,
-            recommendation: dict,
+        self,
+        recommendation: dict,
     ) -> list[str]:
         job = recommendation["job"]
         analysis = recommendation["analysis"]
@@ -82,6 +151,16 @@ class ReportBuilder:
                 ]
             )
 
+        competitive_status = analysis.get(
+            "competitive_status"
+        )
+
+        if competitive_status:
+            sections.append(
+                "**Competitive status:** "
+                f"{competitive_status}"
+            )
+
         current_fit = analysis.get("current_fit")
 
         if current_fit is not None:
@@ -96,47 +175,87 @@ class ReportBuilder:
                 f"**Growth value:** {growth_value}"
             )
 
-        reason = analysis.get("reason")
+        job_level = analysis.get("job_level")
 
-        if reason:
-            sections.extend(
-                [
-                    "",
-                    "**Why this role**",
-                    "",
-                    reason,
-                ]
+        if job_level:
+            sections.append(
+                f"**Job level:** {job_level}"
             )
 
-        strengths = analysis.get("strengths") or []
+        candidate_level = analysis.get(
+            "candidate_level"
+        )
 
-        if strengths:
-            sections.extend(
-                [
-                    "",
-                    "**Strengths**",
-                    "",
-                    *[
-                        f"- {strength}"
-                        for strength in strengths
-                    ],
-                ]
+        if candidate_level:
+            sections.append(
+                f"**Candidate level:** {candidate_level}"
             )
 
-        gaps = analysis.get("gaps") or []
+        self._append_text_section(
+            sections,
+            "Level assessment",
+            analysis.get("level_assessment"),
+        )
 
-        if gaps:
-            sections.extend(
-                [
-                    "",
-                    "**Gaps**",
-                    "",
-                    *[
-                        f"- {gap}"
-                        for gap in gaps
-                    ],
-                ]
-            )
+        self._append_text_section(
+            sections,
+            "Why you might apply",
+            analysis.get("reason"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Core requirements",
+            analysis.get("core_requirements"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Core requirements you already meet",
+            analysis.get("requirements_met"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Strengths you bring",
+            analysis.get("strengths"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Development gaps",
+            analysis.get("development_gaps"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Structural gaps",
+            analysis.get("structural_gaps"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Positive points for you",
+            analysis.get("positive_points"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Negative points for you",
+            analysis.get("personal_negatives"),
+        )
+
+        self._append_list_section(
+            sections,
+            "Hard conflicts",
+            analysis.get("hard_conflicts"),
+        )
+
+        self._append_text_section(
+            sections,
+            "Final recommendation",
+            analysis.get("final_reason"),
+        )
 
         url = job.get("url")
 
@@ -149,49 +268,3 @@ class ReportBuilder:
             )
 
         return sections
-
-    def test_build_report_groups_jobs_by_recommendation():
-        recommendations = [
-            {
-                "job": {
-                    "title": "Support Engineer",
-                    "company": "Company A",
-                    "location": "Limerick",
-                    "url": "https://example.com/job-a",
-                },
-                "analysis": {
-                    "recommendation": "apply",
-                    "current_fit": 85,
-                    "growth_value": 80,
-                    "reason": "Strong current fit.",
-                    "strengths": ["technical support"],
-                    "gaps": ["cloud"],
-                },
-            },
-            {
-                "job": {
-                    "title": "Cloud Engineer",
-                    "company": "Company B",
-                    "location": "Dublin",
-                    "url": "https://example.com/job-b",
-                },
-                "analysis": {
-                    "recommendation": "stretch",
-                    "current_fit": 60,
-                    "growth_value": 95,
-                    "reason": "High growth opportunity.",
-                    "strengths": ["troubleshooting"],
-                    "gaps": ["cloud infrastructure"],
-                },
-            },
-        ]
-
-        report = ReportBuilder().build(recommendations)
-
-        assert "## Apply" in report
-        assert "## Stretch" in report
-        assert "## Consider" not in report
-
-        assert report.index("## Apply") < report.index("## Stretch")
-        assert "### Support Engineer — Company A" in report
-        assert "### Cloud Engineer — Company B" in report

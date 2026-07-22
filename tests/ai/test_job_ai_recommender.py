@@ -55,5 +55,19 @@ def test_recommends_multiple_jobs():
     assert recommendations[0].job == jobs[0]
     assert recommendations[1].job == jobs[1]
 
-    assert recommendations[0].analysis.recommendation == "apply"
-    assert recommendations[1].analysis.recommendation == "apply"
+    assert (
+            recommendations[0].analysis.recommendation
+            == "recommended_apply"
+    )
+    assert (
+            recommendations[0].analysis.competitive_status
+            == "competitive_now"
+    )
+    assert (
+            recommendations[1].analysis.recommendation
+            == "recommended_apply"
+    )
+    assert (
+            recommendations[1].analysis.competitive_status
+            == "competitive_now"
+    )
