@@ -40,3 +40,8 @@ jobs_recommended.json
 jobs_ai_recommended.json
 
 job_report.md
+
+# ==========================
+# Runtime State
+# ==========================
+data/collector_state.json

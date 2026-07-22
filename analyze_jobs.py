@@ -94,8 +94,6 @@ def main(
 
             enricher.enrich(job)
 
-            enricher.enrich(job)
-
             if job.description is None:
                 failed_count += 1
             else:
