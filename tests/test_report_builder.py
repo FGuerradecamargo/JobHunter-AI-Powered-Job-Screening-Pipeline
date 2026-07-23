@@ -64,18 +64,27 @@ def test_build_report_contains_job_information():
     )
 
     assert "# JobHunter Decision Report" in report
-    assert "Generated from 1 AI-reviewed jobs." in report
+    assert (
+            "1 opportunities matched your competitiveness "
+            "and preferences."
+            in report
+    )
     assert "Technical Support Engineer" in report
     assert "Example Company" in report
     assert "Dublin" in report
     assert "**Current fit:** 80" in report
     assert "**Growth value:** 90" in report
-    assert "**Job level:** Intermediate" in report
-    assert "**Level assessment**" in report
-    assert "**Core requirements**" in report
-    assert "**Development gaps**" in report
-    assert "**Negative points for you**" in report
+
+    assert "**Job level:** Intermediate" not in report
+    assert "**Level assessment**" not in report
+    assert "**Core requirements**" not in report
+
+    assert "**What you already bring**" in report
+    assert "**Main gaps**" in report
+    assert "**Positive points**" in report
+    assert "**Personal tradeoffs**" in report
     assert "**Final recommendation**" in report
+
     assert "https://example.com/job" in report
 
 
@@ -94,13 +103,7 @@ def test_build_report_groups_jobs_by_recommendation():
     )
 
     assert "## Recommended Applications" in report
-    assert "## Not Competitive Now" in report
-
-    assert (
-        report.index("## Recommended Applications")
-        <
-        report.index("## Not Competitive Now")
-    )
+    assert "## Not Competitive Now" not in report
 
 
 def test_build_report_omits_empty_fields():

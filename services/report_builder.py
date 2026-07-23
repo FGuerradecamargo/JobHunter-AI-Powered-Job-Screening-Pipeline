@@ -2,42 +2,63 @@ class ReportBuilder:
     RECOMMENDATION_ORDER = [
         "recommended_apply",
         "worth_second_look",
-        "interview_practice_only",
-        "not_competitive_now",
-        "personally_unsuitable",
     ]
 
     RECOMMENDATION_TITLES = {
         "recommended_apply": "Recommended Applications",
         "worth_second_look": "Worth a Second Look",
-        "interview_practice_only": "Interview Practice Only",
-        "not_competitive_now": "Not Competitive Now",
-        "personally_unsuitable": "Personally Unsuitable",
     }
+
+    @staticmethod
+    def _should_include(
+        recommendation: dict,
+    ) -> bool:
+        analysis = recommendation["analysis"]
+
+        recommendation_name = analysis.get(
+            "recommendation"
+        )
+
+        hard_conflicts = analysis.get(
+            "hard_conflicts"
+        ) or []
+
+        return (
+            recommendation_name
+            in {
+                "recommended_apply",
+                "worth_second_look",
+            }
+            and not hard_conflicts
+        )
 
     def build(
         self,
         recommendations: list[dict],
     ) -> str:
+        visible_recommendations = [
+            recommendation
+            for recommendation in recommendations
+            if self._should_include(recommendation)
+        ]
+
         sections = [
             "# JobHunter Decision Report",
             "",
             (
-                f"Generated from {len(recommendations)} "
-                "AI-reviewed jobs."
+                f"{len(visible_recommendations)} opportunities "
+                "matched your competitiveness and preferences."
             ),
             "",
             (
-                "> This report provides decision-support "
-                "recommendations. It does not guarantee "
-                "candidate suitability, interview selection "
-                "or hiring outcome. The final decision always "
-                "belongs to the candidate."
+                "> This report shows only opportunities worth "
+                "your time based on competitiveness and "
+                "personal constraints."
             ),
         ]
 
         grouped = self._group_by_recommendation(
-            recommendations
+            visible_recommendations
         )
 
         for recommendation_name in self.RECOMMENDATION_ORDER:
@@ -110,6 +131,7 @@ class ReportBuilder:
         sections: list[str],
         title: str,
         values: list[str] | None,
+        limit: int = 4,
     ) -> None:
         if not values:
             return
@@ -121,7 +143,7 @@ class ReportBuilder:
                 "",
                 *[
                     f"- {value}"
-                    for value in values
+                    for value in values[:limit]
                 ],
             ]
         )
@@ -162,93 +184,60 @@ class ReportBuilder:
             )
 
         current_fit = analysis.get("current_fit")
+        growth_value = analysis.get("growth_value")
 
         if current_fit is not None:
             sections.append(
                 f"**Current fit:** {current_fit}"
             )
 
-        growth_value = analysis.get("growth_value")
-
         if growth_value is not None:
             sections.append(
                 f"**Growth value:** {growth_value}"
             )
 
-        job_level = analysis.get("job_level")
-
-        if job_level:
-            sections.append(
-                f"**Job level:** {job_level}"
-            )
-
-        candidate_level = analysis.get(
-            "candidate_level"
-        )
-
-        if candidate_level:
-            sections.append(
-                f"**Candidate level:** {candidate_level}"
-            )
-
         self._append_text_section(
             sections,
-            "Level assessment",
-            analysis.get("level_assessment"),
-        )
-
-        self._append_text_section(
-            sections,
-            "Why you might apply",
+            "Why this role is worth considering",
             analysis.get("reason"),
         )
 
-        self._append_list_section(
-            sections,
-            "Core requirements",
-            analysis.get("core_requirements"),
+        strengths = (
+            analysis.get("requirements_met", [])
+            + analysis.get("strengths", [])
         )
 
         self._append_list_section(
             sections,
-            "Core requirements you already meet",
-            analysis.get("requirements_met"),
+            "What you already bring",
+            strengths,
+            limit=4,
+        )
+
+        gaps = (
+            analysis.get("development_gaps", [])
+            + analysis.get("structural_gaps", [])
         )
 
         self._append_list_section(
             sections,
-            "Strengths you bring",
-            analysis.get("strengths"),
+            "Main gaps",
+            gaps,
+            limit=4,
         )
 
         self._append_list_section(
             sections,
-            "Development gaps",
-            analysis.get("development_gaps"),
-        )
-
-        self._append_list_section(
-            sections,
-            "Structural gaps",
-            analysis.get("structural_gaps"),
-        )
-
-        self._append_list_section(
-            sections,
-            "Positive points for you",
+            "Positive points",
             analysis.get("positive_points"),
+            limit=4,
         )
 
         self._append_list_section(
             sections,
-            "Negative points for you",
+            "Personal tradeoffs",
             analysis.get("personal_negatives"),
-        )
-
-        self._append_list_section(
-            sections,
-            "Hard conflicts",
-            analysis.get("hard_conflicts"),
+            limit=4,
         )
 
         self._append_text_section(

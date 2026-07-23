@@ -1,58 +1,54 @@
+import json
+
 from models.candidate_profile import CandidateProfile
 from models.job import Job
-from services.ai.ai_recommendation_service import AIRecommendationService
+from services.ai.ai_recommendation_service import (
+    AIRecommendationService,
+)
 from services.ai.openai_client import OpenAIClient
 
 
-candidate_profile = CandidateProfile(
-    current_roles=[
-        "Technical Support Engineer",
-    ],
-    bridge_roles=[
-        "Technical Operations Analyst",
-    ],
-    target_roles=[
-        "Technical Investigations Specialist",
-    ],
-    current_skills=[
-        "Python",
-        "Linux",
-        "Technical Support",
-        "Troubleshooting",
-    ],
-    growth_skills=[
-        "Cloud Infrastructure",
-        "SQL",
-        "Workflow Automation",
-    ],
-)
+def main() -> None:
+    with open(
+        "candidate_profile.json",
+        "r",
+        encoding="utf-8",
+    ) as file:
+        profile_data = json.load(file)
 
-job = Job(
-    id="manual-test-001",
-    raw_text="Technical Operations Analyst at Example Company",
-    url="https://example.com/job",
-    title="Technical Operations Analyst",
-    company="Example Company",
-    location="Dublin",
-    remote=False,
-    salary=None,
-    easy_apply=False,
-    score=None,
-)
+    candidate_profile = CandidateProfile(
+        **profile_data
+    )
 
-job.description = """
-Investigate technical incidents, troubleshoot customer issues,
-analyze logs, work with Linux systems, SQL and internal APIs,
-and collaborate with engineering teams.
-""".strip()
+    job = Job(
+        id="manual-test",
+        raw_text="Manual test",
+        url="https://example.com",
+        title="Technical Support Engineer",
+        company="Example Company",
+        location="Ireland",
+        remote=True,
+        salary=None,
+        easy_apply=False,
+        score=None,
+    )
 
-service = AIRecommendationService(
-    llm_client=OpenAIClient(),
-)
+    job.description = """
+    Technical support, troubleshooting,
+    APIs, logs and customer escalations.
+    """.strip()
 
-result = service.analyze(
-    job=job,
-    candidate_profile=candidate_profile,
-)
+    service = AIRecommendationService(
+        llm_client=OpenAIClient(),
+    )
 
-print(result)
+    result = service.analyze(
+        job=job,
+        candidate_profile=candidate_profile,
+    )
+
+    print(result)
+
+
+if __name__ == "__main__":
+    main()
