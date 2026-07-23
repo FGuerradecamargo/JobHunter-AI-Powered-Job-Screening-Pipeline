@@ -73,6 +73,27 @@ def select_recommended_jobs(
         if job.id in recommended_ids
     ]
 
+def deduplicate_jobs(
+    jobs: list[Job],
+) -> list[Job]:
+    unique_jobs: list[Job] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+
+    for job in jobs:
+        key = (
+            (job.title or "").strip().lower(),
+            (job.company or "").strip().lower(),
+            (job.location or "").strip().lower(),
+        )
+
+        if key in seen_keys:
+            continue
+
+        seen_keys.add(key)
+        unique_jobs.append(job)
+
+    return unique_jobs
+
 
 def load_ai_cache() -> list[dict]:
     if not AI_RECOMMENDED_JOBS_FILE.exists():
@@ -167,6 +188,10 @@ def main(
     selected_jobs = select_recommended_jobs(
         jobs,
         recommended_ids,
+    )
+
+    selected_jobs = deduplicate_jobs(
+        selected_jobs
     )
 
     profile = load_candidate_profile(

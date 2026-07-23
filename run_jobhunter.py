@@ -122,7 +122,6 @@ def print_summary(
     analysis_result: dict,
     recommendations: list[dict],
 ) -> None:
-
     total_collected = len(collection_result["jobs"])
     total_analyzed = len(analysis_result["jobs"])
     total_relevant = len(analysis_result["relevant_jobs"])
@@ -134,16 +133,22 @@ def print_summary(
         - total_review
     )
 
+    total_hard_rejected = analysis_result.get(
+        "hard_rejected_jobs",
+        0,
+    )
+
     print("\n" + "=" * 60)
     print("JOBHUNTER — RESUMO FINAL")
     print("=" * 60)
 
-    print(f"Vagas coletadas:       {total_collected}")
-    print(f"Vagas analisadas:      {total_analyzed}")
-    print(f"Vagas relevantes:      {total_relevant}")
-    print(f"Vagas para revisão:    {total_review}")
-    print(f"Vagas não relevantes:  {total_not_relevant}")
-    print(f"Recomendações geradas: {len(recommendations)}")
+    print(f"Vagas coletadas:        {total_collected}")
+    print(f"Vagas analisadas:       {total_analyzed}")
+    print(f"Vagas relevantes:       {total_relevant}")
+    print(f"Vagas para revisão:     {total_review}")
+    print(f"Vagas não relevantes:   {total_not_relevant}")
+    print(f"Eliminadas antes da IA: {total_hard_rejected}")
+    print(f"Recomendações geradas:  {len(recommendations)}")
 
     print("=" * 60)
 
@@ -191,7 +196,6 @@ def main() -> None:
                 filter_by=args.filter,
                 limit=args.limit,
             )
-
 
     except Exception:
 

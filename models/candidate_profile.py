@@ -20,3 +20,7 @@ class CandidateProfile:
 
     relocation_policy: str = ""
     salary_policy: str = ""
+
+    spoken_languages: list[str] = field(
+        default_factory=list
+    )

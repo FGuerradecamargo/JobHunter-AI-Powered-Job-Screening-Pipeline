@@ -7,6 +7,13 @@ from models.job import Job
 from services.job_enricher import JobEnricher
 from services.job_matcher import JobMatcher
 
+from services.analyzers.hard_filter_analyzer import (
+    HardFilterAnalyzer,
+)
+from services.candidate_profile_loader import (
+    load_candidate_profile,
+)
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -16,6 +23,10 @@ MATCHED_JOBS_FILE = BASE_DIR / "jobs_matched.json"
 REVIEW_JOBS_FILE = BASE_DIR / "jobs_review.json"
 
 REQUEST_DELAY_SECONDS = 2
+
+CANDIDATE_PROFILE_FILE = (
+    BASE_DIR / "candidate_profile.json"
+)
 
 
 def load_jobs() -> list[Job]:
@@ -70,6 +81,14 @@ def main(
     matcher = JobMatcher()
     enricher = JobEnricher()
 
+    profile = load_candidate_profile(
+        CANDIDATE_PROFILE_FILE
+    )
+
+    hard_filter = HardFilterAnalyzer(
+        profile
+    )
+
     jobs = load_jobs()
     cached_descriptions = load_cached_descriptions()
 
@@ -79,13 +98,14 @@ def main(
     fetched_count = 0
     failed_count = 0
 
+    hard_rejected_count = 0
+
     for job in jobs:
         cached_description = cached_descriptions.get(job.id)
 
         if cached_description:
             job.description = cached_description
             cached_count += 1
-
 
         else:
 
@@ -101,11 +121,26 @@ def main(
 
             time.sleep(REQUEST_DELAY_SECONDS)
 
-        analysis = matcher.analyze(job)
+        hard_filter_result = hard_filter.analyze(job)
 
-        job.score = analysis["score"]
-        job.reasons = analysis["reasons"]
-        job.classification = matcher.classify(job)
+        if hard_filter_result["rejected"]:
+            hard_rejected_count += 1
+
+            analysis = {
+                "score": -100,
+                "reasons": hard_filter_result["reasons"],
+            }
+
+            job.score = -100
+            job.reasons = hard_filter_result["reasons"]
+            job.classification = matcher.NOT_RELEVANT
+
+        else:
+            analysis = matcher.analyze(job)
+
+            job.score = analysis["score"]
+            job.reasons = analysis["reasons"]
+            job.classification = matcher.classify(job)
 
         analyses[job.id] = analysis
 
@@ -164,6 +199,11 @@ def main(
             f"{REVIEW_JOBS_FILE}"
         )
 
+        print(
+            f"Vagas eliminadas antes da IA: "
+            f"{hard_rejected_count}"
+        )
+
     return {
         "jobs": sorted_jobs,
         "relevant_jobs": relevant_jobs,
@@ -171,6 +211,7 @@ def main(
         "cached_descriptions": cached_count,
         "fetched_descriptions": fetched_count,
         "failed_descriptions": failed_count,
+        "hard_rejected_jobs": hard_rejected_count,
     }
 
 
