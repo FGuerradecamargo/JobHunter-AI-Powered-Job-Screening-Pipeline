@@ -1,17 +1,19 @@
 import streamlit as st
 
+from services.candidate_repository import CandidateRepository
 from services.database import (
-    count_jobs_by_status,
+    count_candidate_jobs_by_status,
     initialize_database,
-    list_jobs,
-    update_job_notes,
-    update_job_status,
+    list_candidate_jobs,
+    update_candidate_job_notes,
+    update_candidate_job_status,
 )
 
 
 STATUS_LABELS = {
     "in_review": "In review",
     "applied": "Applied",
+    "in_process": "In process",
     "rejected": "Rejected",
 }
 
@@ -44,10 +46,12 @@ def render_text_section(
 
 
 def change_status(
+    candidate_id: str,
     job_id: str,
     new_status: str,
 ) -> None:
-    update_job_status(
+    update_candidate_job_status(
+        candidate_id=candidate_id,
         job_id=job_id,
         status=new_status,
     )
@@ -56,10 +60,12 @@ def change_status(
 
 
 def save_notes(
+    candidate_id: str,
     job_id: str,
     notes: str,
 ) -> None:
-    update_job_notes(
+    update_candidate_job_notes(
+        candidate_id=candidate_id,
         job_id=job_id,
         notes=notes,
     )
@@ -68,21 +74,23 @@ def save_notes(
 
 
 def render_status_buttons(
+    candidate_id: str,
     job_id: str,
     current_status: str,
 ) -> None:
     st.subheader("Application status")
 
-    columns = st.columns(3)
+    columns = st.columns(4)
 
     with columns[0]:
         if current_status != "in_review":
             if st.button(
                 "Move to In review",
-                key=f"in_review_{job_id}",
+                key=f"in_review_{candidate_id}_{job_id}",
                 use_container_width=True,
             ):
                 change_status(
+                    candidate_id,
                     job_id,
                     "in_review",
                 )
@@ -91,29 +99,45 @@ def render_status_buttons(
         if current_status != "applied":
             if st.button(
                 "Mark as Applied",
-                key=f"applied_{job_id}",
-                type="primary",
+                key=f"applied_{candidate_id}_{job_id}",
                 use_container_width=True,
             ):
                 change_status(
+                    candidate_id,
                     job_id,
                     "applied",
                 )
 
     with columns[2]:
-        if current_status != "rejected":
+        if current_status != "in_process":
             if st.button(
-                "Mark as Rejected",
-                key=f"rejected_{job_id}",
+                "Move to In process",
+                key=f"in_process_{candidate_id}_{job_id}",
+                type="primary",
                 use_container_width=True,
             ):
                 change_status(
+                    candidate_id,
+                    job_id,
+                    "in_process",
+                )
+
+    with columns[3]:
+        if current_status != "rejected":
+            if st.button(
+                "Mark as Rejected",
+                key=f"rejected_{candidate_id}_{job_id}",
+                use_container_width=True,
+            ):
+                change_status(
+                    candidate_id,
                     job_id,
                     "rejected",
                 )
 
 
 def render_job(
+    candidate_id: str,
     item: dict,
 ) -> None:
     analysis = item.get(
@@ -285,6 +309,7 @@ def render_job(
         st.divider()
 
         render_status_buttons(
+            candidate_id=candidate_id,
             job_id=job_id,
             current_status=status,
         )
@@ -294,7 +319,7 @@ def render_job(
         notes_value = st.text_area(
             "Personal notes",
             value=notes,
-            key=f"notes_{job_id}",
+            key=f"notes_{candidate_id}_{job_id}",
             label_visibility="collapsed",
             placeholder=(
                 "Add salary information, interview notes, "
@@ -319,9 +344,13 @@ def render_job(
 
 
 def render_job_section(
+    candidate_id: str,
     status: str,
 ) -> None:
-    jobs = list_jobs(status)
+    jobs = list_candidate_jobs(
+        candidate_id,
+        status,
+    )
 
     if not jobs:
         st.info(
@@ -331,7 +360,10 @@ def render_job_section(
         return
 
     for item in jobs:
-        render_job(item)
+        render_job(
+            candidate_id,
+            item,
+        )
 
 
 def main() -> None:
@@ -343,15 +375,40 @@ def main() -> None:
 
     initialize_database()
 
+    candidate_repository = CandidateRepository()
+    candidates = candidate_repository.list_all()
+
+    if not candidates:
+        st.warning(
+            "No candidates were found in the database."
+        )
+        return
+
     st.title("JobHunter")
 
     st.caption(
         "Review opportunities and track your applications."
     )
 
-    counts = count_jobs_by_status()
+    candidate_options = {
+        candidate.name: candidate.id
+        for candidate in candidates
+    }
 
-    summary_columns = st.columns(4)
+    selected_candidate_name = st.selectbox(
+        "Candidate",
+        options=list(candidate_options.keys()),
+    )
+
+    selected_candidate_id = candidate_options[
+        selected_candidate_name
+    ]
+
+    counts = count_candidate_jobs_by_status(
+        selected_candidate_id
+    )
+
+    summary_columns = st.columns(5)
 
     summary_columns[0].metric(
         "Total tracked",
@@ -369,31 +426,58 @@ def main() -> None:
     )
 
     summary_columns[3].metric(
+        "In process",
+        counts["in_process"],
+    )
+
+    summary_columns[4].metric(
         "Rejected",
         counts["rejected"],
     )
 
     st.divider()
 
-    review_tab, applied_tab, rejected_tab = st.tabs(
+    (
+        review_tab,
+        applied_tab,
+        process_tab,
+        rejected_tab,
+    ) = st.tabs(
         [
             f"In review ({counts['in_review']})",
             f"Applied ({counts['applied']})",
+            f"In process ({counts['in_process']})",
             f"Rejected ({counts['rejected']})",
         ]
     )
 
     with review_tab:
         st.subheader("Jobs waiting for your decision")
-        render_job_section("in_review")
+        render_job_section(
+            selected_candidate_id,
+            "in_review",
+        )
 
     with applied_tab:
         st.subheader("Applications in progress")
-        render_job_section("applied")
+        render_job_section(
+            selected_candidate_id,
+            "applied",
+        )
 
     with rejected_tab:
         st.subheader("Rejected or discarded opportunities")
-        render_job_section("rejected")
+        render_job_section(
+            selected_candidate_id,
+            "rejected",
+        )
+
+    with process_tab:
+        st.subheader("Applications currently in process")
+        render_job_section(
+            selected_candidate_id,
+            "in_process",
+        )
 
 
 if __name__ == "__main__":

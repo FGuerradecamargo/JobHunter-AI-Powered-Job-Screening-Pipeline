@@ -10,6 +10,7 @@ DATABASE_FILE = Path("data/jobhunter.db")
 VALID_STATUSES = {
     "in_review",
     "applied",
+    "in_process",
     "rejected",
 }
 
@@ -450,6 +451,7 @@ def count_candidate_jobs_by_status(
     counts = {
         "in_review": 0,
         "applied": 0,
+        "in_process": 0,
         "rejected": 0,
     }
 
