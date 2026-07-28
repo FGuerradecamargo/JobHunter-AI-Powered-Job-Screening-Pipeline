@@ -32,6 +32,10 @@ def get_connection() -> sqlite3.Connection:
 
     connection.row_factory = sqlite3.Row
 
+    connection.execute(
+        "PRAGMA foreign_keys = ON"
+    )
+
     return connection
 
 
@@ -39,38 +43,95 @@ def initialize_database() -> None:
     with get_connection() as connection:
         connection.execute(
             """
-            CREATE TABLE IF NOT EXISTS jobs (
+            CREATE TABLE IF NOT EXISTS candidates (
                 id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                company TEXT,
-                location TEXT,
-                url TEXT,
-                status TEXT NOT NULL DEFAULT 'in_review',
-                recommendation TEXT,
-                competitive_status TEXT,
-                current_fit INTEGER,
-                growth_value INTEGER,
-                analysis_json TEXT NOT NULL,
-                notes TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL,
+                current_role TEXT NOT NULL,
+                current_level TEXT NOT NULL,
+                professional_summary TEXT NOT NULL,
+                target_roles_json TEXT NOT NULL,
+                spoken_languages_json TEXT NOT NULL,
+                skills_json TEXT NOT NULL,
+                strengths_json TEXT NOT NULL,
+                development_areas_json TEXT NOT NULL,
+                preferences_json TEXT NOT NULL,
+                constraints_json TEXT NOT NULL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                applied_at TEXT,
-                rejected_at TEXT
+                updated_at TEXT NOT NULL
             )
             """
         )
 
         connection.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_jobs_status
-            ON jobs(status)
+            CREATE TABLE IF NOT EXISTS candidate_job_analyses (
+                candidate_id TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+                recommendation TEXT,
+                competitive_status TEXT,
+                current_fit INTEGER,
+                growth_value INTEGER,
+                analysis_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'in_review',
+                notes TEXT NOT NULL DEFAULT '',
+                job_signature TEXT,
+                candidate_signature TEXT,
+                analysis_version TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                applied_at TEXT,
+                rejected_at TEXT,
+
+                PRIMARY KEY (
+                    candidate_id,
+                    job_id
+                ),
+
+                FOREIGN KEY (
+                    candidate_id
+                )
+                REFERENCES candidates(id)
+                ON DELETE CASCADE,
+
+                FOREIGN KEY (
+                    job_id
+                )
+                REFERENCES jobs(id)
+                ON DELETE CASCADE
+            )
             """
         )
 
         connection.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_jobs_company
-            ON jobs(company)
+            CREATE INDEX IF NOT EXISTS
+            idx_candidate_job_status
+            ON candidate_job_analyses(
+                candidate_id,
+                status
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_candidate_job_fit
+            ON candidate_job_analyses(
+                candidate_id,
+                current_fit
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_candidate_job_growth
+            ON candidate_job_analyses(
+                candidate_id,
+                growth_value
+            )
             """
         )
 
@@ -313,6 +374,191 @@ def update_job_notes(
             (
                 notes,
                 utc_now(),
+                job_id,
+            ),
+        )
+
+
+def list_candidate_jobs(
+    candidate_id: str,
+    status: str,
+) -> list[dict[str, Any]]:
+    if status not in VALID_STATUSES:
+        raise ValueError(
+            f"Invalid status: {status}"
+        )
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                jobs.id,
+                jobs.title,
+                jobs.company,
+                jobs.location,
+                jobs.url,
+
+                candidate_job_analyses.status,
+                candidate_job_analyses.notes,
+                candidate_job_analyses.recommendation,
+                candidate_job_analyses.competitive_status,
+                candidate_job_analyses.current_fit,
+                candidate_job_analyses.growth_value,
+                candidate_job_analyses.analysis_json,
+                candidate_job_analyses.created_at,
+                candidate_job_analyses.updated_at,
+                candidate_job_analyses.applied_at,
+                candidate_job_analyses.rejected_at
+
+            FROM candidate_job_analyses
+
+            INNER JOIN jobs
+                ON jobs.id = candidate_job_analyses.job_id
+
+            WHERE
+                candidate_job_analyses.candidate_id = ?
+                AND candidate_job_analyses.status = ?
+
+            ORDER BY
+                candidate_job_analyses.growth_value DESC,
+                candidate_job_analyses.current_fit DESC,
+                candidate_job_analyses.created_at DESC
+            """,
+            (
+                candidate_id,
+                status,
+            ),
+        ).fetchall()
+
+    results: list[dict[str, Any]] = []
+
+    for row in rows:
+        item = dict(row)
+
+        item["analysis"] = json.loads(
+            item.pop("analysis_json")
+        )
+
+        results.append(item)
+
+    return results
+
+
+def count_candidate_jobs_by_status(
+    candidate_id: str,
+) -> dict[str, int]:
+    counts = {
+        "in_review": 0,
+        "applied": 0,
+        "rejected": 0,
+    }
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                status,
+                COUNT(*) AS total
+
+            FROM candidate_job_analyses
+
+            WHERE candidate_id = ?
+
+            GROUP BY status
+            """,
+            (candidate_id,),
+        ).fetchall()
+
+    for row in rows:
+        counts[row["status"]] = row["total"]
+
+    return counts
+
+
+def update_candidate_job_status(
+    candidate_id: str,
+    job_id: str,
+    status: str,
+) -> None:
+    if status not in VALID_STATUSES:
+        raise ValueError(
+            f"Invalid status: {status}"
+        )
+
+    now = utc_now()
+
+    applied_at = (
+        now
+        if status == "applied"
+        else None
+    )
+
+    rejected_at = (
+        now
+        if status == "rejected"
+        else None
+    )
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE candidate_job_analyses
+
+            SET
+                status = ?,
+                updated_at = ?,
+
+                applied_at = CASE
+                    WHEN ? IS NOT NULL
+                    THEN ?
+                    ELSE applied_at
+                END,
+
+                rejected_at = CASE
+                    WHEN ? IS NOT NULL
+                    THEN ?
+                    ELSE rejected_at
+                END
+
+            WHERE
+                candidate_id = ?
+                AND job_id = ?
+            """,
+            (
+                status,
+                now,
+                applied_at,
+                applied_at,
+                rejected_at,
+                rejected_at,
+                candidate_id,
+                job_id,
+            ),
+        )
+
+
+def update_candidate_job_notes(
+    candidate_id: str,
+    job_id: str,
+    notes: str,
+) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE candidate_job_analyses
+
+            SET
+                notes = ?,
+                updated_at = ?
+
+            WHERE
+                candidate_id = ?
+                AND job_id = ?
+            """,
+            (
+                notes,
+                utc_now(),
+                candidate_id,
                 job_id,
             ),
         )

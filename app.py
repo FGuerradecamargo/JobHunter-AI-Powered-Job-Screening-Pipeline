@@ -1,60 +1,19 @@
-import json
-from pathlib import Path
-from typing import Any
-
 import streamlit as st
 
+from services.database import (
+    count_jobs_by_status,
+    initialize_database,
+    list_jobs,
+    update_job_notes,
+    update_job_status,
+)
 
-AI_RECOMMENDATIONS_FILE = Path("jobs_ai_recommended.json")
 
-VISIBLE_RECOMMENDATIONS = {
-    "recommended_apply",
-    "worth_second_look",
+STATUS_LABELS = {
+    "in_review": "In review",
+    "applied": "Applied",
+    "rejected": "Rejected",
 }
-
-
-def load_recommendations() -> list[dict[str, Any]]:
-    if not AI_RECOMMENDATIONS_FILE.exists():
-        return []
-
-    try:
-        content = AI_RECOMMENDATIONS_FILE.read_text(
-            encoding="utf-8"
-        )
-        data = json.loads(content)
-    except (OSError, json.JSONDecodeError):
-        return []
-
-    if not isinstance(data, list):
-        return []
-
-    return data
-
-
-def get_visible_recommendations(
-    recommendations: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    visible: list[dict[str, Any]] = []
-
-    for item in recommendations:
-        analysis = item.get("analysis", {})
-
-        recommendation = analysis.get(
-            "recommendation"
-        )
-
-        hard_conflicts = analysis.get(
-            "hard_conflicts",
-            [],
-        )
-
-        if (
-            recommendation in VISIBLE_RECOMMENDATIONS
-            and not hard_conflicts
-        ):
-            visible.append(item)
-
-    return visible
 
 
 def render_list(
@@ -84,40 +43,116 @@ def render_text_section(
         st.caption(empty_message)
 
 
-def render_job(
-    item: dict[str, Any],
+def change_status(
+    job_id: str,
+    new_status: str,
 ) -> None:
-    job = item.get("job", {})
-    analysis = item.get("analysis", {})
+    update_job_status(
+        job_id=job_id,
+        status=new_status,
+    )
 
-    title = job.get(
+    st.rerun()
+
+
+def save_notes(
+    job_id: str,
+    notes: str,
+) -> None:
+    update_job_notes(
+        job_id=job_id,
+        notes=notes,
+    )
+
+    st.toast("Notes saved.")
+
+
+def render_status_buttons(
+    job_id: str,
+    current_status: str,
+) -> None:
+    st.subheader("Application status")
+
+    columns = st.columns(3)
+
+    with columns[0]:
+        if current_status != "in_review":
+            if st.button(
+                "Move to In review",
+                key=f"in_review_{job_id}",
+                use_container_width=True,
+            ):
+                change_status(
+                    job_id,
+                    "in_review",
+                )
+
+    with columns[1]:
+        if current_status != "applied":
+            if st.button(
+                "Mark as Applied",
+                key=f"applied_{job_id}",
+                type="primary",
+                use_container_width=True,
+            ):
+                change_status(
+                    job_id,
+                    "applied",
+                )
+
+    with columns[2]:
+        if current_status != "rejected":
+            if st.button(
+                "Mark as Rejected",
+                key=f"rejected_{job_id}",
+                use_container_width=True,
+            ):
+                change_status(
+                    job_id,
+                    "rejected",
+                )
+
+
+def render_job(
+    item: dict,
+) -> None:
+    analysis = item.get(
+        "analysis",
+        {},
+    )
+
+    job_id = str(item["id"])
+    title = item.get(
         "title",
         "Untitled role",
     )
-
-    company = job.get(
+    company = item.get(
         "company",
         "Unknown company",
     )
-
-    location = job.get(
+    location = item.get(
         "location",
         "Location unavailable",
     )
+    url = item.get("url")
+    status = item.get(
+        "status",
+        "in_review",
+    )
+    notes = item.get(
+        "notes",
+        "",
+    )
 
-    url = job.get("url")
-
-    current_fit = analysis.get(
+    current_fit = item.get(
         "current_fit",
         "-",
     )
-
-    growth_value = analysis.get(
+    growth_value = item.get(
         "growth_value",
         "-",
     )
-
-    recommendation = analysis.get(
+    recommendation = item.get(
         "recommendation",
         "unknown",
     )
@@ -168,7 +203,7 @@ def render_job(
         label,
         expanded=False,
     ):
-        metric_columns = st.columns(3)
+        metric_columns = st.columns(4)
 
         metric_columns[0].metric(
             "Current fit",
@@ -185,6 +220,14 @@ def render_job(
             recommendation
             .replace("_", " ")
             .title(),
+        )
+
+        metric_columns[3].metric(
+            "Status",
+            STATUS_LABELS.get(
+                status,
+                status,
+            ),
         )
 
         st.write(
@@ -239,11 +282,56 @@ def render_job(
                 "No final recommendation available.",
             )
 
+        st.divider()
+
+        render_status_buttons(
+            job_id=job_id,
+            current_status=status,
+        )
+
+        st.subheader("Notes")
+
+        notes_value = st.text_area(
+            "Personal notes",
+            value=notes,
+            key=f"notes_{job_id}",
+            label_visibility="collapsed",
+            placeholder=(
+                "Add salary information, interview notes, "
+                "recruiter feedback, or reasons for your decision."
+            ),
+        )
+
+        if st.button(
+            "Save notes",
+            key=f"save_notes_{job_id}",
+        ):
+            save_notes(
+                job_id=job_id,
+                notes=notes_value,
+            )
+
         if url:
             st.link_button(
                 "Open job",
                 url,
             )
+
+
+def render_job_section(
+    status: str,
+) -> None:
+    jobs = list_jobs(status)
+
+    if not jobs:
+        st.info(
+            f"No jobs currently marked as "
+            f"{STATUS_LABELS[status]}."
+        )
+        return
+
+    for item in jobs:
+        render_job(item)
 
 
 def main() -> None:
@@ -253,62 +341,59 @@ def main() -> None:
         layout="wide",
     )
 
+    initialize_database()
+
     st.title("JobHunter")
 
     st.caption(
-        "Technical opportunities matched to your "
-        "profile and preferences."
+        "Review opportunities and track your applications."
     )
 
-    recommendations = load_recommendations()
+    counts = count_jobs_by_status()
 
-    visible_jobs = get_visible_recommendations(
-        recommendations
-    )
-
-    discarded_count = (
-        len(recommendations)
-        - len(visible_jobs)
-    )
-
-    summary_columns = st.columns(3)
+    summary_columns = st.columns(4)
 
     summary_columns[0].metric(
-        "AI analyses",
-        len(recommendations),
+        "Total tracked",
+        sum(counts.values()),
     )
 
     summary_columns[1].metric(
-        "Worth reviewing",
-        len(visible_jobs),
+        "In review",
+        counts["in_review"],
     )
 
     summary_columns[2].metric(
-        "Discarded by decision layer",
-        discarded_count,
+        "Applied",
+        counts["applied"],
+    )
+
+    summary_columns[3].metric(
+        "Rejected",
+        counts["rejected"],
     )
 
     st.divider()
 
-    if not recommendations:
-        st.warning(
-            "No AI recommendations were found."
-        )
-        return
-
-    if not visible_jobs:
-        st.info(
-            "No opportunities currently match your "
-            "competitiveness and preferences."
-        )
-        return
-
-    st.subheader(
-        "Opportunities worth reviewing"
+    review_tab, applied_tab, rejected_tab = st.tabs(
+        [
+            f"In review ({counts['in_review']})",
+            f"Applied ({counts['applied']})",
+            f"Rejected ({counts['rejected']})",
+        ]
     )
 
-    for item in visible_jobs:
-        render_job(item)
+    with review_tab:
+        st.subheader("Jobs waiting for your decision")
+        render_job_section("in_review")
+
+    with applied_tab:
+        st.subheader("Applications in progress")
+        render_job_section("applied")
+
+    with rejected_tab:
+        st.subheader("Rejected or discarded opportunities")
+        render_job_section("rejected")
 
 
 if __name__ == "__main__":

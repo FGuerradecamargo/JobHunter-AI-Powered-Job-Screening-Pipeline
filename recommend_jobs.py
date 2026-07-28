@@ -5,8 +5,11 @@ from models.job import Job
 from services.analyzers.candidate_fit_analyzer import (
     CandidateFitAnalyzer,
 )
-from services.candidate_profile_loader import (
-    load_candidate_profile,
+from services.candidate_adapter import (
+    candidate_to_profile,
+)
+from services.candidate_repository import (
+    CandidateRepository,
 )
 from services.recommenders.recommendation_engine import (
     RecommendationEngine,
@@ -16,7 +19,6 @@ from services.recommenders.recommendation_engine import (
 BASE_DIR = Path(__file__).resolve().parent
 
 MATCHED_JOBS_FILE = BASE_DIR / "jobs_matched.json"
-CANDIDATE_PROFILE_FILE = BASE_DIR / "candidate_profile.json"
 RECOMMENDED_JOBS_FILE = BASE_DIR / "jobs_recommended.json"
 
 
@@ -70,8 +72,20 @@ def main(
 ) -> list[dict]:
     jobs = load_matched_jobs()
 
-    profile = load_candidate_profile(
-        CANDIDATE_PROFILE_FILE
+    candidate_repository = CandidateRepository()
+
+    candidate = candidate_repository.get(
+        "felipe"
+    )
+
+    if candidate is None:
+        raise RuntimeError(
+            "Candidate 'felipe' was not found in "
+            "data/candidates."
+        )
+
+    profile = candidate_to_profile(
+        candidate
     )
 
     fit_analyzer = CandidateFitAnalyzer()

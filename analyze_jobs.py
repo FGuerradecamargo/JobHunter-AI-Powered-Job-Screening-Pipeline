@@ -10,8 +10,11 @@ from services.job_matcher import JobMatcher
 from services.analyzers.hard_filter_analyzer import (
     HardFilterAnalyzer,
 )
-from services.candidate_profile_loader import (
-    load_candidate_profile,
+from services.candidate_adapter import (
+    candidate_to_profile,
+)
+from services.candidate_repository import (
+    CandidateRepository,
 )
 
 
@@ -23,10 +26,6 @@ MATCHED_JOBS_FILE = BASE_DIR / "jobs_matched.json"
 REVIEW_JOBS_FILE = BASE_DIR / "jobs_review.json"
 
 REQUEST_DELAY_SECONDS = 2
-
-CANDIDATE_PROFILE_FILE = (
-    BASE_DIR / "candidate_profile.json"
-)
 
 
 def load_jobs() -> list[Job]:
@@ -81,8 +80,20 @@ def main(
     matcher = JobMatcher()
     enricher = JobEnricher()
 
-    profile = load_candidate_profile(
-        CANDIDATE_PROFILE_FILE
+    candidate_repository = CandidateRepository()
+
+    candidate = candidate_repository.get(
+        "felipe"
+    )
+
+    if candidate is None:
+        raise RuntimeError(
+            "Candidate 'felipe' was not found in "
+            "data/candidates."
+        )
+
+    profile = candidate_to_profile(
+        candidate
     )
 
     hard_filter = HardFilterAnalyzer(

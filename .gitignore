@@ -45,3 +45,6 @@ job_report.md
 # Runtime State
 # ==========================
 data/collector_state.json
+
+
+data/jobhunter.db
