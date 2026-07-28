@@ -4,6 +4,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 DATABASE_FILE = Path("data/jobhunter.db")
 
@@ -105,11 +109,104 @@ def initialize_database() -> None:
 
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                candidate_id TEXT UNIQUE,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE SET NULL
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS gmail_connections (
+                user_id TEXT PRIMARY KEY,
+                gmail_address TEXT NOT NULL UNIQUE,
+                encrypted_refresh_token TEXT NOT NULL,
+                access_token TEXT,
+                token_expiry TEXT,
+                scopes_json TEXT NOT NULL,
+                last_history_id TEXT,
+                last_sync_at TEXT,
+                connection_status TEXT NOT NULL DEFAULT 'connected',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS gmail_messages (
+                user_id TEXT NOT NULL,
+                gmail_message_id TEXT NOT NULL,
+                gmail_thread_id TEXT,
+                received_at TEXT,
+                processed_at TEXT,
+                processing_status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+
+                PRIMARY KEY (
+                    user_id,
+                    gmail_message_id
+                ),
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
             CREATE INDEX IF NOT EXISTS
             idx_candidate_job_status
             ON candidate_job_analyses(
                 candidate_id,
                 status
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_users_candidate_id
+            ON users(candidate_id)
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_gmail_messages_status
+            ON gmail_messages(
+                user_id,
+                processing_status
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_gmail_messages_received_at
+            ON gmail_messages(
+                user_id,
+                received_at
             )
             """
         )
