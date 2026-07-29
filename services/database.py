@@ -233,6 +233,49 @@ def initialize_database() -> None:
             """
         )
 
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS oauth_authorization_states (
+                state TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                code_verifier TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                consumed_at TEXT,
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        columns = connection.execute(
+            """
+            PRAGMA table_info(oauth_authorization_states)
+            """
+        ).fetchall()
+
+        column_names = {
+            column["name"]
+            for column in columns
+        }
+
+        if "code_verifier" not in column_names:
+            connection.execute(
+                """
+                ALTER TABLE oauth_authorization_states
+                ADD COLUMN code_verifier TEXT
+                """
+            )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_oauth_states_user_id
+            ON oauth_authorization_states(user_id)
+            """
+        )
+
 
 def upsert_recommendation(
     item: dict[str, Any],

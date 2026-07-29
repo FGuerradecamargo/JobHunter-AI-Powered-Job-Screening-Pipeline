@@ -24,6 +24,13 @@ class GmailOAuthResult:
     scopes: list[str]
 
 
+@dataclass(frozen=True)
+class GmailAuthorizationRequest:
+    authorization_url: str
+    state: str
+    code_verifier: str
+
+
 class GmailOAuthService:
     def __init__(
             self,
@@ -65,9 +72,11 @@ class GmailOAuthService:
             )
 
     def create_authorization_url(
-        self,
-    ) -> tuple[str, str]:
-        flow = self._create_flow()
+            self,
+    ) -> GmailAuthorizationRequest:
+        flow = self._create_flow(
+            autogenerate_code_verifier=True
+        )
 
         authorization_url, state = (
             flow.authorization_url(
@@ -77,26 +86,50 @@ class GmailOAuthService:
             )
         )
 
-        return authorization_url, state
+        if not flow.code_verifier:
+            raise RuntimeError(
+                "OAuth code verifier was not generated."
+            )
 
-    def exchange_authorization_response(
-        self,
-        authorization_response: str,
-        expected_state: str,
+        return GmailAuthorizationRequest(
+            authorization_url=authorization_url,
+            state=state,
+            code_verifier=flow.code_verifier,
+        )
+
+    def exchange_authorization_code(
+            self,
+            authorization_code: str,
+            expected_state: str,
+            code_verifier: str,
     ) -> GmailOAuthResult:
+        if not authorization_code:
+            raise ValueError(
+                "Google authorization code is required."
+            )
+
+        if not expected_state:
+            raise ValueError(
+                "OAuth state is required."
+            )
+
+        if not code_verifier:
+            raise ValueError(
+                "OAuth code verifier is required."
+            )
+
         flow = self._create_flow(
-            state=expected_state
+            state=expected_state,
+            code_verifier=code_verifier,
         )
 
         flow.fetch_token(
-            authorization_response=(
-                authorization_response
-            )
+            code=authorization_code,
         )
 
         credentials = flow.credentials
 
-        if not credentials.access_token:
+        if not credentials.token:
             raise RuntimeError(
                 "Google did not return an access token."
             )
@@ -124,7 +157,7 @@ class GmailOAuthService:
 
         return GmailOAuthResult(
             gmail_address=gmail_address,
-            access_token=credentials.access_token,
+            access_token=credentials.token,
             refresh_token=credentials.refresh_token,
             token_expiry=token_expiry,
             scopes=list(
@@ -134,8 +167,10 @@ class GmailOAuthService:
         )
 
     def _create_flow(
-        self,
-        state: Optional[str] = None,
+            self,
+            state: Optional[str] = None,
+            code_verifier: Optional[str] = None,
+            autogenerate_code_verifier: bool = False,
     ) -> Flow:
         client_config = {
             "web": {
@@ -157,6 +192,10 @@ class GmailOAuthService:
             client_config=client_config,
             scopes=[GMAIL_READONLY_SCOPE],
             state=state,
+            code_verifier=code_verifier,
+            autogenerate_code_verifier=(
+                autogenerate_code_verifier
+            ),
         )
 
         flow.redirect_uri = self._redirect_uri
@@ -193,3 +232,9 @@ class GmailOAuthService:
             )
 
         return gmail_address
+
+    @dataclass(frozen=True)
+    class GmailAuthorizationRequest:
+        authorization_url: str
+        state: str
+        code_verifier: str

@@ -32,6 +32,46 @@ def test_creates_google_authorization_url():
     assert GMAIL_READONLY_SCOPE in query_parameters["scope"]
 
 
+def test_creates_google_authorization_url():
+    service = GmailOAuthService(
+        client_id="example-client-id",
+        client_secret="example-client-secret",
+        redirect_uri="http://localhost:8501",
+    )
+
+    authorization_request = (
+        service.create_authorization_url()
+    )
+
+    authorization_url = (
+        authorization_request.authorization_url
+    )
+
+    state = authorization_request.state
+
+    assert authorization_url.startswith(
+        "https://accounts.google.com/"
+    )
+
+    assert "access_type=offline" in authorization_url
+    assert "prompt=consent" in authorization_url
+    assert state
+
+    assert authorization_request.code_verifier
+
+    assert len(
+        authorization_request.code_verifier
+    ) >= 43
+
+    parsed_url = urlparse(authorization_url)
+    query_parameters = parse_qs(parsed_url.query)
+
+    assert (
+        GMAIL_READONLY_SCOPE
+        in query_parameters["scope"]
+    )
+
+
 def test_requires_client_id():
     with pytest.raises(
         RuntimeError,
