@@ -161,3 +161,25 @@ class UserRepository:
             display_name=row["display_name"],
             candidate_id=row["candidate_id"],
         )
+
+    def list_all(
+            self,
+    ) -> list[AppUser]:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    email,
+                    display_name,
+                    candidate_id
+                FROM users
+                ORDER BY display_name ASC
+                """
+            ).fetchall()
+
+        return [
+            self._row_to_user(row)
+            for row in rows
+            if row is not None
+        ]
