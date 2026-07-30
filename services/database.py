@@ -85,6 +85,7 @@ def initialize_database() -> None:
             "remote": "INTEGER",
             "salary": "TEXT",
             "easy_apply": "INTEGER NOT NULL DEFAULT 0",
+            "description": "TEXT",
         }
 
         for column_name, column_type in jobs_new_columns.items():
@@ -934,3 +935,167 @@ def ensure_candidate_job_analysis(
         )
 
     return cursor.rowcount > 0
+
+def list_pending_candidate_jobs(
+    candidate_id: str,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    if not candidate_id:
+        raise ValueError(
+            "Candidate ID is required."
+        )
+
+    if limit <= 0:
+        raise ValueError(
+            "Limit must be greater than zero."
+        )
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                jobs.id,
+                jobs.raw_text,
+                jobs.url,
+                jobs.title,
+                jobs.company,
+                jobs.location,
+                jobs.remote,
+                jobs.salary,
+                jobs.easy_apply,
+                jobs.description
+
+            FROM candidate_job_analyses
+
+            INNER JOIN jobs
+                ON jobs.id = candidate_job_analyses.job_id
+
+            WHERE
+                candidate_job_analyses.candidate_id = ?
+                AND candidate_job_analyses.status = 'in_review'
+                AND candidate_job_analyses.recommendation IS NULL
+
+            ORDER BY
+                candidate_job_analyses.created_at ASC
+
+            LIMIT ?
+            """,
+            (
+                candidate_id,
+                limit,
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def update_shared_job_analysis_data(
+    job: Job,
+) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE jobs
+
+            SET
+                description = ?,
+                updated_at = ?
+
+            WHERE id = ?
+            """,
+            (
+                job.description,
+                utc_now(),
+                str(job.id),
+            ),
+        )
+
+
+def save_candidate_job_analysis(
+    candidate_id: str,
+    job_id: str,
+    analysis: dict[str, Any],
+    job_signature: str,
+    candidate_signature: str,
+    analysis_version: str,
+    status: str = "in_review",
+) -> None:
+    if status not in VALID_STATUSES:
+        raise ValueError(
+            f"Invalid status: {status}"
+        )
+
+    recommendation = analysis.get(
+        "recommendation"
+    )
+
+    competitive_status = analysis.get(
+        "competitive_status"
+    )
+
+    current_fit = analysis.get(
+        "current_fit"
+    )
+
+    growth_value = analysis.get(
+        "growth_value"
+    )
+
+    now = utc_now()
+
+    rejected_at = (
+        now
+        if status == "rejected"
+        else None
+    )
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE candidate_job_analyses
+
+            SET
+                recommendation = ?,
+                competitive_status = ?,
+                current_fit = ?,
+                growth_value = ?,
+                analysis_json = ?,
+                job_signature = ?,
+                candidate_signature = ?,
+                analysis_version = ?,
+                status = ?,
+                rejected_at = ?,
+                updated_at = ?
+
+            WHERE
+                candidate_id = ?
+                AND job_id = ?
+            """,
+            (
+                recommendation,
+                competitive_status,
+                current_fit,
+                growth_value,
+                json.dumps(
+                    analysis,
+                    ensure_ascii=False,
+                ),
+                job_signature,
+                candidate_signature,
+                analysis_version,
+                status,
+                rejected_at,
+                now,
+                candidate_id,
+                job_id,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(
+                "Candidate-job relationship was not found: "
+                f"{candidate_id} / {job_id}"
+            )
