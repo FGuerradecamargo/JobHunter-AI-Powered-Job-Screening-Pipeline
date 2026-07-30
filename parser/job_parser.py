@@ -3,49 +3,119 @@ from bs4 import BeautifulSoup
 from models.job import Job
 
 
-# Extrai vagas únicas do HTML de um alerta do LinkedIn.
-def extract_jobs_from_html(html: str) -> dict[str, Job]:
-    soup = BeautifulSoup(html, "html.parser")
+def extract_jobs_from_html(
+    html: str,
+) -> dict[str, Job]:
+    """
+    Extrai vagas únicas do HTML de um alerta do LinkedIn.
+    """
+    if not html:
+        return {}
+
+    soup = BeautifulSoup(
+        html,
+        "html.parser",
+    )
+
     job_links: dict[str, Job] = {}
 
     for link in soup.find_all("a"):
         href = link.get("href")
-        text = link.get_text(" ", strip=True)
+        text = link.get_text(
+            " ",
+            strip=True,
+        )
 
-        if not href or "/jobs/view/" not in href:
+        if not href:
             continue
 
-        title_node = link.find(string=lambda value: value and value.strip())
-
-        title = title_node.strip() if title_node else None
+        if "/jobs/view/" not in href:
+            continue
 
         if not text:
             continue
 
+        title_node = link.find(
+            string=lambda value: (
+                value
+                and value.strip()
+            )
+        )
+
+        title = (
+            title_node.strip()
+            if title_node
+            else None
+        )
+
         company = None
         location = None
 
-        details = link.find("p", class_="text-system-gray-100")
+        details = link.find(
+            "p",
+            class_="text-system-gray-100",
+        )
 
         if details:
-            details_text = details.get_text(" ", strip=True)
+            details_text = details.get_text(
+                " ",
+                strip=True,
+            )
 
             if " · " in details_text:
-                company, location = details_text.split(" · ", 1)
+                company, location = (
+                    details_text.split(
+                        " · ",
+                        1,
+                    )
+                )
 
-        #Object criation
-        card_text = link.get_text(" ", strip=True)
-        easy_apply = "Easy Apply" in card_text
+        card_text = link.get_text(
+            " ",
+            strip=True,
+        )
 
-        remote_text = f"{title} {location or ''}".lower()
-        remote = "remote" in remote_text
+        easy_apply = (
+            "Easy Apply" in card_text
+        )
 
-        job_id = href.split("/jobs/view/")[1].split("?")[0]
-        clean_url = f"https://www.linkedin.com/jobs/view/{job_id}"
+        remote_text = (
+            f"{title or ''} "
+            f"{location or ''}"
+        ).lower()
+
+        remote = (
+            "remote" in remote_text
+        )
+
+        job_id_part = href.split(
+            "/jobs/view/",
+            1,
+        )[1]
+
+        job_id = (
+            job_id_part
+            .split("?", 1)[0]
+            .split("/", 1)[0]
+            .strip()
+        )
+
+        if not job_id:
+            continue
+
+        clean_url = (
+            "https://www.linkedin.com/jobs/view/"
+            f"{job_id}"
+        )
+
+        existing_job = job_links.get(
+            job_id
+        )
 
         if (
-            job_id not in job_links
-            or len(title) > len(job_links[job_id].raw_text)
+            existing_job is None
+            or len(card_text)
+            > len(existing_job.raw_text)
         ):
             job_links[job_id] = Job(
                 id=job_id,

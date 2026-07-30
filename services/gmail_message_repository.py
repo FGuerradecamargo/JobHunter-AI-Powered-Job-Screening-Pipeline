@@ -8,11 +8,15 @@ from services.database import get_connection
 
 class GmailMessageRepository:
     def register_if_new(
-        self,
-        user_id: str,
-        gmail_message_id: str,
-        gmail_thread_id: Optional[str] = None,
-        received_at: Optional[str] = None,
+            self,
+            user_id: str,
+            gmail_message_id: str,
+            gmail_thread_id: Optional[str] = None,
+            received_at: Optional[str] = None,
+            subject: Optional[str] = None,
+            sender: Optional[str] = None,
+            snippet: Optional[str] = None,
+            raw_html: Optional[str] = None,
     ) -> bool:
         if not user_id:
             raise ValueError("User ID is required.")
@@ -26,6 +30,10 @@ class GmailMessageRepository:
             timezone.utc
         ).isoformat()
 
+        content_fetched_at = (
+            now if raw_html else None
+        )
+
         with get_connection() as connection:
             cursor = connection.execute(
                 """
@@ -34,23 +42,73 @@ class GmailMessageRepository:
                     gmail_message_id,
                     gmail_thread_id,
                     received_at,
+                    subject,
+                    sender,
+                    snippet,
+                    raw_html,
+                    content_fetched_at,
                     processed_at,
                     processing_status,
                     error_message,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, NULL, 'pending', NULL, ?)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    NULL, 'pending', NULL, ?
+                )
                 """,
                 (
                     user_id,
                     gmail_message_id,
                     gmail_thread_id,
                     received_at,
+                    subject,
+                    sender,
+                    snippet,
+                    raw_html,
+                    content_fetched_at,
                     now,
                 ),
             )
 
         return cursor.rowcount > 0
+
+    def list_pending(
+            self,
+            user_id: str,
+            limit: int = 100,
+    ) -> list[dict]:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    user_id,
+                    gmail_message_id,
+                    gmail_thread_id,
+                    received_at,
+                    subject,
+                    sender,
+                    snippet,
+                    raw_html,
+                    content_fetched_at,
+                    processing_status
+                FROM gmail_messages
+                WHERE
+                    user_id = ?
+                    AND processing_status = 'pending'
+                ORDER BY received_at ASC
+                LIMIT ?
+                """,
+                (
+                    user_id,
+                    limit,
+                ),
+            ).fetchall()
+
+        return [
+            dict(row)
+            for row in rows
+        ]
 
     def exists(
         self,

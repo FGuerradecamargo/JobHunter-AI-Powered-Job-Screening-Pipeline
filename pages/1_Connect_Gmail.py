@@ -20,6 +20,13 @@ from services.oauth_state_repository import (
 )
 from services.user_repository import UserRepository
 
+from services.gmail_job_processor import (
+    GmailJobProcessor,
+)
+from services.gmail_message_repository import (
+    GmailMessageRepository,
+)
+
 
 load_dotenv()
 initialize_database()
@@ -42,6 +49,13 @@ user_repository = UserRepository()
 gmail_repository = GmailConnectionRepository()
 oauth_state_repository = OAuthStateRepository()
 oauth_service = GmailOAuthService()
+gmail_message_repository = GmailMessageRepository()
+
+gmail_job_processor = GmailJobProcessor(
+    gmail_message_repository=(
+        gmail_message_repository
+    )
+)
 
 gmail_sync_service = GmailSyncService(
     client_id=os.environ[
@@ -319,6 +333,123 @@ if existing_connection is not None:
                 "Could not synchronize Gmail."
             )
             st.exception(error)
+
+    st.divider()
+
+    st.subheader(
+        "Process job alerts"
+    )
+
+    st.caption(
+        "Extract LinkedIn jobs from pending Gmail "
+        "alerts and add them to this candidate."
+    )
+
+    processing_limit = st.number_input(
+        "Messages to process",
+        min_value=1,
+        max_value=100,
+        value=5,
+        step=1,
+    )
+
+    if st.button(
+        "Process pending alerts",
+        type="primary",
+        use_container_width=True,
+    ):
+        if not selected_user.candidate_id:
+            st.error(
+                "This user is not linked to a "
+                "candidate profile."
+            )
+
+        else:
+            try:
+                with st.spinner(
+                    "Extracting jobs from alerts..."
+                ):
+                    processing_result = (
+                        gmail_job_processor
+                        .process_pending_messages(
+                            user_id=(
+                                selected_user.id
+                            ),
+                            candidate_id=(
+                                selected_user
+                                .candidate_id
+                            ),
+                            limit=int(
+                                processing_limit
+                            ),
+                        )
+                    )
+
+                st.success(
+                    "Pending alerts processed."
+                )
+
+                first_row = st.columns(4)
+
+                first_row[0].metric(
+                    "Messages selected",
+                    processing_result
+                    .messages_selected,
+                )
+
+                first_row[1].metric(
+                    "Processed",
+                    processing_result
+                    .messages_processed,
+                )
+
+                first_row[2].metric(
+                    "Failed",
+                    processing_result
+                    .messages_failed,
+                )
+
+                first_row[3].metric(
+                    "Without HTML",
+                    processing_result
+                    .messages_without_html,
+                )
+
+                second_row = st.columns(4)
+
+                second_row[0].metric(
+                    "Jobs found",
+                    processing_result.jobs_found,
+                )
+
+                second_row[1].metric(
+                    "Jobs created",
+                    processing_result.jobs_created,
+                )
+
+                second_row[2].metric(
+                    "Jobs updated",
+                    processing_result.jobs_updated,
+                )
+
+                second_row[3].metric(
+                    "Already known",
+                    processing_result
+                    .jobs_unchanged,
+                )
+
+                st.metric(
+                    "Candidate links created",
+                    processing_result
+                    .candidate_links_created,
+                )
+
+            except Exception as error:
+                st.error(
+                    "Could not process pending alerts."
+                )
+
+                st.exception(error)
 
     if st.button(
         "Disconnect Gmail",

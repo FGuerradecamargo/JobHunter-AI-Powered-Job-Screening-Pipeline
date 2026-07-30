@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -167,16 +169,16 @@ class GmailSyncService:
                 .get(
                     userId="me",
                     id=message_id,
-                    format="metadata",
-                    metadataHeaders=[
-                        "Subject",
-                        "From",
-                    ],
+                    format="full",
                 )
                 .execute()
             )
 
             summary = self._to_message_summary(
+                message
+            )
+
+            raw_html = self._extract_html_body(
                 message
             )
 
@@ -193,6 +195,10 @@ class GmailSyncService:
                     received_at=(
                         summary.received_at
                     ),
+                    subject=summary.subject,
+                    sender=summary.sender,
+                    snippet=summary.snippet,
+                    raw_html=raw_html,
                 )
             )
 
@@ -390,3 +396,76 @@ class GmailSyncService:
             return candidate_history_id
 
         return current_history_id
+
+    @classmethod
+    def _extract_html_body(
+            cls,
+            message: dict[str, Any],
+    ) -> str:
+        payload = message.get(
+            "payload",
+            {},
+        )
+
+        html_body = cls._find_body_by_mime_type(
+            payload,
+            "text/html",
+        )
+
+        if html_body:
+            return html_body
+
+        return cls._find_body_by_mime_type(
+            payload,
+            "text/plain",
+        )
+
+    @classmethod
+    def _find_body_by_mime_type(
+            cls,
+            part: dict[str, Any],
+            mime_type: str,
+    ) -> str:
+        if part.get("mimeType") == mime_type:
+            encoded_data = (
+                part.get("body", {})
+                .get("data")
+            )
+
+            if encoded_data:
+                return cls._decode_base64url(
+                    encoded_data
+                )
+
+        for child_part in part.get(
+                "parts",
+                [],
+        ):
+            content = cls._find_body_by_mime_type(
+                child_part,
+                mime_type,
+            )
+
+            if content:
+                return content
+
+        return ""
+
+    @staticmethod
+    def _decode_base64url(
+            encoded_data: str,
+    ) -> str:
+        padding = "=" * (
+                -len(encoded_data) % 4
+        )
+
+        decoded_bytes = (
+            base64.urlsafe_b64decode(
+                encoded_data + padding
+            )
+        )
+
+        return decoded_bytes.decode(
+            "utf-8",
+            errors="replace",
+        )

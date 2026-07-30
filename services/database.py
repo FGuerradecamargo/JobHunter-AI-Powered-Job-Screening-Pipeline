@@ -1,3 +1,5 @@
+from models.job import Job
+
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -66,6 +68,63 @@ def initialize_database() -> None:
             )
             """
         )
+
+        jobs_columns = connection.execute(
+            """
+            PRAGMA table_info(jobs)
+            """
+        ).fetchall()
+
+        jobs_column_names = {
+            column["name"]
+            for column in jobs_columns
+        }
+
+        jobs_new_columns = {
+            "raw_text": "TEXT",
+            "remote": "INTEGER",
+            "salary": "TEXT",
+            "easy_apply": "INTEGER NOT NULL DEFAULT 0",
+        }
+
+        for column_name, column_type in jobs_new_columns.items():
+            if column_name not in jobs_column_names:
+                connection.execute(
+                    f"""
+                    ALTER TABLE jobs
+                    ADD COLUMN {column_name} {column_type}
+                    """
+                )
+
+        gmail_message_columns = connection.execute(
+            """
+            PRAGMA table_info(gmail_messages)
+            """
+        ).fetchall()
+
+        gmail_message_column_names = {
+            column["name"]
+            for column in gmail_message_columns
+        }
+
+        gmail_message_new_columns = {
+            "subject": "TEXT",
+            "sender": "TEXT",
+            "snippet": "TEXT",
+            "raw_html": "TEXT",
+            "content_fetched_at": "TEXT",
+        }
+
+        for column_name, column_type in (
+                gmail_message_new_columns.items()
+        ):
+            if column_name not in gmail_message_column_names:
+                connection.execute(
+                    f"""
+                    ALTER TABLE gmail_messages
+                    ADD COLUMN {column_name} {column_type}
+                    """
+                )
 
         connection.execute(
             """
@@ -297,20 +356,19 @@ def upsert_recommendation(
             """
             INSERT INTO jobs (
                 id,
+                raw_text,
                 title,
                 company,
                 location,
                 url,
-                status,
-                recommendation,
-                competitive_status,
-                current_fit,
-                growth_value,
+                remote,
+                salary,
+                easy_apply,
                 analysis_json,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
             ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
@@ -704,3 +762,175 @@ def update_candidate_job_notes(
                 job_id,
             ),
         )
+
+def upsert_raw_job(
+        job: Job,
+) -> str:
+    """
+    Insere uma vaga nova no pool compartilhado.
+
+    Se a vaga já existir, atualiza apenas quando o novo
+    raw_text possui mais informações.
+    """
+    job_id = str(job.id).strip()
+
+    if not job_id:
+        raise ValueError(
+            "Job ID is required."
+        )
+
+    now = utc_now()
+
+    with get_connection() as connection:
+        existing_row = connection.execute(
+            """
+            SELECT
+                id,
+                raw_text
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        ).fetchone()
+
+        if existing_row is None:
+            connection.execute(
+                """
+                INSERT INTO jobs (
+                    id,
+                    raw_text,
+                    title,
+                    company,
+                    location,
+                    url,
+                    remote,
+                    salary,
+                    easy_apply,
+                    analysis_json,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    job_id,
+                    job.raw_text,
+                    job.title,
+                    job.company,
+                    job.location,
+                    job.url,
+                    job.remote,
+                    job.salary,
+                    job.easy_apply,
+                    "{}",
+                    now,
+                    now,
+                ),
+            )
+
+            return "created"
+
+        current_raw_text = (
+                existing_row["raw_text"]
+                or ""
+        )
+
+        new_raw_text = job.raw_text or ""
+
+        if len(new_raw_text) <= len(
+                current_raw_text
+        ):
+            return "unchanged"
+
+        connection.execute(
+            """
+            UPDATE jobs
+            SET
+                raw_text = ?,
+                title = COALESCE(?, title),
+                company = COALESCE(?, company),
+                location = COALESCE(?, location),
+                url = COALESCE(?, url),
+                remote = COALESCE(?, remote),
+                salary = COALESCE(?, salary),
+                easy_apply = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                new_raw_text,
+                job.title,
+                job.company,
+                job.location,
+                job.url,
+                job.remote,
+                job.salary,
+                job.easy_apply,
+                now,
+                job_id,
+            ),
+        )
+
+        return "updated"
+
+
+def ensure_candidate_job_analysis(
+        candidate_id: str,
+        job_id: str,
+) -> bool:
+    """
+    Cria a relação candidato-vaga caso ela ainda não exista.
+
+    A análise real será preenchida posteriormente.
+    """
+    if not candidate_id:
+        raise ValueError(
+            "Candidate ID is required."
+        )
+
+    if not job_id:
+        raise ValueError(
+            "Job ID is required."
+        )
+
+    now = utc_now()
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            INSERT OR IGNORE INTO candidate_job_analyses (
+                candidate_id,
+                job_id,
+                recommendation,
+                competitive_status,
+                current_fit,
+                growth_value,
+                analysis_json,
+                status,
+                notes,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?,
+                ?,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                '{}',
+                'in_review',
+                '',
+                ?,
+                ?
+            )
+            """,
+            (
+                candidate_id,
+                job_id,
+                now,
+                now,
+            ),
+        )
+
+    return cursor.rowcount > 0
