@@ -3,6 +3,12 @@ from __future__ import annotations
 import streamlit as st
 from dotenv import load_dotenv
 
+import os
+
+from services.gmail_sync_service import (
+    GmailSyncService,
+)
+
 from models.gmail_connection import GmailConnection
 from services.database import initialize_database
 from services.gmail_connection_repository import (
@@ -36,6 +42,18 @@ user_repository = UserRepository()
 gmail_repository = GmailConnectionRepository()
 oauth_state_repository = OAuthStateRepository()
 oauth_service = GmailOAuthService()
+
+gmail_sync_service = GmailSyncService(
+    client_id=os.environ[
+        "GOOGLE_OAUTH_CLIENT_ID"
+    ],
+    client_secret=os.environ[
+        "GOOGLE_OAUTH_CLIENT_SECRET"
+    ],
+    gmail_connection_repository=(
+        gmail_repository
+    ),
+)
 
 
 def get_query_parameter(
@@ -232,6 +250,75 @@ if existing_connection is not None:
             "Last sync:",
             existing_connection.last_sync_at,
         )
+
+    if st.button(
+        "Sync Gmail",
+        type="primary",
+        use_container_width=True,
+    ):
+        try:
+            with st.spinner(
+                "Searching Gmail for job alerts..."
+            ):
+                sync_result = (
+                    gmail_sync_service
+                    .sync_recent_job_alerts(
+                        user_id=selected_user.id
+                    )
+                )
+
+            st.success(
+                "Gmail synchronization completed."
+            )
+
+            result_columns = st.columns(3)
+
+            result_columns[0].metric(
+                "Found in Gmail",
+                sync_result.total_messages_found,
+            )
+
+            result_columns[1].metric(
+                "New messages",
+                sync_result.new_messages_found,
+            )
+
+            result_columns[2].metric(
+                "Already registered",
+                sync_result.skipped_existing,
+            )
+
+            if sync_result.messages:
+                st.subheader(
+                    "Messages found"
+                )
+
+                for message in (
+                    sync_result.messages
+                ):
+                    with st.expander(
+                        message.subject
+                        or "Untitled message"
+                    ):
+                        st.write(
+                            "From:",
+                            message.sender,
+                        )
+
+                        st.write(
+                            "Gmail message ID:",
+                            message.message_id,
+                        )
+
+                        st.write(
+                            message.snippet
+                        )
+
+        except Exception as error:
+            st.error(
+                "Could not synchronize Gmail."
+            )
+            st.exception(error)
 
     if st.button(
         "Disconnect Gmail",
