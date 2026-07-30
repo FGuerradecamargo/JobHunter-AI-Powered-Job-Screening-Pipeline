@@ -227,6 +227,12 @@ def render_job(
         label,
         expanded=False,
     ):
+
+        recommendation = (
+                item.get("recommendation")
+                or "not_analyzed"
+        )
+
         metric_columns = st.columns(4)
 
         metric_columns[0].metric(
