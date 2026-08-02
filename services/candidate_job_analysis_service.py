@@ -35,7 +35,7 @@ from services.recommenders.recommendation_engine import (
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v2"
+ANALYSIS_VERSION = "candidate-job-analysis-v3"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -183,6 +183,8 @@ def build_rule_rejection_analysis(
 
 def ai_analysis_should_be_visible(
     analysis: dict[str, Any],
+    job: Job,
+    candidate,
 ) -> bool:
     recommendation = analysis.get(
         "recommendation"
@@ -192,17 +194,184 @@ def ai_analysis_should_be_visible(
         "competitive_status"
     )
 
+    current_fit = analysis.get(
+        "current_fit"
+    ) or 0
+
+    growth_value = analysis.get(
+        "growth_value"
+    ) or 0
+
     hard_conflicts = analysis.get(
         "hard_conflicts"
     ) or []
 
-    return (
-        recommendation
-        in AI_VISIBLE_RECOMMENDATIONS
-        and competitive_status
-        in AI_VISIBLE_COMPETITIVE_STATUSES
-        and not hard_conflicts
-    )
+    personal_negatives = analysis.get(
+        "personal_negatives"
+    ) or []
+
+    structural_gaps = analysis.get(
+        "structural_gaps"
+    ) or []
+
+    reason = analysis.get(
+        "reason"
+    ) or ""
+
+    final_reason = analysis.get(
+        "final_reason"
+    ) or ""
+
+    review_text = " ".join(
+        [
+            *personal_negatives,
+            *structural_gaps,
+            reason,
+            final_reason,
+        ]
+    ).lower()
+
+    if hard_conflicts:
+        return False
+
+    if competitive_status not in {
+        "competitive_now",
+        "bridge_opportunity",
+    }:
+        return False
+
+    if recommendation == "recommended_apply":
+        minimum_scores_passed = (
+            current_fit >= 60
+            and growth_value >= 40
+        )
+
+    elif recommendation == "worth_second_look":
+        minimum_scores_passed = (
+            current_fit >= 65
+            and growth_value >= 60
+        )
+
+    else:
+        return False
+
+    if not minimum_scores_passed:
+        return False
+
+    preferences = candidate.preferences
+    constraints = candidate.constraints
+
+    fully_onsite_signals = {
+        "fully onsite",
+        "fully on-site",
+        "full onsite",
+        "full on-site",
+        "five days onsite",
+        "five days on-site",
+    }
+
+    if (
+        not preferences.onsite_allowed
+        and any(
+            signal in review_text
+            for signal in fully_onsite_signals
+        )
+    ):
+        return False
+
+    phone_heavy_signals = {
+        "high-volume inbound",
+        "high volume inbound",
+        "phone-heavy",
+        "phone heavy",
+        "contact-centre",
+        "contact centre",
+        "call-centre",
+        "call centre",
+    }
+
+    if (
+        preferences.phone_support_preference
+        == "limited"
+        and any(
+            signal in review_text
+            for signal in phone_heavy_signals
+        )
+    ):
+        return False
+
+    customer_heavy_signals = {
+        "high external customer interaction",
+        "external customer interaction is central",
+        "primary customer contact",
+        "high-volume external customer support",
+        "high volume external customer support",
+    }
+
+    if (
+        preferences.customer_facing_preference
+        == "limited"
+        and any(
+            signal in review_text
+            for signal in customer_heavy_signals
+        )
+    ):
+        return False
+
+    night_or_on_call_signals = {
+        "overnight on-call is required",
+        "overnight on call is required",
+        "night shift is required",
+        "night shifts are required",
+        "24/7 on-call requirement",
+        "24/7 on call requirement",
+    }
+
+    if (
+        constraints.night_shift_is_blocking
+        and any(
+            signal in review_text
+            for signal in night_or_on_call_signals
+        )
+    ):
+        return False
+
+    career_regression_signals = {
+        "step down",
+        "downlevel",
+        "below the candidate's current level",
+        "below the candidate’s current level",
+        "less technical than the candidate's current",
+        "less technical than the candidate’s current",
+        "career direction is more internal it desktop support",
+        "not a direct match for the candidate's target",
+        "not a direct match for the candidate’s target",
+        "outside the candidate's target direction",
+        "outside the candidate’s target direction",
+    }
+
+    if any(
+        signal in review_text
+        for signal in career_regression_signals
+    ):
+        return False
+
+    mandatory_relocation_signals = {
+        "mandatory relocation",
+        "relocation is required",
+        "must relocate",
+    }
+
+    if (
+        constraints.mandatory_relocation_is_blocking
+        and any(
+            signal in review_text
+            for signal in mandatory_relocation_signals
+        )
+    ):
+        return False
+
+    return True
 
 
 class CandidateJobAnalysisService:
@@ -449,7 +618,9 @@ class CandidateJobAnalysisService:
                     ] += 1
 
                     if ai_analysis_should_be_visible(
-                        analysis
+                            analysis=analysis,
+                            job=job,
+                            candidate=candidate,
                     ):
                         analysis_status = "in_review"
 

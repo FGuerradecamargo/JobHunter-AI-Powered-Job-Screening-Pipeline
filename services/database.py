@@ -597,7 +597,6 @@ def list_candidate_jobs(
                 jobs.company,
                 jobs.location,
                 jobs.url,
-
                 candidate_job_analyses.status,
                 candidate_job_analyses.notes,
                 candidate_job_analyses.recommendation,
@@ -618,6 +617,11 @@ def list_candidate_jobs(
             WHERE
                 candidate_job_analyses.candidate_id = ?
                 AND candidate_job_analyses.status = ?
+                AND (
+                    ? != 'in_review'
+                    OR candidate_job_analyses.recommendation
+                        IS NOT NULL
+                )
 
             ORDER BY
                 candidate_job_analyses.growth_value DESC,
@@ -626,6 +630,7 @@ def list_candidate_jobs(
             """,
             (
                 candidate_id,
+                status,
                 status,
             ),
         ).fetchall()
@@ -876,13 +881,15 @@ def upsert_raw_job(
 
 
 def ensure_candidate_job_analysis(
-        candidate_id: str,
-        job_id: str,
+    candidate_id: str,
+    job_id: str,
 ) -> bool:
     """
     Cria a relação candidato-vaga caso ela ainda não exista.
 
-    A análise real será preenchida posteriormente.
+    Também evita que o mesmo candidato receba novamente uma
+    vaga equivalente com outro job ID, considerando título,
+    empresa e localização normalizados.
     """
     if not candidate_id:
         raise ValueError(
@@ -897,9 +904,83 @@ def ensure_candidate_job_analysis(
     now = utc_now()
 
     with get_connection() as connection:
+        job_row = connection.execute(
+            """
+            SELECT
+                id,
+                title,
+                company,
+                location
+            FROM jobs
+            WHERE id = ?
+            """,
+            (job_id,),
+        ).fetchone()
+
+        if job_row is None:
+            raise ValueError(
+                f"Job was not found: {job_id}"
+            )
+
+        equivalent_row = connection.execute(
+            """
+            SELECT
+                candidate_job_analyses.job_id
+
+            FROM candidate_job_analyses
+
+            INNER JOIN jobs
+                ON jobs.id = candidate_job_analyses.job_id
+
+            WHERE
+                candidate_job_analyses.candidate_id = ?
+
+                AND LOWER(
+                    TRIM(
+                        COALESCE(jobs.title, '')
+                    )
+                ) = LOWER(
+                    TRIM(
+                        COALESCE(?, '')
+                    )
+                )
+
+                AND LOWER(
+                    TRIM(
+                        COALESCE(jobs.company, '')
+                    )
+                ) = LOWER(
+                    TRIM(
+                        COALESCE(?, '')
+                    )
+                )
+
+                AND LOWER(
+                    TRIM(
+                        COALESCE(jobs.location, '')
+                    )
+                ) = LOWER(
+                    TRIM(
+                        COALESCE(?, '')
+                    )
+                )
+
+            LIMIT 1
+            """,
+            (
+                candidate_id,
+                job_row["title"],
+                job_row["company"],
+                job_row["location"],
+            ),
+        ).fetchone()
+
+        if equivalent_row is not None:
+            return False
+
         cursor = connection.execute(
             """
-            INSERT OR IGNORE INTO candidate_job_analyses (
+            INSERT INTO candidate_job_analyses (
                 candidate_id,
                 job_id,
                 recommendation,
@@ -936,61 +1017,6 @@ def ensure_candidate_job_analysis(
 
     return cursor.rowcount > 0
 
-def list_pending_candidate_jobs(
-    candidate_id: str,
-    limit: int = 5,
-) -> list[dict[str, Any]]:
-    if not candidate_id:
-        raise ValueError(
-            "Candidate ID is required."
-        )
-
-    if limit <= 0:
-        raise ValueError(
-            "Limit must be greater than zero."
-        )
-
-    with get_connection() as connection:
-        rows = connection.execute(
-            """
-            SELECT
-                jobs.id,
-                jobs.raw_text,
-                jobs.url,
-                jobs.title,
-                jobs.company,
-                jobs.location,
-                jobs.remote,
-                jobs.salary,
-                jobs.easy_apply,
-                jobs.description
-
-            FROM candidate_job_analyses
-
-            INNER JOIN jobs
-                ON jobs.id = candidate_job_analyses.job_id
-
-            WHERE
-                candidate_job_analyses.candidate_id = ?
-                AND candidate_job_analyses.status = 'in_review'
-                AND candidate_job_analyses.recommendation IS NULL
-
-            ORDER BY
-                candidate_job_analyses.created_at ASC
-
-            LIMIT ?
-            """,
-            (
-                candidate_id,
-                limit,
-            ),
-        ).fetchall()
-
-    return [
-        dict(row)
-        for row in rows
-    ]
-
 
 def update_shared_job_analysis_data(
     job: Job,
@@ -999,11 +1025,9 @@ def update_shared_job_analysis_data(
         connection.execute(
             """
             UPDATE jobs
-
             SET
                 description = ?,
                 updated_at = ?
-
             WHERE id = ?
             """,
             (

@@ -339,7 +339,8 @@ def render_job(
         ):
             save_notes(
                 job_id=job_id,
-                notes=notes_value,
+                notes=notes,
+                candidate_id=candidate_id,
             )
 
         if url:

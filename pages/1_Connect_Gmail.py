@@ -27,6 +27,9 @@ from services.gmail_message_repository import (
     GmailMessageRepository,
 )
 
+from services.candidate_job_analysis_service import (
+    CandidateJobAnalysisService,
+)
 
 load_dotenv()
 initialize_database()
@@ -269,6 +272,7 @@ if existing_connection is not None:
         "Sync Gmail",
         type="primary",
         use_container_width=True,
+        key="sync_gmail_button",
     ):
         try:
             with st.spinner(
@@ -302,32 +306,6 @@ if existing_connection is not None:
                 sync_result.skipped_existing,
             )
 
-            if sync_result.messages:
-                st.subheader(
-                    "Messages found"
-                )
-
-                for message in (
-                    sync_result.messages
-                ):
-                    with st.expander(
-                        message.subject
-                        or "Untitled message"
-                    ):
-                        st.write(
-                            "From:",
-                            message.sender,
-                        )
-
-                        st.write(
-                            "Gmail message ID:",
-                            message.message_id,
-                        )
-
-                        st.write(
-                            message.snippet
-                        )
-
         except Exception as error:
             st.error(
                 "Could not synchronize Gmail."
@@ -341,8 +319,8 @@ if existing_connection is not None:
     )
 
     st.caption(
-        "Extract LinkedIn jobs from pending Gmail "
-        "alerts and add them to this candidate."
+        "Extract and analyze jobs from synchronized "
+        "Gmail alerts."
     )
 
     processing_limit = st.number_input(
@@ -351,12 +329,13 @@ if existing_connection is not None:
         max_value=100,
         value=5,
         step=1,
+        key="gmail_processing_limit",
     )
 
     if st.button(
-        "Process pending alerts",
-        type="primary",
-        use_container_width=True,
+            "Process pending alerts",
+            type="primary",
+            use_container_width=True,
     ):
         if not selected_user.candidate_id:
             st.error(
@@ -367,17 +346,14 @@ if existing_connection is not None:
         else:
             try:
                 with st.spinner(
-                    "Extracting jobs from alerts..."
+                        "Extracting jobs from alerts..."
                 ):
                     processing_result = (
                         gmail_job_processor
                         .process_pending_messages(
-                            user_id=(
-                                selected_user.id
-                            ),
+                            user_id=selected_user.id,
                             candidate_id=(
-                                selected_user
-                                .candidate_id
+                                selected_user.candidate_id
                             ),
                             limit=int(
                                 processing_limit
@@ -393,26 +369,22 @@ if existing_connection is not None:
 
                 first_row[0].metric(
                     "Messages selected",
-                    processing_result
-                    .messages_selected,
+                    processing_result.messages_selected,
                 )
 
                 first_row[1].metric(
                     "Processed",
-                    processing_result
-                    .messages_processed,
+                    processing_result.messages_processed,
                 )
 
                 first_row[2].metric(
                     "Failed",
-                    processing_result
-                    .messages_failed,
+                    processing_result.messages_failed,
                 )
 
                 first_row[3].metric(
                     "Without HTML",
-                    processing_result
-                    .messages_without_html,
+                    processing_result.messages_without_html,
                 )
 
                 second_row = st.columns(4)
@@ -434,19 +406,122 @@ if existing_connection is not None:
 
                 second_row[3].metric(
                     "Already known",
-                    processing_result
-                    .jobs_unchanged,
+                    processing_result.jobs_unchanged,
                 )
 
                 st.metric(
                     "Candidate links created",
-                    processing_result
-                    .candidate_links_created,
+                    processing_result.candidate_links_created,
+                )
+
+                st.divider()
+
+                with st.spinner(
+                        "Screening jobs and analyzing "
+                        "qualified opportunities..."
+                ):
+                    analysis_service = (
+                        CandidateJobAnalysisService()
+                    )
+
+                    analysis_result = (
+                        analysis_service.analyze_pending(
+                            candidate_id=(
+                                selected_user.candidate_id
+                            ),
+                            limit=500,
+                        )
+                    )
+
+                st.success(
+                    "Candidate job analysis completed."
+                )
+
+                st.subheader(
+                    "Automated screening"
+                )
+
+                analysis_first_row = st.columns(4)
+
+                analysis_first_row[0].metric(
+                    "Jobs selected",
+                    analysis_result["selected"],
+                )
+
+                analysis_first_row[1].metric(
+                    "Analyzed",
+                    analysis_result["analyzed"],
+                )
+
+                analysis_first_row[2].metric(
+                    "Rule rejected",
+                    (
+                            analysis_result[
+                                "hard_rejected"
+                            ]
+                            + analysis_result[
+                                "matcher_rejected"
+                            ]
+                    ),
+                )
+
+                analysis_first_row[3].metric(
+                    "Sent to AI",
+                    analysis_result[
+                        "ai_analyses_created"
+                    ],
+                )
+
+                analysis_second_row = st.columns(4)
+
+                analysis_second_row[0].metric(
+                    "Approved for review",
+                    analysis_result[
+                        "ai_approved"
+                    ],
+                )
+
+                analysis_second_row[1].metric(
+                    "Rejected by AI",
+                    analysis_result[
+                        "ai_rejected"
+                    ],
+                )
+
+                analysis_second_row[2].metric(
+                    "Descriptions fetched",
+                    analysis_result[
+                        "descriptions_fetched"
+                    ],
+                )
+
+                analysis_second_row[3].metric(
+                    "Analysis failures",
+                    analysis_result["failed"],
+                )
+
+                if analysis_result["errors"]:
+                    st.warning(
+                        "Some jobs could not be analyzed."
+                    )
+
+                    for item in analysis_result[
+                        "errors"
+                    ]:
+                        st.write(
+                            f"{item['title']}: "
+                            f"{item['error']}"
+                        )
+
+                st.info(
+                    "Open the JobHunter dashboard to "
+                    "review the approved opportunities."
                 )
 
             except Exception as error:
                 st.error(
-                    "Could not process pending alerts."
+                    "Could not process or analyze "
+                    "pending job alerts."
                 )
 
                 st.exception(error)
