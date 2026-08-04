@@ -28,3 +28,6 @@ class AIRecommendation:
 
     reason: str = ""
     final_reason: str = ""
+
+    simple_summary: str = ""
+    simple_recommendation: str = ""

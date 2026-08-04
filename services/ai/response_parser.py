@@ -139,4 +139,13 @@ def parse_response(
             "final_reason",
             "",
         ),
+
+        simple_summary=data.get(
+            "simple_summary",
+            "",
+        ),
+        simple_recommendation=data.get(
+            "simple_recommendation",
+            "",
+        ),
     )

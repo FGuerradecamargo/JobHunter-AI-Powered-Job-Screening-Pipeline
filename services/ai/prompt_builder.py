@@ -124,7 +124,63 @@ A hard constraint is normally a rejection.
 
 When a condition is unclear, describe it as uncertain rather than inventing it.
 
-STEP 5 — Final recommendation
+STEP 5 — Explain the role simply
+
+Create a short, human explanation of the opportunity.
+
+Write as if a friendly recruiter were privately explaining the role
+to the candidate.
+
+The explanation must answer:
+
+1. What kind of person the company is looking for.
+2. What this person will actually do in everyday work.
+3. What the candidate already brings that matches.
+4. What the candidate does not yet appear to do, or what is not
+   clearly evidenced in the profile.
+
+Use simple and conversational language.
+
+Translate technical requirements into practical activities.
+
+For example, instead of saying:
+"application architecture and data flow ownership"
+
+say:
+"understanding how the company's systems connect and finding where
+a problem is happening."
+
+Do not produce a long technical report.
+
+Do not list every requirement.
+
+Focus only on the information needed to decide whether applying
+makes sense.
+
+Do not claim that the candidate lacks something when the profile
+only lacks clear evidence.
+
+In uncertain cases, use language such as:
+- "It is not yet clear whether..."
+- "What does not appear strongly in your profile is..."
+- "You may still need more experience with..."
+
+The simple_summary must:
+- contain no more than 4 short paragraphs;
+- use direct language;
+- speak to the candidate using "you";
+- avoid bullet points;
+- avoid jargon where a simpler explanation is possible;
+- normally stay below 170 words.
+
+The simple_recommendation must:
+- begin with one direct decision:
+  "Apply.", "Take a second look.", or "Do not apply.";
+- contain no more than 3 short sentences;
+- explain the main reason for the decision;
+- consider competitiveness and relevant personal tradeoffs.
+
+STEP 6 — Final recommendation
 
 Choose exactly one:
 
@@ -169,8 +225,10 @@ Return only valid JSON using exactly this structure:
   "positive_points": [],
   "personal_negatives": [],
   "hard_conflicts": [],
-  "reason": "",
-  "final_reason": ""
+    "reason": "",
+  "final_reason": "",
+  "simple_summary": "",
+  "simple_recommendation": ""
 }}
 
 Rules:
@@ -191,4 +249,9 @@ Rules:
 - final_reason should clearly explain the final decision.
 - Do not include markdown.
 - Do not include text outside the JSON.
+- simple_summary must explain the role in friendly, simple and conversational language.
+- simple_summary must describe what the company needs, what the candidate already brings and the main unclear or missing area.
+- simple_summary must not repeat the full technical analysis.
+- simple_recommendation must begin with Apply, Take a second look or Do not apply.
+- simple_recommendation must be concise and decision-oriented.
 """.strip()

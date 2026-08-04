@@ -46,5 +46,18 @@ class FakeLLMClient(LLMClient):
   "hard_conflicts": [],
   "reason": "The role uses the candidate's investigation and troubleshooting experience while providing realistic technical growth.",
   "final_reason": "The candidate can compete for this role and the remaining gaps are suitable for preparation or onboarding."
+  
+  "simple_summary": (
+    "The company is looking for someone who can support its "
+    "systems, investigate problems and work with different teams "
+    "to keep services running. You already bring investigation, "
+    "support and process-improvement experience. What is less clear "
+    "is your direct experience with some of the role's technical tools."
+),
+"simple_recommendation": (
+    "Apply. Your background matches the central work, and the "
+    "remaining gaps appear manageable."
+),
+
 }
 """.strip()

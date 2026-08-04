@@ -11,10 +11,14 @@ from services.database import (
 
 
 STATUS_LABELS = {
+    "system_rejected": "System rejected",
     "in_review": "In review",
+    "user_rejected": "Not applied",
     "applied": "Applied",
+    "rejected_before_interview": "Rejected before interview",
     "in_process": "In process",
-    "rejected": "Rejected",
+    "rejected_after_interview": "Rejected after interview",
+    "offer": "Offer",
 }
 
 
@@ -80,26 +84,40 @@ def render_status_buttons(
 ) -> None:
     st.subheader("Application status")
 
-    columns = st.columns(4)
+    if current_status == "system_rejected":
+        if st.button(
+            "Move to In review",
+            key=f"in_review_{candidate_id}_{job_id}",
+            use_container_width=True,
+        ):
+            change_status(
+                candidate_id,
+                job_id,
+                "in_review",
+            )
 
-    with columns[0]:
-        if current_status != "in_review":
+        return
+
+    if current_status == "in_review":
+        columns = st.columns(2)
+
+        with columns[0]:
             if st.button(
-                "Move to In review",
-                key=f"in_review_{candidate_id}_{job_id}",
+                "Do not apply",
+                key=f"user_rejected_{candidate_id}_{job_id}",
                 use_container_width=True,
             ):
                 change_status(
                     candidate_id,
                     job_id,
-                    "in_review",
+                    "user_rejected",
                 )
 
-    with columns[1]:
-        if current_status != "applied":
+        with columns[1]:
             if st.button(
                 "Mark as Applied",
                 key=f"applied_{candidate_id}_{job_id}",
+                type="primary",
                 use_container_width=True,
             ):
                 change_status(
@@ -108,10 +126,40 @@ def render_status_buttons(
                     "applied",
                 )
 
-    with columns[2]:
-        if current_status != "in_process":
+        return
+
+    if current_status == "user_rejected":
+        if st.button(
+            "Move back to In review",
+            key=f"restore_review_{candidate_id}_{job_id}",
+            use_container_width=True,
+        ):
+            change_status(
+                candidate_id,
+                job_id,
+                "in_review",
+            )
+
+        return
+
+    if current_status == "applied":
+        columns = st.columns(2)
+
+        with columns[0]:
             if st.button(
-                "Move to In process",
+                "Rejected before interview",
+                key=f"rejected_before_{candidate_id}_{job_id}",
+                use_container_width=True,
+            ):
+                change_status(
+                    candidate_id,
+                    job_id,
+                    "rejected_before_interview",
+                )
+
+        with columns[1]:
+            if st.button(
+                "Moved to interview process",
                 key=f"in_process_{candidate_id}_{job_id}",
                 type="primary",
                 use_container_width=True,
@@ -122,18 +170,53 @@ def render_status_buttons(
                     "in_process",
                 )
 
-    with columns[3]:
-        if current_status != "rejected":
+        return
+
+    if current_status == "in_process":
+        columns = st.columns(2)
+
+        with columns[0]:
             if st.button(
-                "Mark as Rejected",
-                key=f"rejected_{candidate_id}_{job_id}",
+                "Rejected in process",
+                key=f"rejected_after_{candidate_id}_{job_id}",
                 use_container_width=True,
             ):
                 change_status(
                     candidate_id,
                     job_id,
-                    "rejected",
+                    "rejected_after_interview",
                 )
+
+        with columns[1]:
+            if st.button(
+                "Mark as Offer",
+                key=f"offer_{candidate_id}_{job_id}",
+                type="primary",
+                use_container_width=True,
+            ):
+                change_status(
+                    candidate_id,
+                    job_id,
+                    "offer",
+                )
+
+        return
+
+    if current_status in {
+        "rejected_before_interview",
+        "rejected_after_interview",
+        "offer",
+    }:
+        if st.button(
+            "Move back to In process",
+            key=f"restore_process_{candidate_id}_{job_id}",
+            use_container_width=True,
+        ):
+            change_status(
+                candidate_id,
+                job_id,
+                "in_process",
+            )
 
 
 def render_job(
@@ -221,6 +304,16 @@ def render_job(
         "",
     )
 
+    simple_summary = analysis.get(
+        "simple_summary",
+        "",
+    )
+
+    simple_recommendation = analysis.get(
+        "simple_recommendation",
+        "",
+    )
+
     label = f"{title} — {company}"
 
     with st.expander(
@@ -264,52 +357,67 @@ def render_job(
             f"**Location:** {location}"
         )
 
-        first_row = st.columns(2)
+        render_text_section(
+            "Quick overview",
+            simple_summary,
+            (
+                "A simple overview is not available for this analysis yet. "
+                "Open the technical details below."
+            ),
+        )
 
-        with first_row[0]:
-            render_list(
-                "What you already bring",
-                requirements_met,
-            )
+        render_text_section(
+            "My recommendation",
+            simple_recommendation,
+            final_recommendation or "No recommendation available.",
+        )
 
-        with first_row[1]:
-            render_list(
-                "Main gaps",
-                all_gaps,
-            )
+        with st.expander(
+                "View technical details",
+                expanded=False,
+        ):
+            first_row = st.columns(2)
 
-        st.divider()
+            with first_row[0]:
+                render_list(
+                    "What you already bring",
+                    requirements_met,
+                )
 
-        second_row = st.columns(2)
+            with first_row[1]:
+                render_list(
+                    "Main gaps",
+                    all_gaps,
+                )
 
-        with second_row[0]:
-            render_list(
-                "Positive points",
-                positive_points,
-            )
+            st.divider()
 
-        with second_row[1]:
-            render_list(
-                "Personal tradeoffs",
-                personal_tradeoffs,
-            )
+            second_row = st.columns(2)
 
-        st.divider()
+            with second_row[0]:
+                render_list(
+                    "Positive points",
+                    positive_points,
+                )
 
-        third_row = st.columns(2)
+            with second_row[1]:
+                render_list(
+                    "Personal tradeoffs",
+                    personal_tradeoffs,
+                )
 
-        with third_row[0]:
+            st.divider()
+
             render_text_section(
-                "Why this role is worth considering",
+                "Why this role may be worth considering",
                 reason,
                 "No explanation available.",
             )
 
-        with third_row[1]:
             render_text_section(
-                "Final recommendation",
+                "Full recommendation",
                 final_recommendation,
-                "No final recommendation available.",
+                "No full recommendation available.",
             )
 
         st.divider()
@@ -339,7 +447,7 @@ def render_job(
         ):
             save_notes(
                 job_id=job_id,
-                notes=notes,
+                notes=notes_value,
                 candidate_id=candidate_id,
             )
 
@@ -355,8 +463,8 @@ def render_job_section(
     status: str,
 ) -> None:
     jobs = list_candidate_jobs(
-        candidate_id,
-        status,
+        candidate_id=candidate_id,
+        status=status,
     )
 
     if not jobs:
@@ -415,75 +523,103 @@ def main() -> None:
         selected_candidate_id
     )
 
-    summary_columns = st.columns(5)
+    metric_columns = st.columns(5)
 
-    summary_columns[0].metric(
-        "Total tracked",
-        sum(counts.values()),
-    )
-
-    summary_columns[1].metric(
+    metric_columns[0].metric(
         "In review",
         counts["in_review"],
     )
 
-    summary_columns[2].metric(
+    metric_columns[1].metric(
         "Applied",
         counts["applied"],
     )
 
-    summary_columns[3].metric(
+    metric_columns[2].metric(
         "In process",
         counts["in_process"],
     )
 
-    summary_columns[4].metric(
-        "Rejected",
-        counts["rejected"],
+    metric_columns[3].metric(
+        "Rejected by company",
+        (
+                counts["rejected_before_interview"]
+                + counts["rejected_after_interview"]
+        ),
+    )
+
+    metric_columns[4].metric(
+        "Offers",
+        counts["offer"],
     )
 
     st.divider()
 
-    (
-        review_tab,
-        applied_tab,
-        process_tab,
-        rejected_tab,
-    ) = st.tabs(
+    tabs = st.tabs(
         [
             f"In review ({counts['in_review']})",
+            f"Not applied ({counts['user_rejected']})",
             f"Applied ({counts['applied']})",
             f"In process ({counts['in_process']})",
-            f"Rejected ({counts['rejected']})",
+            (
+                "Rejected before interview "
+                f"({counts['rejected_before_interview']})"
+            ),
+            (
+                "Rejected in process "
+                f"({counts['rejected_after_interview']})"
+            ),
+            f"Offers ({counts['offer']})",
+            f"System rejected ({counts['system_rejected']})",
         ]
     )
 
-    with review_tab:
-        st.subheader("Jobs waiting for your decision")
+    with tabs[0]:
         render_job_section(
-            selected_candidate_id,
-            "in_review",
+            candidate_id=selected_candidate_id,
+            status="in_review",
         )
 
-    with applied_tab:
-        st.subheader("Applications in progress")
+    with tabs[1]:
         render_job_section(
-            selected_candidate_id,
-            "applied",
+            candidate_id=selected_candidate_id,
+            status="user_rejected",
         )
 
-    with rejected_tab:
-        st.subheader("Rejected or discarded opportunities")
+    with tabs[2]:
         render_job_section(
-            selected_candidate_id,
-            "rejected",
+            candidate_id=selected_candidate_id,
+            status="applied",
         )
 
-    with process_tab:
-        st.subheader("Applications currently in process")
+    with tabs[3]:
         render_job_section(
-            selected_candidate_id,
-            "in_process",
+            candidate_id=selected_candidate_id,
+            status="in_process",
+        )
+
+    with tabs[4]:
+        render_job_section(
+            candidate_id=selected_candidate_id,
+            status="rejected_before_interview",
+        )
+
+    with tabs[5]:
+        render_job_section(
+            candidate_id=selected_candidate_id,
+            status="rejected_after_interview",
+        )
+
+    with tabs[6]:
+        render_job_section(
+            candidate_id=selected_candidate_id,
+            status="offer",
+        )
+
+    with tabs[7]:
+        render_job_section(
+            candidate_id=selected_candidate_id,
+            status="system_rejected",
         )
 
 
