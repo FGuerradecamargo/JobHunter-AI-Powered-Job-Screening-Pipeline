@@ -521,7 +521,7 @@ class CandidateJobAnalysisService:
                         )
                     )
 
-                    analysis_status = "rejected"
+                    analysis_status = "system_rejected"
 
                     result["hard_rejected"] += 1
 
@@ -551,7 +551,7 @@ class CandidateJobAnalysisService:
                         )
                     )
 
-                    analysis_status = "rejected"
+                    analysis_status = "system_rejected"
 
                     result[
                         "matcher_rejected"
@@ -628,7 +628,7 @@ class CandidateJobAnalysisService:
                             "ai_approved"
                         ] += 1
                     else:
-                        analysis_status = "rejected"
+                        analysis_status = "system_rejected"
 
                         result[
                             "ai_rejected"

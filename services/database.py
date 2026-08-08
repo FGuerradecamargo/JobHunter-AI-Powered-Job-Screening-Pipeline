@@ -14,10 +14,27 @@ load_dotenv()
 DATABASE_FILE = Path("data/jobhunter.db")
 
 VALID_STATUSES = {
+    "system_rejected",
     "in_review",
+    "user_rejected",
     "applied",
+    "rejected_before_interview",
     "in_process",
-    "rejected",
+    "rejected_after_interview",
+    "offer",
+}
+
+APPLICATION_STATUSES = {
+    "applied",
+    "rejected_before_interview",
+    "in_process",
+    "rejected_after_interview",
+    "offer",
+}
+
+COMPANY_REJECTION_STATUSES = {
+    "rejected_before_interview",
+    "rejected_after_interview",
 }
 
 
@@ -165,6 +182,17 @@ def initialize_database() -> None:
                 ON DELETE CASCADE
             )
             """
+        )
+
+        connection.execute(
+            """
+            UPDATE candidate_job_analyses
+            SET
+                status = 'system_rejected',
+                updated_at = ?
+            WHERE status = 'rejected'
+            """,
+            (utc_now(),),
         )
 
         connection.execute(
@@ -488,9 +516,14 @@ def list_jobs(
 
 def count_jobs_by_status() -> dict[str, int]:
     counts = {
+        "system_rejected": 0,
         "in_review": 0,
+        "user_rejected": 0,
         "applied": 0,
-        "rejected": 0,
+        "rejected_before_interview": 0,
+        "in_process": 0,
+        "rejected_after_interview": 0,
+        "offer": 0,
     }
 
     with get_connection() as connection:
@@ -521,13 +554,13 @@ def update_job_status(
 
     applied_at = (
         now
-        if status == "applied"
+        if status in APPLICATION_STATUSES
         else None
     )
 
     rejected_at = (
         now
-        if status == "rejected"
+        if status in COMPANY_REJECTION_STATUSES
         else None
     )
 
@@ -653,10 +686,14 @@ def count_candidate_jobs_by_status(
     candidate_id: str,
 ) -> dict[str, int]:
     counts = {
+        "system_rejected": 0,
         "in_review": 0,
+        "user_rejected": 0,
         "applied": 0,
+        "rejected_before_interview": 0,
         "in_process": 0,
-        "rejected": 0,
+        "rejected_after_interview": 0,
+        "offer": 0,
     }
 
     with get_connection() as connection:
@@ -695,13 +732,13 @@ def update_candidate_job_status(
 
     applied_at = (
         now
-        if status == "applied"
+        if status in APPLICATION_STATUSES
         else None
     )
 
     rejected_at = (
         now
-        if status == "rejected"
+        if status in COMPANY_REJECTION_STATUSES
         else None
     )
 
@@ -1016,6 +1053,62 @@ def ensure_candidate_job_analysis(
         )
 
     return cursor.rowcount > 0
+
+
+def list_pending_candidate_jobs(
+    candidate_id: str,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    if not candidate_id:
+        raise ValueError(
+            "Candidate ID is required."
+        )
+
+    if limit <= 0:
+        raise ValueError(
+            "Limit must be greater than zero."
+        )
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                jobs.id,
+                jobs.raw_text,
+                jobs.url,
+                jobs.title,
+                jobs.company,
+                jobs.location,
+                jobs.remote,
+                jobs.salary,
+                jobs.easy_apply,
+                jobs.description
+
+            FROM candidate_job_analyses
+
+            INNER JOIN jobs
+                ON jobs.id = candidate_job_analyses.job_id
+
+            WHERE
+                candidate_job_analyses.candidate_id = ?
+                AND candidate_job_analyses.status = 'in_review'
+                AND candidate_job_analyses.recommendation IS NULL
+
+            ORDER BY
+                candidate_job_analyses.created_at ASC
+
+            LIMIT ?
+            """,
+            (
+                candidate_id,
+                limit,
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def update_shared_job_analysis_data(
