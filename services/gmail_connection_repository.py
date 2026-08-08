@@ -108,29 +108,35 @@ class GmailConnectionRepository:
             )
 
     def get_by_user_id(
-        self,
-        user_id: str,
+            self,
+            user_id: str,
     ) -> Optional[GmailConnection]:
         with get_connection() as connection:
             row = connection.execute(
                 """
                 SELECT
-                    user_id,
-                    gmail_address,
-                    encrypted_refresh_token,
-                    access_token,
-                    token_expiry,
-                    scopes_json,
-                    last_history_id,
-                    last_sync_at,
-                    connection_status
-                FROM gmail_connections
-                WHERE user_id = ?
+    user_id,
+    gmail_address,
+    encrypted_refresh_token,
+    access_token,
+    token_expiry,
+    scopes_json,
+    last_history_id,
+    last_sync_at,
+    connection_status
+FROM gmail_connections
+WHERE user_id = ?
                 """,
                 (user_id,),
             ).fetchone()
 
         if row is None:
+            return None
+
+        if (
+                row["connection_status"] != "connected"
+                or not row["encrypted_refresh_token"]
+        ):
             return None
 
         return GmailConnection(
@@ -141,11 +147,9 @@ class GmailConnectionRepository:
                     row["encrypted_refresh_token"]
                 )
             ),
+            scopes=json.loads(row["scopes_json"]),
             access_token=row["access_token"],
             token_expiry=row["token_expiry"],
-            scopes=json.loads(
-                row["scopes_json"] or "[]"
-            ),
             last_history_id=row["last_history_id"],
             last_sync_at=row["last_sync_at"],
             connection_status=row["connection_status"],

@@ -416,9 +416,16 @@ if existing_connection is not None:
 
                 st.divider()
 
+                st.info(
+                    "This process may take several minutes depending on the number "
+                    "of pending jobs. For around 40 jobs, it may take approximately "
+                    "5–15 minutes. Keep this page open and avoid refreshing or "
+                    "clicking the button again while processing."
+                )
+
                 with st.spinner(
-                        "Screening jobs and analyzing "
-                        "qualified opportunities..."
+                        "Screening jobs and analyzing qualified opportunities... "
+                        "Please keep this page open."
                 ):
                     analysis_service = (
                         CandidateJobAnalysisService()
