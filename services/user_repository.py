@@ -15,15 +15,26 @@ class UserRepository:
         display_name: str,
         candidate_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        access_level: str = "user",
     ) -> AppUser:
         normalized_email = email.strip().lower()
         normalized_name = display_name.strip()
+        normalized_access_level = access_level.strip().lower()
 
         if not normalized_email:
             raise ValueError("Email is required.")
 
         if not normalized_name:
             raise ValueError("Display name is required.")
+
+        if normalized_access_level not in {
+            "admin",
+            "manager",
+            "user",
+        }:
+            raise ValueError(
+                f"Invalid access level: {access_level}"
+            )
 
         resolved_user_id = user_id or uuid4().hex
         now = datetime.now(timezone.utc).isoformat()
@@ -36,16 +47,18 @@ class UserRepository:
                     email,
                     display_name,
                     candidate_id,
+                    access_level,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     resolved_user_id,
                     normalized_email,
                     normalized_name,
                     candidate_id,
+                    normalized_access_level,
                     now,
                     now,
                 ),
@@ -56,6 +69,7 @@ class UserRepository:
             email=normalized_email,
             display_name=normalized_name,
             candidate_id=candidate_id,
+            access_level=normalized_access_level,
         )
 
     def get_by_id(
@@ -69,7 +83,8 @@ class UserRepository:
                     id,
                     email,
                     display_name,
-                    candidate_id
+                    candidate_id,
+                    access_level
                 FROM users
                 WHERE id = ?
                 """,
@@ -91,7 +106,8 @@ class UserRepository:
                     id,
                     email,
                     display_name,
-                    candidate_id
+                    candidate_id,
+                    access_level
                 FROM users
                 WHERE email = ?
                 """,
@@ -111,7 +127,8 @@ class UserRepository:
                     id,
                     email,
                     display_name,
-                    candidate_id
+                    candidate_id,
+                    access_level
                 FROM users
                 WHERE candidate_id = ?
                 """,
@@ -148,6 +165,47 @@ class UserRepository:
                 f"User not found: {user_id}"
             )
 
+    def set_access_level(
+        self,
+        user_id: str,
+        access_level: str,
+    ) -> None:
+        normalized_access_level = (
+            access_level.strip().lower()
+        )
+
+        if normalized_access_level not in {
+            "admin",
+            "manager",
+            "user",
+        }:
+            raise ValueError(
+                f"Invalid access level: {access_level}"
+            )
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        with get_connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE users
+                SET
+                    access_level = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    normalized_access_level,
+                    now,
+                    user_id,
+                ),
+            )
+
+        if cursor.rowcount == 0:
+            raise ValueError(
+                f"User not found: {user_id}"
+            )
+
     @staticmethod
     def _row_to_user(
         row,
@@ -160,10 +218,11 @@ class UserRepository:
             email=row["email"],
             display_name=row["display_name"],
             candidate_id=row["candidate_id"],
+            access_level=row["access_level"],
         )
 
     def list_all(
-            self,
+        self,
     ) -> list[AppUser]:
         with get_connection() as connection:
             rows = connection.execute(
@@ -172,7 +231,8 @@ class UserRepository:
                     id,
                     email,
                     display_name,
-                    candidate_id
+                    candidate_id,
+                    access_level
                 FROM users
                 ORDER BY display_name ASC
                 """

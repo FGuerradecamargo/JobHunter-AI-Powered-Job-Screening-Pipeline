@@ -8,3 +8,4 @@ class AppUser:
     email: str
     display_name: str
     candidate_id: Optional[str] = None
+    access_level: str = "user"

@@ -67,24 +67,48 @@ def initialize_database() -> None:
     with get_connection() as connection:
         connection.execute(
             """
-            CREATE TABLE IF NOT EXISTS candidates (
+            CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                current_role TEXT NOT NULL,
-                current_level TEXT NOT NULL,
-                professional_summary TEXT NOT NULL,
-                target_roles_json TEXT NOT NULL,
-                spoken_languages_json TEXT NOT NULL,
-                skills_json TEXT NOT NULL,
-                strengths_json TEXT NOT NULL,
-                development_areas_json TEXT NOT NULL,
-                preferences_json TEXT NOT NULL,
-                constraints_json TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                candidate_id TEXT,
+                access_level TEXT NOT NULL DEFAULT 'user',
+                password_hash TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
             )
-            """
+                        """
         )
+
+        users_columns = connection.execute(
+            """
+            PRAGMA table_info(users)
+            """
+        ).fetchall()
+
+        users_column_names = {
+            column["name"]
+            for column in users_columns
+        }
+
+        if "access_level" not in users_column_names:
+            connection.execute(
+                """
+                ALTER TABLE users
+                ADD COLUMN access_level TEXT
+                NOT NULL DEFAULT 'user'
+                """
+            )
+
+        if "password_hash" not in users_column_names:
+            connection.execute(
+                """
+                ALTER TABLE users
+                ADD COLUMN password_hash TEXT
+                """
+            )
 
         jobs_columns = connection.execute(
             """
@@ -143,46 +167,6 @@ def initialize_database() -> None:
                     ADD COLUMN {column_name} {column_type}
                     """
                 )
-
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS candidate_job_analyses (
-                candidate_id TEXT NOT NULL,
-                job_id TEXT NOT NULL,
-                recommendation TEXT,
-                competitive_status TEXT,
-                current_fit INTEGER,
-                growth_value INTEGER,
-                analysis_json TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'in_review',
-                notes TEXT NOT NULL DEFAULT '',
-                job_signature TEXT,
-                candidate_signature TEXT,
-                analysis_version TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                applied_at TEXT,
-                rejected_at TEXT,
-
-                PRIMARY KEY (
-                    candidate_id,
-                    job_id
-                ),
-
-                FOREIGN KEY (
-                    candidate_id
-                )
-                REFERENCES candidates(id)
-                ON DELETE CASCADE,
-
-                FOREIGN KEY (
-                    job_id
-                )
-                REFERENCES jobs(id)
-                ON DELETE CASCADE
-            )
-            """
-        )
 
         connection.execute(
             """
@@ -334,6 +318,56 @@ def initialize_database() -> None:
                     REFERENCES users(id)
                     ON DELETE CASCADE
             )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_onboarding (
+                candidate_id TEXT PRIMARY KEY,
+                location TEXT NOT NULL DEFAULT '',
+                work_authorisation TEXT NOT NULL DEFAULT '',
+                spoken_languages_json TEXT NOT NULL DEFAULT '[]',
+                desired_next_work TEXT NOT NULL DEFAULT '',
+                enjoyed_work TEXT NOT NULL DEFAULT '',
+                avoid_work TEXT NOT NULL DEFAULT '',
+                development_interests TEXT NOT NULL DEFAULT '',
+                career_priorities_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_work_experiences (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                company TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                career_story TEXT NOT NULL,
+                day_to_day_narrative TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_candidate_work_experiences_candidate_id
+            ON candidate_work_experiences(candidate_id)
             """
         )
 
@@ -805,6 +839,7 @@ def update_candidate_job_notes(
                 job_id,
             ),
         )
+
 
 def upsert_raw_job(
         job: Job,
