@@ -6,11 +6,13 @@ from parser.job_parser import (
     extract_jobs_from_html,
 )
 from services.database import (
-    ensure_candidate_job_analysis,
     upsert_raw_job,
 )
 from services.gmail_message_repository import (
     GmailMessageRepository,
+)
+from services.job_source_repository import (
+    JobSourceRepository,
 )
 
 
@@ -33,10 +35,18 @@ class GmailJobProcessor:
         gmail_message_repository: (
             GmailMessageRepository | None
         ) = None,
+        job_source_repository: (
+            JobSourceRepository | None
+        ) = None,
     ) -> None:
         self._gmail_message_repository = (
             gmail_message_repository
             or GmailMessageRepository()
+        )
+
+        self._job_source_repository = (
+            job_source_repository
+            or JobSourceRepository()
         )
 
     def process_pending_messages(
@@ -112,6 +122,12 @@ class GmailJobProcessor:
                 for job in jobs.values():
                     result = upsert_raw_job(job)
 
+                    self._job_source_repository.add_source(
+                        job_id=job.id,
+                        user_id=user_id,
+                        source_type="gmail",
+                    )
+
                     if result == "created":
                         jobs_created += 1
 
@@ -120,18 +136,6 @@ class GmailJobProcessor:
 
                     else:
                         jobs_unchanged += 1
-
-                    link_created = (
-                        ensure_candidate_job_analysis(
-                            candidate_id=(
-                                candidate_id
-                            ),
-                            job_id=job.id,
-                        )
-                    )
-
-                    if link_created:
-                        candidate_links_created += 1
 
                 self._gmail_message_repository.mark_processed(
                     user_id=user_id,

@@ -82,6 +82,31 @@ def initialize_database() -> None:
                         """
         )
 
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_sources (
+                job_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                discovered_at TEXT NOT NULL,
+
+                PRIMARY KEY (
+                    job_id,
+                    user_id,
+                    source_type
+                ),
+
+                FOREIGN KEY (job_id)
+                    REFERENCES jobs(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
         users_columns = connection.execute(
             """
             PRAGMA table_info(users)
@@ -127,6 +152,8 @@ def initialize_database() -> None:
             "salary": "TEXT",
             "easy_apply": "INTEGER NOT NULL DEFAULT 0",
             "description": "TEXT",
+            "category": "TEXT",
+            "sub_category": "TEXT",
         }
 
         for column_name, column_type in jobs_new_columns.items():
@@ -239,6 +266,22 @@ def initialize_database() -> None:
                     REFERENCES users(id)
                     ON DELETE CASCADE
             )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_job_sources_user_id
+            ON job_sources(user_id)
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_job_sources_job_id
+            ON job_sources(job_id)
             """
         )
 
