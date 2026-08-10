@@ -8,6 +8,10 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from services.job_category_service import (
+    JobCategoryService,
+)
+
 load_dotenv()
 
 
@@ -457,6 +461,18 @@ def upsert_recommendation(
 
     now = utc_now()
 
+    category_service = JobCategoryService()
+
+    job_category = category_service.classify(
+        title=job.title or "",
+        description=getattr(
+            job,
+            "description",
+            "",
+        ) or "",
+        raw_text=job.raw_text or "",
+    )
+
     with get_connection() as connection:
         connection.execute(
             """
@@ -470,11 +486,13 @@ def upsert_recommendation(
                 remote,
                 salary,
                 easy_apply,
+                category,
+                sub_category,
                 analysis_json,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
             ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
@@ -885,7 +903,7 @@ def update_candidate_job_notes(
 
 
 def upsert_raw_job(
-        job: Job,
+    job: Job,
 ) -> str:
     """
     Insere uma vaga nova no pool compartilhado.
@@ -901,6 +919,18 @@ def upsert_raw_job(
         )
 
     now = utc_now()
+
+    category_service = JobCategoryService()
+
+    job_category = category_service.classify(
+        title=job.title or "",
+        description=getattr(
+            job,
+            "description",
+            "",
+        ) or "",
+        raw_text=job.raw_text or "",
+    )
 
     with get_connection() as connection:
         existing_row = connection.execute(
@@ -927,11 +957,13 @@ def upsert_raw_job(
                     remote,
                     salary,
                     easy_apply,
+                    category,
+                    sub_category,
                     analysis_json,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job_id,
@@ -943,6 +975,8 @@ def upsert_raw_job(
                     job.remote,
                     job.salary,
                     job.easy_apply,
+                    job_category.category,
+                    job_category.sub_category,
                     "{}",
                     now,
                     now,
@@ -952,14 +986,14 @@ def upsert_raw_job(
             return "created"
 
         current_raw_text = (
-                existing_row["raw_text"]
-                or ""
+            existing_row["raw_text"]
+            or ""
         )
 
         new_raw_text = job.raw_text or ""
 
         if len(new_raw_text) <= len(
-                current_raw_text
+            current_raw_text
         ):
             return "unchanged"
 
@@ -975,6 +1009,8 @@ def upsert_raw_job(
                 remote = COALESCE(?, remote),
                 salary = COALESCE(?, salary),
                 easy_apply = ?,
+                category = ?,
+                sub_category = ?,
                 updated_at = ?
             WHERE id = ?
             """,
@@ -987,6 +1023,8 @@ def upsert_raw_job(
                 job.remote,
                 job.salary,
                 job.easy_apply,
+                job_category.category,
+                job_category.sub_category,
                 now,
                 job_id,
             ),
