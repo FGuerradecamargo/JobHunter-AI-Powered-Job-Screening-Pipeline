@@ -69,21 +69,124 @@ def get_connection() -> sqlite3.Connection:
 
 def initialize_database() -> None:
     with get_connection() as connection:
+        # ==================================================
+        # Base tables
+        # ==================================================
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidates (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                current_role TEXT NOT NULL,
+                current_level TEXT NOT NULL,
+                professional_summary TEXT NOT NULL,
+
+                target_roles_json TEXT NOT NULL,
+                spoken_languages_json TEXT NOT NULL,
+                skills_json TEXT NOT NULL,
+                strengths_json TEXT NOT NULL,
+                development_areas_json TEXT NOT NULL,
+                preferences_json TEXT NOT NULL,
+                constraints_json TEXT NOT NULL,
+
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                company TEXT,
+                location TEXT,
+                url TEXT,
+
+                status TEXT NOT NULL DEFAULT 'in_review',
+                recommendation TEXT,
+                competitive_status TEXT,
+                current_fit INTEGER,
+                growth_value INTEGER,
+                analysis_json TEXT NOT NULL DEFAULT '{}',
+                notes TEXT NOT NULL DEFAULT '',
+
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                applied_at TEXT,
+                rejected_at TEXT,
+
+                raw_text TEXT,
+                remote INTEGER,
+                salary TEXT,
+                easy_apply INTEGER NOT NULL DEFAULT 0,
+                description TEXT,
+                category TEXT,
+                sub_category TEXT
+            )
+            """
+        )
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 email TEXT NOT NULL UNIQUE,
                 display_name TEXT NOT NULL,
-                candidate_id TEXT,
+                candidate_id TEXT UNIQUE,
                 access_level TEXT NOT NULL DEFAULT 'user',
                 password_hash TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+
                 FOREIGN KEY (candidate_id)
                     REFERENCES candidates(id)
+                    ON DELETE SET NULL
             )
-                        """
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_job_analyses (
+                candidate_id TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+
+                recommendation TEXT,
+                competitive_status TEXT,
+                current_fit INTEGER,
+                growth_value INTEGER,
+
+                analysis_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'in_review',
+                notes TEXT NOT NULL DEFAULT '',
+
+                job_signature TEXT,
+                candidate_signature TEXT,
+                analysis_version TEXT,
+
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                applied_at TEXT,
+                rejected_at TEXT,
+
+                PRIMARY KEY (
+                    candidate_id,
+                    job_id
+                ),
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (job_id)
+                    REFERENCES jobs(id)
+                    ON DELETE CASCADE
+            )
+            """
         )
 
         connection.execute(
@@ -110,6 +213,62 @@ def initialize_database() -> None:
             )
             """
         )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS gmail_connections (
+                user_id TEXT PRIMARY KEY,
+                gmail_address TEXT NOT NULL UNIQUE,
+                encrypted_refresh_token TEXT NOT NULL,
+                access_token TEXT,
+                token_expiry TEXT,
+                scopes_json TEXT NOT NULL,
+                last_history_id TEXT,
+                last_sync_at TEXT,
+                connection_status TEXT NOT NULL DEFAULT 'connected',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS gmail_messages (
+                user_id TEXT NOT NULL,
+                gmail_message_id TEXT NOT NULL,
+                gmail_thread_id TEXT,
+                received_at TEXT,
+                processed_at TEXT,
+                processing_status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+
+                subject TEXT,
+                sender TEXT,
+                snippet TEXT,
+                raw_html TEXT,
+                content_fetched_at TEXT,
+
+                PRIMARY KEY (
+                    user_id,
+                    gmail_message_id
+                ),
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        # ==================================================
+        # Migrations for existing databases
+        # ==================================================
 
         users_columns = connection.execute(
             """
