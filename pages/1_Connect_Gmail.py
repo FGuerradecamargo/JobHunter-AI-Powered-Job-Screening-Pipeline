@@ -31,6 +31,20 @@ from services.candidate_job_analysis_service import (
     CandidateJobAnalysisService,
 )
 
+import os
+import streamlit as st
+
+client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+
+st.caption(
+    "OAuth Client ID loaded: "
+    + (
+        f"{client_id[:12]}...{client_id[-12:]}"
+        if client_id
+        else "NOT SET"
+    )
+)
+
 load_dotenv()
 initialize_database()
 
