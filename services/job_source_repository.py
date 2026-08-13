@@ -19,13 +19,19 @@ class JobSourceRepository:
         with get_connection() as connection:
             connection.execute(
                 """
-                INSERT OR IGNORE INTO job_sources (
+                INSERT INTO job_sources (
                     job_id,
                     user_id,
                     source_type,
                     discovered_at
                 )
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (
+                    job_id,
+                    user_id,
+                    source_type
+                )
+                DO NOTHING
                 """,
                 (
                     job_id,
@@ -44,7 +50,7 @@ class JobSourceRepository:
                 """
                 SELECT job_id
                 FROM job_sources
-                WHERE user_id = ?
+                WHERE user_id = %s
                 ORDER BY discovered_at DESC
                 """,
                 (user_id,),
@@ -67,7 +73,7 @@ class JobSourceRepository:
                     source_type,
                     discovered_at
                 FROM job_sources
-                WHERE job_id = ?
+                WHERE job_id = %s
                 ORDER BY discovered_at ASC
                 """,
                 (job_id,),

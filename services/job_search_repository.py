@@ -13,7 +13,7 @@ class JobSearchRepository:
             return []
 
         placeholders = ",".join(
-            "?"
+            "%s"
             for _ in categories
         )
 
@@ -30,7 +30,7 @@ class JobSearchRepository:
             FROM jobs
             WHERE category IN ({placeholders})
             ORDER BY created_at DESC
-            LIMIT ?
+            LIMIT %s
         """
 
         params = [
@@ -54,7 +54,7 @@ class JobSearchRepository:
             return []
 
         placeholders = ",".join(
-            "?"
+            "%s"
             for _ in categories
         )
 
@@ -74,11 +74,11 @@ class JobSearchRepository:
                 ON job_sources.job_id = jobs.id
 
             WHERE
-                job_sources.user_id = ?
+                job_sources.user_id = %s
                 AND jobs.category IN ({placeholders})
 
             ORDER BY jobs.created_at DESC
-            LIMIT ?
+            LIMIT %s
         """
 
         params = [

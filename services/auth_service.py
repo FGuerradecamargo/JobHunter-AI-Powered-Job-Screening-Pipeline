@@ -9,7 +9,7 @@ from uuid import uuid4
 from models.app_user import AppUser
 from models.candidate import Candidate
 from services.candidate_repository import CandidateRepository
-from services.database import get_connection
+from services.database import get_connection, utc_now
 from services.user_repository import UserRepository
 
 
@@ -79,23 +79,28 @@ class AuthService:
         )
 
     def set_password(
-        self,
-        user_id: str,
-        password: str,
+            self,
+            user_id: str,
+            password: str,
     ) -> None:
-        password_hash = self.hash_password(password)
+        password_hash = self.hash_password(
+            password
+        )
+
+        now = utc_now()
 
         with get_connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE users
                 SET
-                    password_hash = ?,
-                    updated_at = datetime('now')
-                WHERE id = ?
+                    password_hash = %s,
+                    updated_at = %s
+                WHERE id = %s
                 """,
                 (
                     password_hash,
+                    now,
                     user_id,
                 ),
             )
@@ -119,7 +124,7 @@ class AuthService:
                     id,
                     password_hash
                 FROM users
-                WHERE email = ?
+                WHERE email = %s
                 """,
                 (normalized_email,),
             ).fetchone()
@@ -184,11 +189,14 @@ class AuthService:
             connection.execute(
                 """
                 UPDATE users
-                SET password_hash = ?
-                WHERE id = ?
+                SET
+                    password_hash = %s,
+                    updated_at = %s
+                WHERE id = %s
                 """,
                 (
                     password_hash,
+                    utc_now(),
                     user.id,
                 ),
             )

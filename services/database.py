@@ -58,9 +58,13 @@ def get_connection():
     )
 
     if database_url:
-        return psycopg.connect(
+        connection = psycopg.connect(
             database_url,
             row_factory=dict_row,
+        )
+
+        return PostgresConnectionAdapter(
+            connection
         )
 
     DATABASE_FILE.parent.mkdir(
@@ -72,7 +76,9 @@ def get_connection():
         DATABASE_FILE
     )
 
-    connection.row_factory = sqlite3.Row
+    connection.row_factory = (
+        sqlite3.Row
+    )
 
     connection.execute(
         "PRAGMA foreign_keys = ON"
@@ -80,8 +86,401 @@ def get_connection():
 
     return connection
 
+def is_postgres() -> bool:
+    return bool(
+        os.getenv("DATABASE_URL")
+    )
 
-def initialize_database() -> None:
+
+def initialize_postgres_database() -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidates (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                "current_role" TEXT NOT NULL,
+                current_level TEXT NOT NULL,
+                professional_summary TEXT NOT NULL,
+
+                target_roles_json TEXT NOT NULL,
+                spoken_languages_json TEXT NOT NULL,
+                skills_json TEXT NOT NULL,
+                strengths_json TEXT NOT NULL,
+                development_areas_json TEXT NOT NULL,
+                preferences_json TEXT NOT NULL,
+                constraints_json TEXT NOT NULL,
+
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                company TEXT,
+                location TEXT,
+                url TEXT,
+
+                status TEXT NOT NULL DEFAULT 'in_review',
+                recommendation TEXT,
+                competitive_status TEXT,
+                current_fit INTEGER,
+                growth_value INTEGER,
+                analysis_json TEXT NOT NULL DEFAULT '{}',
+                notes TEXT NOT NULL DEFAULT '',
+
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                applied_at TEXT,
+                rejected_at TEXT,
+
+                raw_text TEXT,
+                remote INTEGER,
+                salary TEXT,
+                easy_apply INTEGER NOT NULL DEFAULT 0,
+                description TEXT,
+                category TEXT,
+                sub_category TEXT
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                candidate_id TEXT UNIQUE,
+                access_level TEXT NOT NULL DEFAULT 'user',
+                password_hash TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE SET NULL
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_job_analyses (
+                candidate_id TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+
+                recommendation TEXT,
+                competitive_status TEXT,
+                current_fit INTEGER,
+                growth_value INTEGER,
+
+                analysis_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'in_review',
+                notes TEXT NOT NULL DEFAULT '',
+
+                job_signature TEXT,
+                candidate_signature TEXT,
+                analysis_version TEXT,
+
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                applied_at TEXT,
+                rejected_at TEXT,
+
+                PRIMARY KEY (
+                    candidate_id,
+                    job_id
+                ),
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (job_id)
+                    REFERENCES jobs(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_sources (
+                job_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                discovered_at TEXT NOT NULL,
+
+                PRIMARY KEY (
+                    job_id,
+                    user_id,
+                    source_type
+                ),
+
+                FOREIGN KEY (job_id)
+                    REFERENCES jobs(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS gmail_connections (
+                user_id TEXT PRIMARY KEY,
+                gmail_address TEXT NOT NULL UNIQUE,
+                encrypted_refresh_token TEXT NOT NULL,
+                access_token TEXT,
+                token_expiry TEXT,
+                scopes_json TEXT NOT NULL,
+                last_history_id TEXT,
+                last_sync_at TEXT,
+                connection_status TEXT NOT NULL DEFAULT 'connected',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS gmail_messages (
+                user_id TEXT NOT NULL,
+                gmail_message_id TEXT NOT NULL,
+                gmail_thread_id TEXT,
+                received_at TEXT,
+                processed_at TEXT,
+                processing_status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+
+                subject TEXT,
+                sender TEXT,
+                snippet TEXT,
+                raw_html TEXT,
+                content_fetched_at TEXT,
+
+                PRIMARY KEY (
+                    user_id,
+                    gmail_message_id
+                ),
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS oauth_authorization_states (
+                state TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                code_verifier TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                consumed_at TEXT,
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_onboarding (
+                candidate_id TEXT PRIMARY KEY,
+                location TEXT NOT NULL DEFAULT '',
+                work_authorisation TEXT NOT NULL DEFAULT '',
+                spoken_languages_json TEXT NOT NULL DEFAULT '[]',
+                desired_next_work TEXT NOT NULL DEFAULT '',
+                enjoyed_work TEXT NOT NULL DEFAULT '',
+                avoid_work TEXT NOT NULL DEFAULT '',
+                development_interests TEXT NOT NULL DEFAULT '',
+                career_priorities_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_work_experiences (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                company TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                career_story TEXT NOT NULL,
+                day_to_day_narrative TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_job_sources_user_id
+            ON job_sources(user_id)
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_job_sources_job_id
+            ON job_sources(job_id)
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_candidate_job_status
+            ON candidate_job_analyses(
+                candidate_id,
+                status
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_users_candidate_id
+            ON users(candidate_id)
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_gmail_messages_status
+            ON gmail_messages(
+                user_id,
+                processing_status
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_gmail_messages_received_at
+            ON gmail_messages(
+                user_id,
+                received_at
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_candidate_job_fit
+            ON candidate_job_analyses(
+                candidate_id,
+                current_fit
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_candidate_job_growth
+            ON candidate_job_analyses(
+                candidate_id,
+                growth_value
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_candidate_work_experiences_candidate_id
+            ON candidate_work_experiences(candidate_id)
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_oauth_states_user_id
+            ON oauth_authorization_states(user_id)
+            """
+        )
+
+
+class PostgresConnectionAdapter:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(
+        self,
+        query: str,
+        params=None,
+    ):
+        if params is not None:
+            query = query.replace(
+                "?",
+                "%s",
+            )
+
+        return self._connection.execute(
+            query,
+            params,
+        )
+
+    def __enter__(self):
+        self._connection.__enter__()
+        return self
+
+    def __exit__(
+        self,
+        exc_type,
+        exc_value,
+        traceback,
+    ):
+        return self._connection.__exit__(
+            exc_type,
+            exc_value,
+            traceback,
+        )
+
+    def close(self):
+        return self._connection.close()
+
+
+def initialize_sqlite_database() -> None:
     with get_connection() as connection:
         # ==================================================
         # Base tables
@@ -279,6 +678,13 @@ def initialize_database() -> None:
             )
             """
         )
+
+        def initialize_database() -> None:
+            if is_postgres():
+                initialize_postgres_database()
+                return
+
+            initialize_sqlite_database()
 
         # ==================================================
         # Migrations for existing databases
@@ -617,6 +1023,14 @@ def initialize_database() -> None:
             ON oauth_authorization_states(user_id)
             """
         )
+
+
+def initialize_database() -> None:
+    if is_postgres():
+        initialize_postgres_database()
+        return
+
+    initialize_sqlite_database()
 
 
 def upsert_recommendation(
@@ -1145,9 +1559,13 @@ def upsert_raw_job(
                     job.company,
                     job.location,
                     job.url,
-                    job.remote,
+                    (
+                        None
+                        if job.remote is None
+                        else int(job.remote)
+                    ),
                     job.salary,
-                    job.easy_apply,
+                    int(job.easy_apply),
                     job_category.category,
                     job_category.sub_category,
                     "{}",
@@ -1193,9 +1611,13 @@ def upsert_raw_job(
                 job.company,
                 job.location,
                 job.url,
-                job.remote,
+                (
+                    None
+                    if job.remote is None
+                    else int(job.remote)
+                ),
                 job.salary,
-                job.easy_apply,
+                int(job.easy_apply),
                 job_category.category,
                 job_category.sub_category,
                 now,

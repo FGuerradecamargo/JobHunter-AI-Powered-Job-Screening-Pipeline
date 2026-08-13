@@ -6,7 +6,6 @@ from typing import Optional
 
 from models.gmail_connection import GmailConnection
 from services.database import get_connection
-
 from services.token_encryption_service import (
     TokenEncryptionService,
 )
@@ -28,13 +27,9 @@ class GmailConnectionRepository:
         self,
         gmail_connection: GmailConnection,
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
-
-        encrypted_refresh_token = (
-            self._token_encryption_service.encrypt(
-                gmail_connection.refresh_token
-            )
-        )
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         encrypted_refresh_token = (
             self._token_encryption_service.encrypt(
@@ -58,7 +53,10 @@ class GmailConnectionRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s
+                )
 
                 ON CONFLICT(user_id)
                 DO UPDATE SET
@@ -91,7 +89,9 @@ class GmailConnectionRepository:
                 """,
                 (
                     gmail_connection.user_id,
-                    gmail_connection.gmail_address.strip().lower(),
+                    gmail_connection.gmail_address
+                    .strip()
+                    .lower(),
                     encrypted_refresh_token,
                     gmail_connection.access_token,
                     gmail_connection.token_expiry,
@@ -108,24 +108,24 @@ class GmailConnectionRepository:
             )
 
     def get_by_user_id(
-            self,
-            user_id: str,
+        self,
+        user_id: str,
     ) -> Optional[GmailConnection]:
         with get_connection() as connection:
             row = connection.execute(
                 """
                 SELECT
-    user_id,
-    gmail_address,
-    encrypted_refresh_token,
-    access_token,
-    token_expiry,
-    scopes_json,
-    last_history_id,
-    last_sync_at,
-    connection_status
-FROM gmail_connections
-WHERE user_id = ?
+                    user_id,
+                    gmail_address,
+                    encrypted_refresh_token,
+                    access_token,
+                    token_expiry,
+                    scopes_json,
+                    last_history_id,
+                    last_sync_at,
+                    connection_status
+                FROM gmail_connections
+                WHERE user_id = %s
                 """,
                 (user_id,),
             ).fetchone()
@@ -134,25 +134,41 @@ WHERE user_id = ?
             return None
 
         if (
-                row["connection_status"] != "connected"
-                or not row["encrypted_refresh_token"]
+            row["connection_status"] != "connected"
+            or not row["encrypted_refresh_token"]
         ):
             return None
 
         return GmailConnection(
             user_id=row["user_id"],
-            gmail_address=row["gmail_address"],
+            gmail_address=row[
+                "gmail_address"
+            ],
             refresh_token=(
                 self._token_encryption_service.decrypt(
-                    row["encrypted_refresh_token"]
+                    row[
+                        "encrypted_refresh_token"
+                    ]
                 )
             ),
-            scopes=json.loads(row["scopes_json"]),
-            access_token=row["access_token"],
-            token_expiry=row["token_expiry"],
-            last_history_id=row["last_history_id"],
-            last_sync_at=row["last_sync_at"],
-            connection_status=row["connection_status"],
+            scopes=json.loads(
+                row["scopes_json"]
+            ),
+            access_token=row[
+                "access_token"
+            ],
+            token_expiry=row[
+                "token_expiry"
+            ],
+            last_history_id=row[
+                "last_history_id"
+            ],
+            last_sync_at=row[
+                "last_sync_at"
+            ],
+            connection_status=row[
+                "connection_status"
+            ],
         )
 
     def update_sync_state(
@@ -163,7 +179,9 @@ WHERE user_id = ?
     ) -> None:
         resolved_sync_at = (
             last_sync_at
-            or datetime.now(timezone.utc).isoformat()
+            or datetime.now(
+                timezone.utc
+            ).isoformat()
         )
 
         with get_connection() as connection:
@@ -171,10 +189,10 @@ WHERE user_id = ?
                 """
                 UPDATE gmail_connections
                 SET
-                    last_history_id = ?,
-                    last_sync_at = ?,
-                    updated_at = ?
-                WHERE user_id = ?
+                    last_history_id = %s,
+                    last_sync_at = %s,
+                    updated_at = %s
+                WHERE user_id = %s
                 """,
                 (
                     last_history_id,
@@ -194,7 +212,9 @@ WHERE user_id = ?
         self,
         user_id: str,
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         with get_connection() as connection:
             cursor = connection.execute(
@@ -204,8 +224,8 @@ WHERE user_id = ?
                     connection_status = 'disconnected',
                     access_token = NULL,
                     encrypted_refresh_token = '',
-                    updated_at = ?
-                WHERE user_id = ?
+                    updated_at = %s
+                WHERE user_id = %s
                 """,
                 (
                     now,
@@ -218,4 +238,3 @@ WHERE user_id = ?
                 "Gmail connection not found for "
                 f"user: {user_id}"
             )
-

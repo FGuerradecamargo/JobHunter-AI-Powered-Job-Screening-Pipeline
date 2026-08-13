@@ -5,7 +5,10 @@ from typing import Optional
 from uuid import uuid4
 
 from models.app_user import AppUser
-from services.database import get_connection
+from services.database import (
+    get_connection,
+    utc_now,
+)
 
 
 class UserRepository:
@@ -19,13 +22,19 @@ class UserRepository:
     ) -> AppUser:
         normalized_email = email.strip().lower()
         normalized_name = display_name.strip()
-        normalized_access_level = access_level.strip().lower()
+        normalized_access_level = (
+            access_level.strip().lower()
+        )
 
         if not normalized_email:
-            raise ValueError("Email is required.")
+            raise ValueError(
+                "Email is required."
+            )
 
         if not normalized_name:
-            raise ValueError("Display name is required.")
+            raise ValueError(
+                "Display name is required."
+            )
 
         if normalized_access_level not in {
             "admin",
@@ -36,8 +45,13 @@ class UserRepository:
                 f"Invalid access level: {access_level}"
             )
 
-        resolved_user_id = user_id or uuid4().hex
-        now = datetime.now(timezone.utc).isoformat()
+        resolved_user_id = (
+            user_id or uuid4().hex
+        )
+
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         with get_connection() as connection:
             connection.execute(
@@ -51,7 +65,15 @@ class UserRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
                 """,
                 (
                     resolved_user_id,
@@ -86,18 +108,22 @@ class UserRepository:
                     candidate_id,
                     access_level
                 FROM users
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (user_id,),
             ).fetchone()
 
-        return self._row_to_user(row)
+        return self._row_to_user(
+            row
+        )
 
     def get_by_email(
         self,
         email: str,
     ) -> Optional[AppUser]:
-        normalized_email = email.strip().lower()
+        normalized_email = (
+            email.strip().lower()
+        )
 
         with get_connection() as connection:
             row = connection.execute(
@@ -109,12 +135,14 @@ class UserRepository:
                     candidate_id,
                     access_level
                 FROM users
-                WHERE email = ?
+                WHERE email = %s
                 """,
                 (normalized_email,),
             ).fetchone()
 
-        return self._row_to_user(row)
+        return self._row_to_user(
+            row
+        )
 
     def get_by_candidate_id(
         self,
@@ -130,28 +158,32 @@ class UserRepository:
                     candidate_id,
                     access_level
                 FROM users
-                WHERE candidate_id = ?
+                WHERE candidate_id = %s
                 """,
                 (candidate_id,),
             ).fetchone()
 
-        return self._row_to_user(row)
+        return self._row_to_user(
+            row
+        )
 
     def link_candidate(
         self,
         user_id: str,
         candidate_id: str,
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         with get_connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE users
                 SET
-                    candidate_id = ?,
-                    updated_at = ?
-                WHERE id = ?
+                    candidate_id = %s,
+                    updated_at = %s
+                WHERE id = %s
                 """,
                 (
                     candidate_id,
@@ -183,16 +215,18 @@ class UserRepository:
                 f"Invalid access level: {access_level}"
             )
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         with get_connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE users
                 SET
-                    access_level = ?,
-                    updated_at = ?
-                WHERE id = ?
+                    access_level = %s,
+                    updated_at = %s
+                WHERE id = %s
                 """,
                 (
                     normalized_access_level,
@@ -216,9 +250,15 @@ class UserRepository:
         return AppUser(
             id=row["id"],
             email=row["email"],
-            display_name=row["display_name"],
-            candidate_id=row["candidate_id"],
-            access_level=row["access_level"],
+            display_name=row[
+                "display_name"
+            ],
+            candidate_id=row[
+                "candidate_id"
+            ],
+            access_level=row[
+                "access_level"
+            ],
         )
 
     def list_all(

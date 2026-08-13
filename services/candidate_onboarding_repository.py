@@ -36,7 +36,10 @@ class CandidateOnboardingRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s
+                )
 
                 ON CONFLICT(candidate_id) DO UPDATE SET
                     location = excluded.location,
@@ -79,7 +82,7 @@ class CandidateOnboardingRepository:
                 """
                 SELECT *
                 FROM candidate_onboarding
-                WHERE candidate_id = ?
+                WHERE candidate_id = %s
                 """,
                 (candidate_id,),
             ).fetchone()
@@ -121,7 +124,9 @@ class CandidateOnboardingRepository:
             start_date=start_date,
             end_date=end_date,
             career_story=career_story.strip(),
-            day_to_day_narrative=day_to_day_narrative.strip(),
+            day_to_day_narrative=(
+                day_to_day_narrative.strip()
+            ),
         )
 
         now = utc_now()
@@ -140,7 +145,10 @@ class CandidateOnboardingRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s
+                )
                 """,
                 (
                     experience.id,
@@ -166,7 +174,7 @@ class CandidateOnboardingRepository:
                 """
                 SELECT *
                 FROM candidate_work_experiences
-                WHERE candidate_id = ?
+                WHERE candidate_id = %s
                 ORDER BY start_date DESC
                 """,
                 (candidate_id,),
@@ -188,8 +196,8 @@ class CandidateOnboardingRepository:
         ]
 
     def update_work_experience(
-            self,
-            experience: WorkExperience,
+        self,
+        experience: WorkExperience,
     ) -> None:
         now = utc_now()
 
@@ -198,13 +206,13 @@ class CandidateOnboardingRepository:
                 """
                 UPDATE candidate_work_experiences
                 SET
-                    company = ?,
-                    start_date = ?,
-                    end_date = ?,
-                    career_story = ?,
-                    day_to_day_narrative = ?,
-                    updated_at = ?
-                WHERE id = ?
+                    company = %s,
+                    start_date = %s,
+                    end_date = %s,
+                    career_story = %s,
+                    day_to_day_narrative = %s,
+                    updated_at = %s
+                WHERE id = %s
                 """,
                 (
                     experience.company.strip(),
@@ -218,14 +226,14 @@ class CandidateOnboardingRepository:
             )
 
     def delete_work_experience(
-            self,
-            experience_id: str,
+        self,
+        experience_id: str,
     ) -> None:
         with get_connection() as connection:
             connection.execute(
                 """
                 DELETE FROM candidate_work_experiences
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (experience_id,),
             )

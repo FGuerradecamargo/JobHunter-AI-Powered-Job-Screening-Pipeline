@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from services.database import get_connection
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -17,23 +17,29 @@ class OAuthStateRepository:
     STATE_LIFETIME_MINUTES = 15
 
     def save(
-            self,
-            state: str,
-            user_id: str,
-            code_verifier: str,
+        self,
+        state: str,
+        user_id: str,
+        code_verifier: str,
     ) -> None:
         if not state:
-            raise ValueError("OAuth state is required.")
+            raise ValueError(
+                "OAuth state is required."
+            )
 
         if not user_id:
-            raise ValueError("User ID is required.")
+            raise ValueError(
+                "User ID is required."
+            )
 
         if not code_verifier:
             raise ValueError(
                 "OAuth code verifier is required."
             )
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(
+            timezone.utc
+        ).isoformat()
 
         with get_connection() as connection:
             connection.execute(
@@ -45,7 +51,9 @@ class OAuthStateRepository:
                     created_at,
                     consumed_at
                 )
-                VALUES (?, ?, ?, ?, NULL)
+                VALUES (
+                    %s, %s, %s, %s, NULL
+                )
                 """,
                 (
                     state,
@@ -56,10 +64,9 @@ class OAuthStateRepository:
             )
 
     def consume(
-            self,
-            state: str,
+        self,
+        state: str,
     ) -> Optional[OAuthAuthorizationState]:
-
         with get_connection() as connection:
             row = connection.execute(
                 """
@@ -70,7 +77,7 @@ class OAuthStateRepository:
                     created_at,
                     consumed_at
                 FROM oauth_authorization_states
-                WHERE state = ?
+                WHERE state = %s
                 """,
                 (state,),
             ).fetchone()
@@ -85,11 +92,16 @@ class OAuthStateRepository:
                 row["created_at"]
             )
 
-            expires_at = created_at + timedelta(
-                minutes=self.STATE_LIFETIME_MINUTES
+            expires_at = (
+                created_at
+                + timedelta(
+                    minutes=self.STATE_LIFETIME_MINUTES
+                )
             )
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(
+                timezone.utc
+            )
 
             if now > expires_at:
                 return None
@@ -97,8 +109,8 @@ class OAuthStateRepository:
             connection.execute(
                 """
                 UPDATE oauth_authorization_states
-                SET consumed_at = ?
-                WHERE state = ?
+                SET consumed_at = %s
+                WHERE state = %s
                 """,
                 (
                     now.isoformat(),
@@ -111,9 +123,13 @@ class OAuthStateRepository:
             code_verifier=row["code_verifier"],
         )
 
-    def delete_expired(self) -> int:
+    def delete_expired(
+        self,
+    ) -> int:
         cutoff = (
-            datetime.now(timezone.utc)
+            datetime.now(
+                timezone.utc
+            )
             - timedelta(
                 minutes=self.STATE_LIFETIME_MINUTES
             )
@@ -124,7 +140,7 @@ class OAuthStateRepository:
                 """
                 DELETE FROM oauth_authorization_states
                 WHERE
-                    created_at < ?
+                    created_at < %s
                     OR consumed_at IS NOT NULL
                 """,
                 (cutoff,),

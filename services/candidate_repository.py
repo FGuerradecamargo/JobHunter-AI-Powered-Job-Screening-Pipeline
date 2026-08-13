@@ -27,7 +27,7 @@ class CandidateRepository:
                 INSERT INTO candidates (
                     id,
                     name,
-                    current_role,
+                    "current_role",
                     current_level,
                     professional_summary,
                     target_roles_json,
@@ -40,11 +40,14 @@ class CandidateRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s
+                )
 
                 ON CONFLICT(id) DO UPDATE SET
                     name = excluded.name,
-                    current_role = excluded.current_role,
+                    "current_role" = excluded."current_role",
                     current_level = excluded.current_level,
                     professional_summary = excluded.professional_summary,
                     target_roles_json = excluded.target_roles_json,
@@ -104,7 +107,7 @@ class CandidateRepository:
                 """
                 SELECT *
                 FROM candidates
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (candidate_id,),
             ).fetchone()
@@ -139,7 +142,7 @@ class CandidateRepository:
             cursor = connection.execute(
                 """
                 DELETE FROM candidates
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (candidate_id,),
             )
@@ -155,7 +158,7 @@ class CandidateRepository:
                 """
                 SELECT 1
                 FROM candidates
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (candidate_id,),
             ).fetchone()
