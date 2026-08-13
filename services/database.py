@@ -12,6 +12,10 @@ from services.job_category_service import (
     JobCategoryService,
 )
 
+import os
+import psycopg
+from psycopg.rows import dict_row
+
 load_dotenv()
 
 
@@ -48,7 +52,17 @@ def utc_now() -> str:
     ).isoformat()
 
 
-def get_connection() -> sqlite3.Connection:
+def get_connection():
+    database_url = os.getenv(
+        "DATABASE_URL"
+    )
+
+    if database_url:
+        return psycopg.connect(
+            database_url,
+            row_factory=dict_row,
+        )
+
     DATABASE_FILE.parent.mkdir(
         parents=True,
         exist_ok=True,
