@@ -1,6 +1,7 @@
 import streamlit as st
 
 from services.candidate_repository import CandidateRepository
+from services.session_auth import require_login
 from services.database import (
     count_candidate_jobs_by_status,
     initialize_database,
@@ -490,14 +491,9 @@ def main() -> None:
 
     initialize_database()
 
-    candidate_repository = CandidateRepository()
-    candidates = candidate_repository.list_all()
+    current_user = require_login()
 
-    if not candidates:
-        st.warning(
-            "No candidates were found in the database."
-        )
-        return
+    candidate_repository = CandidateRepository()
 
     st.title("JobHunter")
 
@@ -505,19 +501,47 @@ def main() -> None:
         "Review opportunities and track your applications."
     )
 
-    candidate_options = {
-        candidate.name: candidate.id
-        for candidate in candidates
-    }
+    if current_user.access_level == "admin":
+        candidates = candidate_repository.list_all()
 
-    selected_candidate_name = st.selectbox(
-        "Candidate",
-        options=list(candidate_options.keys()),
-    )
+        if not candidates:
+            st.warning(
+                "No candidates were found in the database."
+            )
+            return
 
-    selected_candidate_id = candidate_options[
-        selected_candidate_name
-    ]
+        candidate_options = {
+            candidate.name: candidate.id
+            for candidate in candidates
+        }
+
+        selected_candidate_name = st.selectbox(
+            "Candidate",
+            options=list(candidate_options.keys()),
+        )
+
+        selected_candidate_id = candidate_options[
+            selected_candidate_name
+        ]
+
+    else:
+        if not current_user.candidate_id:
+            st.warning(
+                "Your account does not have a professional profile yet."
+            )
+            return
+
+        selected_candidate_id = current_user.candidate_id
+
+        candidate = candidate_repository.get(
+            selected_candidate_id
+        )
+
+        if candidate is None:
+            st.warning(
+                "Your professional profile could not be found."
+            )
+            return
 
     counts = count_candidate_jobs_by_status(
         selected_candidate_id
