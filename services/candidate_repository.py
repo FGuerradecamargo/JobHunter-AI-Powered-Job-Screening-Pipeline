@@ -4,6 +4,7 @@ from dataclasses import asdict
 from models.candidate import Candidate
 from models.candidate_constraints import CandidateConstraints
 from models.candidate_preferences import CandidatePreferences
+from models.candidate_priority import CandidatePriority
 from services.database import (
     get_connection,
     initialize_database,
@@ -37,12 +38,13 @@ class CandidateRepository:
                     development_areas_json,
                     preferences_json,
                     constraints_json,
+                    priorities_json,
                     created_at,
                     updated_at
                 )
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s
                 )
 
                 ON CONFLICT(id) DO UPDATE SET
@@ -57,6 +59,7 @@ class CandidateRepository:
                     development_areas_json = excluded.development_areas_json,
                     preferences_json = excluded.preferences_json,
                     constraints_json = excluded.constraints_json,
+                    priorities_json = excluded.priorities_json,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -91,6 +94,13 @@ class CandidateRepository:
                     ),
                     json.dumps(
                         asdict(candidate.constraints),
+                        ensure_ascii=False,
+                    ),
+                    json.dumps(
+                        [
+                            asdict(priority)
+                            for priority in candidate.priorities
+                        ],
                         ensure_ascii=False,
                     ),
                     now,
@@ -169,6 +179,10 @@ class CandidateRepository:
     def _from_row(
         row,
     ) -> Candidate:
+        priorities_data = json.loads(
+            row["priorities_json"] or "[]"
+        )
+
         return Candidate(
             id=row["id"],
             name=row["name"],
@@ -202,4 +216,8 @@ class CandidateRepository:
                     row["constraints_json"]
                 )
             ),
+            priorities=[
+                CandidatePriority(**priority)
+                for priority in priorities_data
+            ],
         )

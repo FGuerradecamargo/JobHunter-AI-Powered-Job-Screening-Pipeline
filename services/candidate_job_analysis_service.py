@@ -30,12 +30,19 @@ from services.database import (
 )
 from services.job_enricher import JobEnricher
 from services.job_matcher import JobMatcher
+from services.job_bucket_classifier import (
+    classify_job_bucket,
+    BEST_MATCH,
+    TRADEOFF,
+    LOWER_ALIGNMENT,
+    REJECT,
+)
 from services.recommenders.recommendation_engine import (
     RecommendationEngine,
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v3"
+ANALYSIS_VERSION = "candidate-job-analysis-v4"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -421,6 +428,8 @@ class CandidateJobAnalysisService:
         pending_rows = list_pending_candidate_jobs(
             candidate_id=candidate_id,
             limit=limit,
+            analysis_version=ANALYSIS_VERSION,
+            candidate_signature=candidate_signature,
         )
 
         result = {
@@ -431,6 +440,9 @@ class CandidateJobAnalysisService:
             "ai_analyses_created": 0,
             "ai_approved": 0,
             "ai_rejected": 0,
+            "best_match": 0,
+            "tradeoff": 0,
+            "lower_alignment": 0,
             "descriptions_reused": 0,
             "descriptions_fetched": 0,
             "descriptions_failed": 0,
@@ -521,6 +533,7 @@ class CandidateJobAnalysisService:
                         )
                     )
 
+                    analysis["bucket"] = REJECT
                     analysis_status = "system_rejected"
 
                     result["hard_rejected"] += 1
@@ -551,6 +564,7 @@ class CandidateJobAnalysisService:
                         )
                     )
 
+                    analysis["bucket"] = REJECT
                     analysis_status = "system_rejected"
 
                     result[
@@ -617,22 +631,30 @@ class CandidateJobAnalysisService:
                         "ai_analyses_created"
                     ] += 1
 
-                    if ai_analysis_should_be_visible(
-                            analysis=analysis,
-                            job=job,
-                            candidate=candidate,
-                    ):
-                        analysis_status = "in_review"
+                    bucket = classify_job_bucket(
+                        analysis
+                    )
 
-                        result[
-                            "ai_approved"
-                        ] += 1
+                    analysis["bucket"] = bucket
+
+                    if bucket == BEST_MATCH:
+                        analysis_status = "in_review"
+                        result["best_match"] += 1
+                        result["ai_approved"] += 1
+
+                    elif bucket == TRADEOFF:
+                        analysis_status = "in_review"
+                        result["tradeoff"] += 1
+                        result["ai_approved"] += 1
+
+                    elif bucket == LOWER_ALIGNMENT:
+                        analysis_status = "in_review"
+                        result["lower_alignment"] += 1
+                        result["ai_approved"] += 1
+
                     else:
                         analysis_status = "system_rejected"
-
-                        result[
-                            "ai_rejected"
-                        ] += 1
+                        result["ai_rejected"] += 1
 
                 job_signature = (
                     build_job_signature(job)

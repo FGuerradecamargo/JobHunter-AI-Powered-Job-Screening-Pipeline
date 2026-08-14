@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+﻿from dataclasses import dataclass, field
 
 
 @dataclass
@@ -17,6 +17,9 @@ class CandidateProfile:
     positive_preferences: list[str] = field(default_factory=list)
     negative_preferences: list[str] = field(default_factory=list)
     hard_constraints: list[str] = field(default_factory=list)
+
+    positive_priorities: list[str] = field(default_factory=list)
+    negative_priorities: list[str] = field(default_factory=list)
 
     relocation_policy: str = ""
     salary_policy: str = ""

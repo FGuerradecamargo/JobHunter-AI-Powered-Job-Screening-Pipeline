@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from models.candidate_constraints import CandidateConstraints
 from models.candidate_preferences import CandidatePreferences
+from models.candidate_priority import CandidatePriority
 
 
 @dataclass
@@ -40,4 +41,8 @@ class Candidate:
 
     constraints: CandidateConstraints = field(
         default_factory=CandidateConstraints
+    )
+
+    priorities: list[CandidatePriority] = field(
+        default_factory=list
     )

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+﻿from dataclasses import dataclass, field
 
 
 @dataclass
@@ -10,6 +10,9 @@ class AIRecommendation:
 
     current_fit: int
     growth_value: int
+
+    direction_alignment: str = ""
+    bucket: str = ""
 
     job_level: str = ""
     candidate_level: str = ""
@@ -24,6 +27,10 @@ class AIRecommendation:
 
     positive_points: list[str] = field(default_factory=list)
     personal_negatives: list[str] = field(default_factory=list)
+
+    priority_matches: list[str] = field(default_factory=list)
+    priority_conflicts: list[str] = field(default_factory=list)
+
     hard_conflicts: list[str] = field(default_factory=list)
 
     reason: str = ""

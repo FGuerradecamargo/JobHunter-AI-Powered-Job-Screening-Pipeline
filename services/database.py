@@ -86,6 +86,7 @@ def get_connection():
 
     return connection
 
+
 def is_postgres() -> bool:
     return bool(
         os.getenv("DATABASE_URL")
@@ -110,10 +111,19 @@ def initialize_postgres_database() -> None:
                 development_areas_json TEXT NOT NULL,
                 preferences_json TEXT NOT NULL,
                 constraints_json TEXT NOT NULL,
+                priorities_json TEXT NOT NULL DEFAULT '[]',
 
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE candidates
+            ADD COLUMN IF NOT EXISTS priorities_json
+            TEXT NOT NULL DEFAULT '[]'
             """
         )
 
@@ -502,6 +512,7 @@ def initialize_sqlite_database() -> None:
                 development_areas_json TEXT NOT NULL,
                 preferences_json TEXT NOT NULL,
                 constraints_json TEXT NOT NULL,
+                priorities_json TEXT NOT NULL DEFAULT '[]',
 
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -1428,23 +1439,11 @@ def update_candidate_job_status(
         connection.execute(
             """
             UPDATE candidate_job_analyses
-
             SET
                 status = ?,
                 updated_at = ?,
-
-                applied_at = CASE
-                    WHEN ? IS NOT NULL
-                    THEN ?
-                    ELSE applied_at
-                END,
-
-                rejected_at = CASE
-                    WHEN ? IS NOT NULL
-                    THEN ?
-                    ELSE rejected_at
-                END
-
+                applied_at = COALESCE(?, applied_at),
+                rejected_at = COALESCE(?, rejected_at)
             WHERE
                 candidate_id = ?
                 AND job_id = ?
@@ -1453,8 +1452,6 @@ def update_candidate_job_status(
                 status,
                 now,
                 applied_at,
-                applied_at,
-                rejected_at,
                 rejected_at,
                 candidate_id,
                 job_id,
@@ -1769,6 +1766,8 @@ def ensure_candidate_job_analysis(
 def list_pending_candidate_jobs(
     candidate_id: str,
     limit: int = 5,
+    analysis_version: str | None = None,
+    candidate_signature: str | None = None,
 ) -> list[dict[str, Any]]:
     if not candidate_id:
         raise ValueError(
@@ -1793,7 +1792,13 @@ def list_pending_candidate_jobs(
                 jobs.remote,
                 jobs.salary,
                 jobs.easy_apply,
-                jobs.description
+                jobs.description,
+
+                candidate_job_analyses.analysis_version,
+                candidate_job_analyses.candidate_signature,
+                candidate_job_analyses.job_signature,
+                candidate_job_analyses.recommendation,
+                candidate_job_analyses.status
 
             FROM candidate_job_analyses
 
@@ -1802,8 +1807,25 @@ def list_pending_candidate_jobs(
 
             WHERE
                 candidate_job_analyses.candidate_id = ?
-                AND candidate_job_analyses.status = 'in_review'
-                AND candidate_job_analyses.recommendation IS NULL
+
+                AND candidate_job_analyses.status IN (
+                    'in_review',
+                    'system_rejected'
+                )
+
+                AND (
+                    candidate_job_analyses.recommendation IS NULL
+
+                    OR COALESCE(
+                        candidate_job_analyses.analysis_version,
+                        ''
+                    ) != COALESCE(?, '')
+
+                    OR COALESCE(
+                        candidate_job_analyses.candidate_signature,
+                        ''
+                    ) != COALESCE(?, '')
+                )
 
             ORDER BY
                 candidate_job_analyses.created_at ASC
@@ -1812,6 +1834,8 @@ def list_pending_candidate_jobs(
             """,
             (
                 candidate_id,
+                analysis_version,
+                candidate_signature,
                 limit,
             ),
         ).fetchall()
@@ -1820,7 +1844,6 @@ def list_pending_candidate_jobs(
         dict(row)
         for row in rows
     ]
-
 
 def update_shared_job_analysis_data(
     job: Job,

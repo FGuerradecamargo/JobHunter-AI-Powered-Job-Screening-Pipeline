@@ -1,4 +1,4 @@
-from models.candidate import Candidate
+﻿from models.candidate import Candidate
 from models.candidate_profile import CandidateProfile
 
 
@@ -9,8 +9,24 @@ def candidate_to_profile(
     negative_preferences: list[str] = []
     hard_constraints: list[str] = []
 
+    positive_priorities: list[str] = []
+    negative_priorities: list[str] = []
+
     preferences = candidate.preferences
     constraints = candidate.constraints
+
+    for priority in candidate.priorities:
+        if not priority.active:
+            continue
+
+        if priority.direction == "negative":
+            negative_priorities.append(
+                priority.text
+            )
+        else:
+            positive_priorities.append(
+                priority.text
+            )
 
     if preferences.remote_allowed:
         positive_preferences.append(
@@ -62,9 +78,7 @@ def candidate_to_profile(
             "Night and overnight shifts are not acceptable."
         )
 
-    if (
-        constraints.unsupported_languages_are_blocking
-    ):
+    if constraints.unsupported_languages_are_blocking:
         hard_constraints.append(
             "A mandatory language not spoken by the "
             "candidate is a blocking conflict."
@@ -75,9 +89,7 @@ def candidate_to_profile(
             "Mandatory overnight on-call work is not acceptable."
         )
 
-    if (
-        constraints.mandatory_relocation_is_blocking
-    ):
+    if constraints.mandatory_relocation_is_blocking:
         hard_constraints.append(
             "Mandatory relocation is a blocking conflict."
         )
@@ -119,6 +131,8 @@ def candidate_to_profile(
         positive_preferences=positive_preferences,
         negative_preferences=negative_preferences,
         hard_constraints=hard_constraints,
+        positive_priorities=positive_priorities,
+        negative_priorities=negative_priorities,
         relocation_policy=constraints.relocation,
         salary_policy=salary_policy,
         spoken_languages=list(

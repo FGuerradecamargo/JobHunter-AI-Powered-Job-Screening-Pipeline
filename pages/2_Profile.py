@@ -1,7 +1,8 @@
-import streamlit as st
+﻿import streamlit as st
 
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
+from models.candidate_priority import CandidatePriority
 from services.candidate_onboarding_repository import (
     CandidateOnboardingRepository,
 )
@@ -19,7 +20,7 @@ current_user = require_login()
 
 st.set_page_config(
     page_title="Professional Profile",
-    page_icon="👤",
+    page_icon="ðŸ‘¤",
     layout="wide",
 )
 
@@ -64,7 +65,7 @@ if AccessPolicy.can_view_all_users(
         "Profile",
         accessible_users,
         format_func=lambda user: (
-            f"{user.display_name} — {user.email}"
+            f"{user.display_name} â€” {user.email}"
         ),
     )
 
@@ -210,7 +211,7 @@ if st.session_state.languages:
 
         with col_language_name:
             st.write(
-                f"• {language}"
+                f"â€¢ {language}"
             )
 
         with col_remove:
@@ -349,7 +350,7 @@ st.subheader("Your work history")
 
 st.write(
     "Add each company you worked for. "
-    "Tell the story naturally — the system will "
+    "Tell the story naturally â€” the system will "
     "structure it later."
 )
 
@@ -491,7 +492,7 @@ if experiences:
     for experience in experiences:
         with st.expander(
             f"{experience.company} "
-            f"— {experience.start_date}"
+            f"â€” {experience.start_date}"
         ):
             edit_company = st.text_input(
                 "Company",
@@ -612,6 +613,201 @@ if experiences:
                     st.rerun()
 
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# CURRENT PRIORITIES
+# ---------------------------------------------------------
+
+st.divider()
+
+st.subheader("Current priorities")
+
+st.write(
+    "Tell JobHunter what matters particularly to you right now. "
+    "Priorities influence job recommendations without changing "
+    "your professional history."
+)
+
+st.caption(
+    "Positive priorities make matching jobs more attractive. "
+    "Negative priorities flag trade-offs that you may want to review."
+)
+
+priority_candidate = candidate_repository.get(
+    candidate_id
+)
+
+if priority_candidate is not None:
+    priority_text = st.text_input(
+        "Add a priority",
+        placeholder=(
+            "e.g. Move to Cork, avoid weekend work, "
+            "find a more technical role..."
+        ),
+        key="new_priority_text",
+    )
+
+    priority_direction = st.selectbox(
+        "How should JobHunter interpret it?",
+        options=[
+            "positive",
+            "negative",
+        ],
+        format_func=lambda value: (
+            "Positive - I want more of this"
+            if value == "positive"
+            else "Negative - I want to avoid this"
+        ),
+        key="new_priority_direction",
+    )
+
+    if st.button(
+        "Add priority",
+        use_container_width=True,
+    ):
+        cleaned_priority = priority_text.strip()
+
+        if not cleaned_priority:
+            st.warning(
+                "Write a priority before adding it."
+            )
+
+        else:
+            priority_candidate.priorities.append(
+                CandidatePriority(
+                    text=cleaned_priority,
+                    direction=priority_direction,
+                    active=True,
+                )
+            )
+
+            candidate_repository.save(
+                priority_candidate
+            )
+
+            st.success(
+                "Priority added."
+            )
+
+            st.rerun()
+
+    if priority_candidate.priorities:
+        st.markdown("**Your priorities**")
+
+        for index, priority in enumerate(
+            priority_candidate.priorities
+        ):
+            with st.container(border=True):
+                priority_edit_text = st.text_input(
+                    "Priority",
+                    value=priority.text,
+                    key=(
+                        f"priority_text_"
+                        f"{candidate_id}_{index}"
+                    ),
+                )
+
+                priority_edit_direction = st.selectbox(
+                    "Direction",
+                    options=[
+                        "positive",
+                        "negative",
+                    ],
+                    index=(
+                        0
+                        if priority.direction == "positive"
+                        else 1
+                    ),
+                    format_func=lambda value: (
+                        "Positive"
+                        if value == "positive"
+                        else "Negative"
+                    ),
+                    key=(
+                        f"priority_direction_"
+                        f"{candidate_id}_{index}"
+                    ),
+                )
+
+                priority_active = st.checkbox(
+                    "Active",
+                    value=priority.active,
+                    key=(
+                        f"priority_active_"
+                        f"{candidate_id}_{index}"
+                    ),
+                )
+
+                col_update, col_remove = (
+                    st.columns(2)
+                )
+
+                with col_update:
+                    if st.button(
+                        "Save changes",
+                        key=(
+                            f"save_priority_"
+                            f"{candidate_id}_{index}"
+                        ),
+                        use_container_width=True,
+                    ):
+                        cleaned_text = (
+                            priority_edit_text.strip()
+                        )
+
+                        if not cleaned_text:
+                            st.warning(
+                                "Priority cannot be empty."
+                            )
+
+                        else:
+                            priority_candidate.priorities[
+                                index
+                            ] = CandidatePriority(
+                                text=cleaned_text,
+                                direction=(
+                                    priority_edit_direction
+                                ),
+                                active=priority_active,
+                            )
+
+                            candidate_repository.save(
+                                priority_candidate
+                            )
+
+                            st.success(
+                                "Priority updated."
+                            )
+
+                            st.rerun()
+
+                with col_remove:
+                    if st.button(
+                        "Remove",
+                        key=(
+                            f"remove_priority_"
+                            f"{candidate_id}_{index}"
+                        ),
+                        use_container_width=True,
+                    ):
+                        priority_candidate.priorities.pop(
+                            index
+                        )
+
+                        candidate_repository.save(
+                            priority_candidate
+                        )
+
+                        st.success(
+                            "Priority removed."
+                        )
+
+                        st.rerun()
+
+    else:
+        st.info(
+            "No current priorities added yet."
+        )
+
 # GENERATE PROFESSIONAL PROFILE
 # ---------------------------------------------------------
 
@@ -698,7 +894,7 @@ if generated_candidate is not None:
             generated_candidate.target_roles
         ):
             st.write(
-                f"• {role}"
+                f"â€¢ {role}"
             )
 
     if generated_candidate.skills:
@@ -710,7 +906,7 @@ if generated_candidate is not None:
             generated_candidate.skills
         ):
             st.write(
-                f"• {skill}"
+                f"â€¢ {skill}"
             )
 
     if generated_candidate.strengths:
@@ -722,7 +918,7 @@ if generated_candidate is not None:
             generated_candidate.strengths
         ):
             st.write(
-                f"• {strength}"
+                f"â€¢ {strength}"
             )
 
     if generated_candidate.development_areas:
@@ -734,7 +930,7 @@ if generated_candidate is not None:
             generated_candidate.development_areas
         ):
             st.write(
-                f"• {area}"
+                f"â€¢ {area}"
             )
 
     if generated_candidate.spoken_languages:
@@ -747,3 +943,8 @@ if generated_candidate is not None:
                 generated_candidate.spoken_languages
             )
         )
+
+
+
+
+

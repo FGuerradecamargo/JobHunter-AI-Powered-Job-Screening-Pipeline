@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from services.database import get_connection
 
@@ -6,16 +6,26 @@ from services.database import get_connection
 class JobSearchRepository:
     def list_global_jobs(
         self,
-        categories: list[str],
         limit: int = 100,
+        categories: list[str] | None = None,
     ):
-        if not categories:
-            return []
+        params = []
 
-        placeholders = ",".join(
-            "%s"
-            for _ in categories
-        )
+        category_filter = ""
+
+        if categories:
+            placeholders = ",".join(
+                "%s"
+                for _ in categories
+            )
+
+            category_filter = (
+                f"WHERE category IN ({placeholders})"
+            )
+
+            params.extend(categories)
+
+        params.append(limit)
 
         query = f"""
             SELECT
@@ -28,15 +38,12 @@ class JobSearchRepository:
                 sub_category,
                 created_at
             FROM jobs
-            WHERE category IN ({placeholders})
+
+            {category_filter}
+
             ORDER BY created_at DESC
             LIMIT %s
         """
-
-        params = [
-            *categories,
-            limit,
-        ]
 
         with get_connection() as connection:
             return connection.execute(
@@ -47,16 +54,28 @@ class JobSearchRepository:
     def list_user_jobs(
         self,
         user_id: str,
-        categories: list[str],
         limit: int = 100,
+        categories: list[str] | None = None,
     ):
-        if not categories:
-            return []
+        params = [
+            user_id,
+        ]
 
-        placeholders = ",".join(
-            "%s"
-            for _ in categories
-        )
+        category_filter = ""
+
+        if categories:
+            placeholders = ",".join(
+                "%s"
+                for _ in categories
+            )
+
+            category_filter = (
+                f"AND jobs.category IN ({placeholders})"
+            )
+
+            params.extend(categories)
+
+        params.append(limit)
 
         query = f"""
             SELECT DISTINCT
@@ -75,17 +94,12 @@ class JobSearchRepository:
 
             WHERE
                 job_sources.user_id = %s
-                AND jobs.category IN ({placeholders})
+
+                {category_filter}
 
             ORDER BY jobs.created_at DESC
             LIMIT %s
         """
-
-        params = [
-            user_id,
-            *categories,
-            limit,
-        ]
 
         with get_connection() as connection:
             return connection.execute(

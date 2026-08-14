@@ -1,4 +1,4 @@
-import json
+﻿import json
 from typing import Any
 
 from models.ai_recommendation import AIRecommendation
@@ -17,6 +17,12 @@ VALID_COMPETITIVE_STATUSES = {
     "bridge_opportunity",
     "interview_practice_only",
     "not_competitive_now",
+}
+
+VALID_DIRECTION_ALIGNMENTS = {
+    "high",
+    "medium",
+    "low",
 }
 
 
@@ -68,6 +74,9 @@ def parse_response(
 
     recommendation = data["recommendation"]
     competitive_status = data["competitive_status"]
+    direction_alignment = data[
+        "direction_alignment"
+    ]
 
     if recommendation not in VALID_RECOMMENDATIONS:
         raise ValueError(
@@ -78,6 +87,12 @@ def parse_response(
         raise ValueError(
             "Invalid competitive_status: "
             f"{competitive_status}"
+        )
+
+    if direction_alignment not in VALID_DIRECTION_ALIGNMENTS:
+        raise ValueError(
+            "Invalid direction_alignment: "
+            f"{direction_alignment}"
         )
 
     current_fit = validate_score(
@@ -96,12 +111,18 @@ def parse_response(
         competitive_status=competitive_status,
         current_fit=current_fit,
         growth_value=growth_value,
+        direction_alignment=direction_alignment,
+
         job_level=data.get("job_level", ""),
-        candidate_level=data.get("candidate_level", ""),
+        candidate_level=data.get(
+            "candidate_level",
+            "",
+        ),
         level_assessment=data.get(
             "level_assessment",
             "",
         ),
+
         core_requirements=validate_string_list(
             data.get("core_requirements"),
             "core_requirements",
@@ -110,6 +131,7 @@ def parse_response(
             data.get("requirements_met"),
             "requirements_met",
         ),
+
         strengths=validate_string_list(
             data.get("strengths"),
             "strengths",
@@ -122,6 +144,7 @@ def parse_response(
             data.get("structural_gaps"),
             "structural_gaps",
         ),
+
         positive_points=validate_string_list(
             data.get("positive_points"),
             "positive_points",
@@ -130,10 +153,21 @@ def parse_response(
             data.get("personal_negatives"),
             "personal_negatives",
         ),
+
+        priority_matches=validate_string_list(
+            data.get("priority_matches"),
+            "priority_matches",
+        ),
+        priority_conflicts=validate_string_list(
+            data.get("priority_conflicts"),
+            "priority_conflicts",
+        ),
+
         hard_conflicts=validate_string_list(
             data.get("hard_conflicts"),
             "hard_conflicts",
         ),
+
         reason=data.get("reason", ""),
         final_reason=data.get(
             "final_reason",
