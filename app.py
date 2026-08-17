@@ -1,7 +1,7 @@
 import streamlit as st
 
 from services.candidate_repository import CandidateRepository
-from services.session_auth import require_login
+from services.session_auth import require_login, render_logout_button
 from services.database import (
     count_candidate_jobs_by_status,
     initialize_database,
@@ -492,6 +492,7 @@ def main() -> None:
     initialize_database()
 
     current_user = require_login()
+    render_logout_button()
 
     candidate_repository = CandidateRepository()
 

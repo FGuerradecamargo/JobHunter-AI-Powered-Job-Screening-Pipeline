@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
@@ -14,9 +14,10 @@ from services.candidate_profile_generation_service import (
 )
 from services.candidate_repository import CandidateRepository
 from services.access_policy import AccessPolicy
-from services.session_auth import require_login
+from services.session_auth import require_login, render_logout_button
 
 current_user = require_login()
+render_logout_button()
 
 st.set_page_config(
     page_title="Professional Profile",

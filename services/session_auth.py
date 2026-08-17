@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 
 from models.app_user import AppUser
 
@@ -36,3 +36,25 @@ def require_login() -> AppUser:
         st.stop()
 
     return user
+
+
+def render_logout_button() -> None:
+    user = get_current_user()
+
+    if user is None:
+        return
+
+    with st.sidebar:
+        st.caption(
+            f"Signed in as {user.display_name}"
+        )
+
+        if st.button(
+            "Log out",
+            use_container_width=True,
+            key="global_logout_button",
+        ):
+            logout_user()
+            st.switch_page(
+                "pages/0_Login.py"
+            )

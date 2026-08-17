@@ -1,14 +1,25 @@
-﻿import streamlit as st
+import hashlib
+from urllib.parse import urlparse
+
+import streamlit as st
+
+from models.job import Job
 
 from services.job_search_repository import JobSearchRepository
-from services.session_auth import require_login
+from services.job_source_repository import JobSourceRepository
+from services.session_auth import require_login, render_logout_button
 from services.candidate_repository import CandidateRepository
 from services.candidate_job_analysis_service import (
     CandidateJobAnalysisService,
+    ANALYSIS_VERSION,
+    build_candidate_signature,
 )
 from services.database import (
     ensure_candidate_job_analysis,
     list_candidate_jobs,
+    update_candidate_job_notes,
+    update_candidate_job_status,
+    upsert_raw_job,
 )
 
 
@@ -21,8 +32,10 @@ st.set_page_config(
 st.title("Analyze Jobs")
 
 current_user = require_login()
+render_logout_button()
 
 repository = JobSearchRepository()
+job_source_repository = JobSourceRepository()
 candidate_repository = CandidateRepository()
 analysis_service = CandidateJobAnalysisService()
 
@@ -54,18 +67,157 @@ st.write(
 )
 
 
-source = st.radio(
-    "Job source",
-    [
-        "My jobs",
-        "Global jobs",
-    ],
-    horizontal=True,
+
+st.divider()
+
+with st.expander(
+    "Add a job manually",
+):
+    st.caption(
+        "Enter the complete job information. "
+        "All fields are required."
+    )
+
+    with st.form(
+        "manual_job_form",
+        clear_on_submit=True,
+    ):
+        manual_title = st.text_input(
+            "Job title *"
+        )
+
+        manual_company = st.text_input(
+            "Company *"
+        )
+
+        manual_location = st.text_input(
+            "Location *"
+        )
+
+        manual_description = st.text_area(
+            "Job description *",
+            height=250,
+            placeholder=(
+                "Paste the complete job description here."
+            ),
+        )
+
+        manual_url = st.text_input(
+            "Job URL *",
+            placeholder="https://...",
+        )
+
+        manual_submit = st.form_submit_button(
+            "Add job",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if manual_submit:
+        title = manual_title.strip()
+        company = manual_company.strip()
+        location = manual_location.strip()
+        description = manual_description.strip()
+        url = manual_url.strip()
+
+        missing_fields = []
+
+        if not title:
+            missing_fields.append("Job title")
+
+        if not company:
+            missing_fields.append("Company")
+
+        if not location:
+            missing_fields.append("Location")
+
+        if not description:
+            missing_fields.append("Job description")
+
+        if not url:
+            missing_fields.append("Job URL")
+
+        if missing_fields:
+            st.error(
+                "Complete all required fields: "
+                + ", ".join(missing_fields)
+                + "."
+            )
+
+        else:
+            parsed_url = urlparse(url)
+
+            valid_url = (
+                parsed_url.scheme in {
+                    "http",
+                    "https",
+                }
+                and bool(parsed_url.netloc)
+            )
+
+            if not valid_url:
+                st.error(
+                    "Enter a valid job URL starting "
+                    "with http:// or https://."
+                )
+
+            else:
+                normalized_url = url.strip().lower()
+
+                job_id = (
+                    "manual_"
+                    + hashlib.sha256(
+                        normalized_url.encode(
+                            "utf-8"
+                        )
+                    ).hexdigest()[:24]
+                )
+
+                raw_text = (
+                    f"Title: {title}\n"
+                    f"Company: {company}\n"
+                    f"Location: {location}\n"
+                    f"URL: {url}\n\n"
+                    f"{description}"
+                )
+
+                manual_job = Job(
+                    id=job_id,
+                    raw_text=raw_text,
+                    url=url,
+                    title=title,
+                    company=company,
+                    location=location,
+                    description=description,
+                )
+
+                upsert_raw_job(
+                    manual_job
+                )
+
+                job_source_repository.add_source(
+                    job_id=job_id,
+                    user_id=current_user.id,
+                    source_type="manual",
+                )
+
+                st.success(
+                    "Job added to the global pool. "
+                    "It will be considered in your next opportunity scan."
+                )
+
+                st.rerun()
+
+
+st.divider()
+
+candidate_signature = build_candidate_signature(
+    candidate
 )
 
 
 limit = st.selectbox(
-    "Maximum jobs to scan",
+    "Maximum new jobs to analyze",
     [
         25,
         50,
@@ -81,15 +233,33 @@ if st.button(
     type="primary",
     use_container_width=True,
 ):
-    if source == "My jobs":
-        jobs = repository.list_user_jobs(
-            user_id=current_user.id,
-            limit=limit,
-        )
-    else:
-        jobs = repository.list_global_jobs(
-            limit=limit,
-        )
+    jobs = repository.list_jobs_to_analyze_for_candidate(
+        candidate_id=candidate_id,
+        analysis_version=ANALYSIS_VERSION,
+        candidate_signature=candidate_signature,
+        limit=limit,
+    )
+
+    if not jobs:
+        st.session_state["last_scan_result"] = {
+            "selected": 0,
+            "analyzed": 0,
+            "hard_rejected": 0,
+            "matcher_rejected": 0,
+            "ai_analyses_created": 0,
+            "ai_approved": 0,
+            "ai_rejected": 0,
+            "best_match": 0,
+            "tradeoff": 0,
+            "lower_alignment": 0,
+            "failed": 0,
+            "errors": [],
+        }
+
+        st.session_state["last_scan_total"] = 0
+        st.session_state["last_links_created"] = 0
+
+        st.rerun()
 
     links_created = 0
 
@@ -103,7 +273,7 @@ if st.button(
             links_created += 1
 
     with st.spinner(
-        "Scanning and analyzing opportunities..."
+        "Analyzing new opportunities from the global pool..."
     ):
         result = analysis_service.analyze_pending(
             candidate_id=candidate_id,
@@ -330,6 +500,80 @@ def render_job(
                             f"- {item}"
                         )
 
+        st.divider()
+
+        job_id = str(
+            job["id"]
+        )
+
+        st.markdown(
+            "**Your notes**"
+        )
+
+        notes_value = st.text_area(
+            "Personal notes",
+            value=job.get(
+                "notes",
+                "",
+            ),
+            key=f"analysis_notes_{candidate_id}_{job_id}",
+            label_visibility="collapsed",
+            placeholder=(
+                "Add anything useful for your decision: "
+                "salary, concerns, questions, recruiter details..."
+            ),
+        )
+
+        if st.button(
+            "Save notes",
+            key=f"save_analysis_notes_{candidate_id}_{job_id}",
+            use_container_width=True,
+        ):
+            update_candidate_job_notes(
+                candidate_id=candidate_id,
+                job_id=job_id,
+                notes=notes_value,
+            )
+
+            st.toast(
+                "Notes saved."
+            )
+
+        st.markdown(
+            "**Your decision**"
+        )
+
+        decision_columns = st.columns(2)
+
+        with decision_columns[0]:
+            if st.button(
+                "Do not apply",
+                key=f"analysis_reject_{candidate_id}_{job_id}",
+                use_container_width=True,
+            ):
+                update_candidate_job_status(
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    status="user_rejected",
+                )
+
+                st.rerun()
+
+        with decision_columns[1]:
+            if st.button(
+                "Mark as Applied",
+                key=f"analysis_apply_{candidate_id}_{job_id}",
+                type="primary",
+                use_container_width=True,
+            ):
+                update_candidate_job_status(
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    status="applied",
+                )
+
+                st.rerun()
+
         url = job.get(
             "url"
         )
@@ -338,6 +582,7 @@ def render_job(
             st.link_button(
                 "Open job",
                 url,
+                use_container_width=True,
             )
 
 
