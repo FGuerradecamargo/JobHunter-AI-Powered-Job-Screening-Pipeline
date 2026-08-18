@@ -57,8 +57,6 @@ if not users:
     st.warning("No users found.")
     st.stop()
 
-users = user_repository.list_all()
-
 if AccessPolicy.can_view_all_users(
     current_user
 ):
@@ -639,9 +637,11 @@ st.caption(
     "Negative priorities flag trade-offs that you may want to review."
 )
 
-priority_candidate = candidate_repository.get(
+generated_candidate = candidate_repository.get(
     candidate_id
 )
+
+priority_candidate = generated_candidate
 
 if priority_candidate is not None:
     priority_text = st.text_input(
@@ -820,12 +820,6 @@ if priority_candidate is not None:
 
 st.divider()
 
-generated_candidate = (
-    candidate_repository.get(
-        candidate_id
-    )
-)
-
 profile_exists = (
     generated_candidate is not None
 )
@@ -977,12 +971,6 @@ if st.button(
                 f"{exc}"
             )
         )
-
-generated_candidate = (
-    candidate_repository.get(
-        candidate_id
-    )
-)
 
 if generated_candidate is not None:
     st.divider()

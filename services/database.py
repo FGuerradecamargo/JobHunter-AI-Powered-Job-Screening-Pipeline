@@ -1,3 +1,5 @@
+from functools import lru_cache
+from contextlib import contextmanager
 from models.job import Job
 
 import json
@@ -15,6 +17,7 @@ from services.job_category_service import (
 import os
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 load_dotenv()
 
@@ -52,20 +55,38 @@ def utc_now() -> str:
     ).isoformat()
 
 
+@lru_cache(maxsize=1)
+def _get_postgres_pool(
+    database_url: str,
+) -> ConnectionPool:
+    return ConnectionPool(
+        conninfo=database_url,
+        min_size=1,
+        max_size=5,
+        kwargs={
+            "row_factory": dict_row,
+        },
+        open=True,
+    )
+
+
+@contextmanager
 def get_connection():
     database_url = os.getenv(
         "DATABASE_URL"
     )
 
     if database_url:
-        connection = psycopg.connect(
-            database_url,
-            row_factory=dict_row,
+        pool = _get_postgres_pool(
+            database_url
         )
 
-        return PostgresConnectionAdapter(
-            connection
-        )
+        with pool.connection() as connection:
+            yield PostgresConnectionAdapter(
+                connection
+            )
+
+        return
 
     DATABASE_FILE.parent.mkdir(
         parents=True,
@@ -84,7 +105,11 @@ def get_connection():
         "PRAGMA foreign_keys = ON"
     )
 
-    return connection
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 def is_postgres() -> bool:
@@ -1212,6 +1237,7 @@ def initialize_sqlite_database() -> None:
         )
 
 
+@lru_cache(maxsize=1)
 def initialize_database() -> None:
     if is_postgres():
         initialize_postgres_database()
