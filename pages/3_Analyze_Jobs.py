@@ -1,7 +1,10 @@
+import os
 import hashlib
 from urllib.parse import urlparse
 
 import streamlit as st
+
+from components.job_analysis_view import render_job_analysis
 
 from models.job import Job
 
@@ -9,6 +12,10 @@ from services.job_search_repository import JobSearchRepository
 from services.job_source_repository import JobSourceRepository
 from services.session_auth import require_login, render_logout_button
 from services.candidate_repository import CandidateRepository
+from services.gmail_connection_repository import GmailConnectionRepository
+from services.gmail_message_repository import GmailMessageRepository
+from services.gmail_job_processor import GmailJobProcessor
+from services.gmail_sync_service import GmailSyncService
 from services.candidate_job_analysis_service import (
     CandidateJobAnalysisService,
     ANALYSIS_VERSION,
@@ -39,6 +46,13 @@ job_source_repository = JobSourceRepository()
 candidate_repository = CandidateRepository()
 analysis_service = CandidateJobAnalysisService()
 
+gmail_repository = GmailConnectionRepository()
+gmail_message_repository = GmailMessageRepository()
+
+gmail_job_processor = GmailJobProcessor(
+    gmail_message_repository=gmail_message_repository
+)
+
 
 if not current_user.candidate_id:
     st.error(
@@ -66,6 +80,105 @@ st.write(
     "preferences, constraints and current priorities."
 )
 
+
+gmail_connection = gmail_repository.get_by_user_id(
+    current_user.id
+)
+
+if gmail_connection is not None:
+    with st.expander(
+        "Gmail job source",
+        expanded=False,
+    ):
+        st.caption(
+            f"Connected: {gmail_connection.gmail_address}"
+        )
+
+        if gmail_connection.last_sync_at:
+            st.caption(
+                f"Last sync: {gmail_connection.last_sync_at}"
+            )
+
+        if st.button(
+            "Sync Gmail",
+            type="secondary",
+            use_container_width=True,
+            key="analyze_jobs_sync_gmail",
+        ):
+            try:
+                gmail_sync_service = GmailSyncService(
+                    client_id=os.environ[
+                        "GOOGLE_OAUTH_CLIENT_ID"
+                    ],
+                    client_secret=os.environ[
+                        "GOOGLE_OAUTH_CLIENT_SECRET"
+                    ],
+                    gmail_connection_repository=(
+                        gmail_repository
+                    ),
+                    gmail_message_repository=(
+                        gmail_message_repository
+                    ),
+                )
+
+                with st.spinner(
+                    "Syncing Gmail and adding new jobs "
+                    "to the job pool..."
+                ):
+                    sync_result = (
+                        gmail_sync_service
+                        .sync_recent_job_alerts(
+                            user_id=current_user.id
+                        )
+                    )
+
+                    processing_result = (
+                        gmail_job_processor
+                        .process_pending_messages(
+                            user_id=current_user.id,
+                            candidate_id=candidate_id,
+                            limit=100,
+                        )
+                    )
+
+                st.success(
+                    "Gmail sync completed. "
+                    "New jobs are ready for analysis."
+                )
+
+                sync_columns = st.columns(4)
+
+                sync_columns[0].metric(
+                    "Emails found",
+                    sync_result.total_messages_found,
+                )
+
+                sync_columns[1].metric(
+                    "New emails",
+                    sync_result.new_messages_found,
+                )
+
+                sync_columns[2].metric(
+                    "Jobs added",
+                    processing_result.jobs_created,
+                )
+
+                sync_columns[3].metric(
+                    "Already known",
+                    processing_result.jobs_unchanged,
+                )
+
+            except Exception as error:
+                st.error(
+                    "Could not synchronize Gmail."
+                )
+                st.exception(error)
+
+else:
+    st.caption(
+        "Gmail is not connected. "
+        "You can connect it from Connect Gmail."
+    )
 
 
 st.divider()
@@ -251,7 +364,6 @@ if st.button(
             "ai_rejected": 0,
             "best_match": 0,
             "tradeoff": 0,
-            "lower_alignment": 0,
             "failed": 0,
             "errors": [],
         }
@@ -303,7 +415,7 @@ if scan_result:
         f"{total_scanned} jobs scanned."
     )
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     col1.metric(
         "Best Matches",
@@ -321,14 +433,6 @@ if scan_result:
         ),
     )
 
-    col3.metric(
-        "Lower Alignment",
-        scan_result.get(
-            "lower_alignment",
-            0,
-        ),
-    )
-
 
 review_jobs = list_candidate_jobs(
     candidate_id=candidate_id,
@@ -338,7 +442,6 @@ review_jobs = list_candidate_jobs(
 
 best_matches = []
 tradeoffs = []
-lower_alignment = []
 
 for job in review_jobs:
     analysis = job.get(
@@ -355,9 +458,6 @@ for job in review_jobs:
 
     elif bucket == "tradeoff":
         tradeoffs.append(job)
-
-    elif bucket == "lower_alignment":
-        lower_alignment.append(job)
 
 
 def render_job(
@@ -379,126 +479,9 @@ def render_job(
     with st.expander(
         f"{title} - {company}"
     ):
-        simple_summary = analysis.get(
-            "simple_summary",
-            "",
+        render_job_analysis(
+            job,
         )
-
-        simple_recommendation = analysis.get(
-            "simple_recommendation",
-            "",
-        )
-
-        if simple_recommendation:
-            st.markdown(
-                f"**{simple_recommendation}**"
-            )
-
-        if simple_summary:
-            st.write(
-                simple_summary
-            )
-
-        location = job.get(
-            "location"
-        )
-
-        if location:
-            st.caption(
-                f"Location: {location}"
-            )
-
-        direction = analysis.get(
-            "direction_alignment"
-        )
-
-        competitive = analysis.get(
-            "competitive_status"
-        )
-
-        if direction:
-            st.write(
-                f"Career alignment: {direction}"
-            )
-
-        if competitive:
-            st.write(
-                f"Competitive status: {competitive}"
-            )
-
-        priority_matches = analysis.get(
-            "priority_matches",
-            [],
-        )
-
-        if priority_matches:
-            st.write(
-                "Priority matches:"
-            )
-
-            for item in priority_matches:
-                st.write(
-                    f"- {item}"
-                )
-
-        priority_conflicts = analysis.get(
-            "priority_conflicts",
-            [],
-        )
-
-        personal_negatives = analysis.get(
-            "personal_negatives",
-            [],
-        )
-
-        tradeoff_items = (
-            priority_conflicts
-            + personal_negatives
-        )
-
-        if tradeoff_items:
-            st.write(
-                "Trade-offs:"
-            )
-
-            for item in tradeoff_items:
-                st.write(
-                    f"- {item}"
-                )
-
-        development_gaps = analysis.get(
-            "development_gaps",
-            [],
-        )
-
-        structural_gaps = analysis.get(
-            "structural_gaps",
-            [],
-        )
-
-        if development_gaps or structural_gaps:
-            with st.expander(
-                "Technical analysis"
-            ):
-                if development_gaps:
-                    st.write(
-                        "Development gaps:"
-                    )
-
-                    for item in development_gaps:
-                        st.write(
-                            f"- {item}"
-                        )
-
-                if structural_gaps:
-                    st.write(
-                        "Structural gaps:"
-                    )
-
-                    for item in structural_gaps:
-                        st.write(
-                            f"- {item}"
-                        )
 
         st.divider()
 
@@ -589,7 +572,6 @@ def render_job(
 if (
     best_matches
     or tradeoffs
-    or lower_alignment
 ):
     st.divider()
 
@@ -615,18 +597,6 @@ if (
             )
 
         for job in tradeoffs:
-            render_job(job)
-
-    with st.expander(
-        "Competitive but Lower Alignment "
-        f"({len(lower_alignment)})"
-    ):
-        if not lower_alignment:
-            st.info(
-                "No lower-alignment opportunities found."
-            )
-
-        for job in lower_alignment:
             render_job(job)
 
 elif scan_result:

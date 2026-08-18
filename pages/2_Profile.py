@@ -3,8 +3,12 @@ import streamlit as st
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
 from models.candidate_priority import CandidatePriority
+from models.career_update import CareerUpdate
 from services.candidate_onboarding_repository import (
     CandidateOnboardingRepository,
+)
+from services.career_update_repository import (
+    CareerUpdateRepository,
 )
 from services.user_repository import UserRepository
 
@@ -36,12 +40,14 @@ user_repository = UserRepository()
 onboarding_repository = CandidateOnboardingRepository()
 
 candidate_repository = CandidateRepository()
+career_update_repository = CareerUpdateRepository()
 
 profile_generation_service = (
     CandidateProfileGenerationService(
         llm_client=OpenAIClient(),
         onboarding_repository=onboarding_repository,
         candidate_repository=candidate_repository,
+        career_update_repository=career_update_repository,
     )
 )
 
@@ -809,27 +815,143 @@ if priority_candidate is not None:
             "No current priorities added yet."
         )
 
-# GENERATE PROFESSIONAL PROFILE
+# PROFESSIONAL PROFILE GENERATION / UPDATE
 # ---------------------------------------------------------
 
 st.divider()
 
-st.subheader("Generate professional profile")
-
-st.write(
-    "When you are ready, JobHunter will analyse your "
-    "professional history and build a structured profile "
-    "based only on the experience you provided."
+generated_candidate = (
+    candidate_repository.get(
+        candidate_id
+    )
 )
 
+profile_exists = (
+    generated_candidate is not None
+)
+
+if not profile_exists:
+    st.subheader(
+        "Generate your professional profile"
+    )
+
+    st.write(
+        "This creates your initial Master Career Profile "
+        "from the professional history, goals and information "
+        "you provided above."
+    )
+
+    st.caption(
+        "You normally only need to generate your profile once. "
+        "After that, JobHunter will keep it updated as your "
+        "professional life changes."
+    )
+
+    profile_button_label = (
+        "Generate professional profile"
+    )
+
+    spinner_message = (
+        "Building your professional profile..."
+    )
+
+    success_message = (
+        "Professional profile generated."
+    )
+
+else:
+    st.subheader(
+        "Update your professional profile"
+    )
+
+    st.write(
+        "Add only what changed. JobHunter will preserve "
+        "your existing career history and use the new "
+        "information to update your profile."
+    )
+
+    career_update_type = st.selectbox(
+        "What changed?",
+        options=[
+            "promotion",
+            "new_job",
+            "job_ended",
+            "course_or_certification",
+            "new_skill",
+            "new_responsibility",
+            "project",
+            "career_goal_change",
+            "other",
+        ],
+        format_func=lambda value: {
+            "promotion": "Promotion",
+            "new_job": "New job",
+            "job_ended": "Job ended or lost",
+            "course_or_certification": "Course or certification",
+            "new_skill": "New skill",
+            "new_responsibility": "New responsibility",
+            "project": "Relevant project",
+            "career_goal_change": "Career goal changed",
+            "other": "Other professional change",
+        }[value],
+        key=f"career_update_type_{candidate_id}",
+    )
+
+    career_update_description = st.text_area(
+        "Describe what changed",
+        placeholder=(
+            "Example: I completed an SQL course and now "
+            "use joins and basic queries confidently."
+        ),
+        key=f"career_update_description_{candidate_id}",
+    )
+
+    profile_button_label = (
+        "Update professional profile"
+    )
+
+    spinner_message = (
+        "Updating your professional profile..."
+    )
+
+    success_message = (
+        "Professional profile updated."
+    )
+
 if st.button(
-    "Generate professional profile",
+    profile_button_label,
     type="primary",
     use_container_width=True,
 ):
+    if profile_exists:
+        cleaned_update = (
+            career_update_description.strip()
+        )
+
+        if not cleaned_update:
+            st.warning(
+                "Describe what changed before updating "
+                "your professional profile."
+            )
+            st.stop()
+
+        import uuid
+
+        career_update_repository.save(
+            CareerUpdate(
+                id=(
+                    "career_update_"
+                    + uuid.uuid4().hex
+                ),
+                candidate_id=candidate_id,
+                update_type=career_update_type,
+                description=cleaned_update,
+            )
+        )
+
     try:
         with st.spinner(
-            "Analysing your professional history..."
+            spinner_message
         ):
             candidate = (
                 profile_generation_service.generate(
@@ -841,14 +963,19 @@ if st.button(
             )
 
         st.success(
-            "Professional profile generated."
+            success_message
         )
 
         st.rerun()
 
     except Exception as exc:
         st.error(
-            f"Could not generate profile: {exc}"
+            f"Could not update profile: {exc}"
+            if profile_exists
+            else (
+                "Could not generate profile: "
+                f"{exc}"
+            )
         )
 
 generated_candidate = (
@@ -867,13 +994,17 @@ if generated_candidate is not None:
     col_role, col_level = st.columns(2)
 
     with col_role:
-        st.markdown("**Professional positioning**")
+        st.markdown(
+            "**Professional positioning**"
+        )
         st.write(
             generated_candidate.current_role
         )
 
     with col_level:
-        st.markdown("**Current level**")
+        st.markdown(
+            "**Current level**"
+        )
         st.write(
             generated_candidate.current_level
         )
@@ -881,33 +1012,127 @@ if generated_candidate is not None:
     st.markdown(
         "**Professional summary**"
     )
-
     st.write(
         generated_candidate.professional_summary
     )
 
-    if generated_candidate.target_roles:
+    st.divider()
+
+    st.markdown(
+        "### Career positioning"
+    )
+
+    col_current, col_bridge, col_target = (
+        st.columns(3)
+    )
+
+    with col_current:
         st.markdown(
-            "**Roles that may fit your direction**"
+            "**Competitive now**"
         )
 
-        for role in (
-            generated_candidate.target_roles
+        if (
+            generated_candidate
+            .competitive_role_families
         ):
-            st.write(
-                f"â€¢ {role}"
+            for role in (
+                generated_candidate
+                .competitive_role_families
+            ):
+                st.write(f"- {role}")
+        else:
+            st.caption(
+                "Not identified yet."
             )
 
-    if generated_candidate.skills:
+    with col_bridge:
         st.markdown(
-            "**Skills identified from your experience**"
+            "**Bridge opportunities**"
         )
 
-        for skill in (
-            generated_candidate.skills
+        if (
+            generated_candidate
+            .bridge_role_families
+        ):
+            for role in (
+                generated_candidate
+                .bridge_role_families
+            ):
+                st.write(f"- {role}")
+        else:
+            st.caption(
+                "Not identified yet."
+            )
+
+    with col_target:
+        st.markdown(
+            "**Target direction**"
+        )
+
+        if (
+            generated_candidate
+            .target_role_families
+        ):
+            for role in (
+                generated_candidate
+                .target_role_families
+            ):
+                st.write(f"- {role}")
+        else:
+            st.caption(
+                "Not identified yet."
+            )
+
+    st.divider()
+
+    st.markdown(
+        "### Professional capabilities"
+    )
+
+    col_proven, col_transferable = (
+        st.columns(2)
+    )
+
+    with col_proven:
+        st.markdown(
+            "**Proven capabilities**"
+        )
+
+        for capability in (
+            generated_candidate
+            .proven_capabilities
         ):
             st.write(
-                f"â€¢ {skill}"
+                f"- {capability}"
+            )
+
+    with col_transferable:
+        st.markdown(
+            "**Transferable capabilities**"
+        )
+
+        for capability in (
+            generated_candidate
+            .transferable_capabilities
+        ):
+            st.write(
+                f"- {capability}"
+            )
+
+    if (
+        generated_candidate
+        .developing_capabilities
+    ):
+        st.markdown(
+            "**Currently developing**"
+        )
+
+        for capability in (
+            generated_candidate
+            .developing_capabilities
+        ):
+            st.write(
+                f"- {capability}"
             )
 
     if generated_candidate.strengths:
@@ -919,33 +1144,144 @@ if generated_candidate is not None:
             generated_candidate.strengths
         ):
             st.write(
-                f"â€¢ {strength}"
+                f"- {strength}"
             )
 
-    if generated_candidate.development_areas:
+    st.divider()
+
+    col_tools, col_domains = st.columns(2)
+
+    with col_tools:
         st.markdown(
-            "**Development areas**"
+            "### Tools & technologies"
         )
 
-        for area in (
-            generated_candidate.development_areas
-        ):
-            st.write(
-                f"â€¢ {area}"
+        if generated_candidate.technical_tools:
+            for tool in (
+                generated_candidate
+                .technical_tools
+            ):
+                st.write(
+                    f"- {tool}"
+                )
+        else:
+            st.caption(
+                "No tools identified yet."
             )
 
+    with col_domains:
+        st.markdown(
+            "### Domain experience"
+        )
+
+        if generated_candidate.domain_experience:
+            for domain in (
+                generated_candidate
+                .domain_experience
+            ):
+                st.write(
+                    f"- {domain}"
+                )
+        else:
+            st.caption(
+                "No domains identified yet."
+            )
+
+    if (
+        generated_candidate
+        .professional_experiences
+    ):
+        st.divider()
+
+        st.markdown(
+            "### Professional evidence"
+        )
+
+        st.caption(
+            "How your work history supports "
+            "the profile above."
+        )
+
+        for experience in (
+            generated_candidate
+            .professional_experiences
+        ):
+            role_label = (
+                experience.stated_role
+                or experience.inferred_role
+                or "Professional experience"
+            )
+
+            expander_title = (
+                f"{experience.company} ? "
+                f"{role_label}"
+            )
+
+            with st.expander(
+                expander_title
+            ):
+                if experience.inferred_role:
+                    st.markdown(
+                        "**Functional role**"
+                    )
+                    st.write(
+                        experience.inferred_role
+                    )
+
+                if experience.role_family:
+                    st.markdown(
+                        "**Role family**"
+                    )
+                    st.write(
+                        experience.role_family
+                    )
+
+                if experience.summary:
+                    st.markdown(
+                        "**What you did**"
+                    )
+                    st.write(
+                        experience.summary
+                    )
+
+                if (
+                    experience
+                    .demonstrated_capabilities
+                ):
+                    st.markdown(
+                        "**Capabilities demonstrated**"
+                    )
+
+                    for capability in (
+                        experience
+                        .demonstrated_capabilities
+                    ):
+                        st.write(
+                            f"- {capability}"
+                        )
+
+                if experience.evidence:
+                    st.markdown(
+                        "**Evidence**"
+                    )
+
+                    for evidence in (
+                        experience.evidence
+                    ):
+                        st.write(
+                            f"- {evidence}"
+                        )
+
     if generated_candidate.spoken_languages:
+        st.divider()
+
         st.markdown(
             "**Languages**"
         )
 
         st.write(
             ", ".join(
-                generated_candidate.spoken_languages
+                generated_candidate
+                .spoken_languages
             )
         )
-
-
-
-
-

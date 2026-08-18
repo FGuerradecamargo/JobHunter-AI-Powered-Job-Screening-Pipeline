@@ -4,8 +4,8 @@ from services.analyzers.title_analyzer import TitleAnalyzer
 
 
 class JobMatcher:
-    MIN_RELEVANT_SCORE = 30
-    MIN_REVIEW_SCORE = 20
+    MIN_RELEVANT_SCORE = 20
+    MIN_REVIEW_SCORE = -10
 
     RELEVANT = "relevant"
     REVIEW = "review"

@@ -113,6 +113,16 @@ def initialize_postgres_database() -> None:
                 constraints_json TEXT NOT NULL,
                 priorities_json TEXT NOT NULL DEFAULT '[]',
 
+                professional_experiences_json TEXT NOT NULL DEFAULT '[]',
+                proven_capabilities_json TEXT NOT NULL DEFAULT '[]',
+                transferable_capabilities_json TEXT NOT NULL DEFAULT '[]',
+                developing_capabilities_json TEXT NOT NULL DEFAULT '[]',
+                technical_tools_json TEXT NOT NULL DEFAULT '[]',
+                domain_experience_json TEXT NOT NULL DEFAULT '[]',
+                competitive_role_families_json TEXT NOT NULL DEFAULT '[]',
+                bridge_role_families_json TEXT NOT NULL DEFAULT '[]',
+                target_role_families_json TEXT NOT NULL DEFAULT '[]',
+
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -124,6 +134,80 @@ def initialize_postgres_database() -> None:
             ALTER TABLE candidates
             ADD COLUMN IF NOT EXISTS priorities_json
             TEXT NOT NULL DEFAULT '[]'
+            """
+        )
+
+        for column_name in (
+            "professional_experiences_json",
+            "proven_capabilities_json",
+            "transferable_capabilities_json",
+            "developing_capabilities_json",
+            "technical_tools_json",
+            "domain_experience_json",
+            "competitive_role_families_json",
+            "bridge_role_families_json",
+            "target_role_families_json",
+        ):
+            connection.execute(
+                f'''
+                ALTER TABLE candidates
+                ADD COLUMN IF NOT EXISTS {column_name}
+                TEXT NOT NULL DEFAULT '[]'
+                '''
+            )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_career_updates (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                update_type TEXT NOT NULL,
+                description TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_career_objectives (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                desired_role_families_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_objective_profiles (
+                objective_id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                profile_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (objective_id)
+                    REFERENCES candidate_career_objectives(id)
+                    ON DELETE CASCADE
+            )
             """
         )
 
@@ -514,8 +598,100 @@ def initialize_sqlite_database() -> None:
                 constraints_json TEXT NOT NULL,
                 priorities_json TEXT NOT NULL DEFAULT '[]',
 
+                professional_experiences_json TEXT NOT NULL DEFAULT '[]',
+                proven_capabilities_json TEXT NOT NULL DEFAULT '[]',
+                transferable_capabilities_json TEXT NOT NULL DEFAULT '[]',
+                developing_capabilities_json TEXT NOT NULL DEFAULT '[]',
+                technical_tools_json TEXT NOT NULL DEFAULT '[]',
+                domain_experience_json TEXT NOT NULL DEFAULT '[]',
+                competitive_role_families_json TEXT NOT NULL DEFAULT '[]',
+                bridge_role_families_json TEXT NOT NULL DEFAULT '[]',
+                target_role_families_json TEXT NOT NULL DEFAULT '[]',
+
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        candidate_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(candidates)"
+            ).fetchall()
+        }
+
+        for column_name in (
+            "professional_experiences_json",
+            "proven_capabilities_json",
+            "transferable_capabilities_json",
+            "developing_capabilities_json",
+            "technical_tools_json",
+            "domain_experience_json",
+            "competitive_role_families_json",
+            "bridge_role_families_json",
+            "target_role_families_json",
+        ):
+            if column_name not in candidate_columns:
+                connection.execute(
+                    f'''
+                    ALTER TABLE candidates
+                    ADD COLUMN {column_name}
+                    TEXT NOT NULL DEFAULT '[]'
+                    '''
+                )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_career_updates (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                update_type TEXT NOT NULL,
+                description TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_career_objectives (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                desired_role_families_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_objective_profiles (
+                objective_id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                profile_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (objective_id)
+                    REFERENCES candidate_career_objectives(id)
+                    ON DELETE CASCADE
             )
             """
         )

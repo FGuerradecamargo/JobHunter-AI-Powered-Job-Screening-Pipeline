@@ -1,9 +1,8 @@
-﻿from typing import Any
+from typing import Any
 
 
 BEST_MATCH = "best_match"
 TRADEOFF = "tradeoff"
-LOWER_ALIGNMENT = "lower_alignment"
 REJECT = "reject"
 
 
@@ -38,6 +37,9 @@ def classify_job_bucket(
     if hard_conflicts:
         return REJECT
 
+    if direction_alignment != "high":
+        return REJECT
+
     if competitive_status not in {
         "competitive_now",
         "bridge_opportunity",
@@ -49,16 +51,7 @@ def classify_job_bucket(
         or priority_conflicts
     )
 
-    if direction_alignment == "high":
-        if has_tradeoff:
-            return TRADEOFF
+    if has_tradeoff:
+        return TRADEOFF
 
-        return BEST_MATCH
-
-    if direction_alignment in {
-        "medium",
-        "low",
-    }:
-        return LOWER_ALIGNMENT
-
-    return REJECT
+    return BEST_MATCH

@@ -23,6 +23,9 @@ from services.candidate_adapter import (
 from services.candidate_repository import (
     CandidateRepository,
 )
+from services.objective_profile_repository import (
+    ObjectiveProfileRepository,
+)
 from services.database import (
     list_pending_candidate_jobs,
     save_candidate_job_analysis,
@@ -34,7 +37,6 @@ from services.job_bucket_classifier import (
     classify_job_bucket,
     BEST_MATCH,
     TRADEOFF,
-    LOWER_ALIGNMENT,
     REJECT,
 )
 from services.recommenders.recommendation_engine import (
@@ -42,7 +44,7 @@ from services.recommenders.recommendation_engine import (
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v4"
+ANALYSIS_VERSION = "candidate-job-analysis-v5"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -117,9 +119,19 @@ def build_job_signature(
 
 def build_candidate_signature(
     candidate,
+    objective_profile=None,
 ) -> str:
+    data = {
+        "candidate": asdict(candidate),
+    }
+
+    if objective_profile is not None:
+        data["objective_profile"] = asdict(
+            objective_profile
+        )
+
     return build_signature(
-        asdict(candidate)
+        data
     )
 
 
@@ -387,6 +399,10 @@ class CandidateJobAnalysisService:
             CandidateRepository()
         )
 
+        self.objective_profile_repository = (
+            ObjectiveProfileRepository()
+        )
+
         self.enricher = JobEnricher()
         self.matcher = JobMatcher()
         self.fit_analyzer = CandidateFitAnalyzer()
@@ -413,8 +429,16 @@ class CandidateJobAnalysisService:
                 f"Candidate not found: {candidate_id}"
             )
 
+        objective_profile = (
+            self.objective_profile_repository
+            .get_active_for_candidate(
+                candidate_id
+            )
+        )
+
         profile = candidate_to_profile(
-            candidate
+            candidate,
+            objective_profile,
         )
 
         hard_filter = HardFilterAnalyzer(
@@ -422,7 +446,10 @@ class CandidateJobAnalysisService:
         )
 
         candidate_signature = (
-            build_candidate_signature(candidate)
+            build_candidate_signature(
+                candidate,
+                objective_profile,
+            )
         )
 
         pending_rows = list_pending_candidate_jobs(
@@ -442,7 +469,6 @@ class CandidateJobAnalysisService:
             "ai_rejected": 0,
             "best_match": 0,
             "tradeoff": 0,
-            "lower_alignment": 0,
             "descriptions_reused": 0,
             "descriptions_fetched": 0,
             "descriptions_failed": 0,
@@ -540,7 +566,7 @@ class CandidateJobAnalysisService:
 
                 elif (
                     job.classification
-                    != self.matcher.RELEVANT
+                    == self.matcher.NOT_RELEVANT
                 ):
                     matcher_reasons = (
                         matcher_analysis["reasons"]
@@ -645,11 +671,6 @@ class CandidateJobAnalysisService:
                     elif bucket == TRADEOFF:
                         analysis_status = "in_review"
                         result["tradeoff"] += 1
-                        result["ai_approved"] += 1
-
-                    elif bucket == LOWER_ALIGNMENT:
-                        analysis_status = "in_review"
-                        result["lower_alignment"] += 1
                         result["ai_approved"] += 1
 
                     else:

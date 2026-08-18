@@ -63,6 +63,41 @@ STEP 2 - Evaluate competitiveness
 
 Ask whether the candidate can realistically compete against qualified candidates.
 
+Use the full professional evidence in the candidate profile.
+
+Give particular weight to:
+- professional_experiences;
+- evidence attached to each experience;
+- demonstrated_capabilities;
+- proven_capabilities;
+- transferable_capabilities;
+- developing_capabilities;
+- technical_tools;
+- domain_experience;
+- strengths;
+- competitive_role_families;
+- bridge_role_families;
+- target_role_families.
+
+Professional experience evidence is stronger than a generic skill label.
+
+Do not conclude that the candidate lacks a capability merely because
+the exact wording used in the job description does not appear in the
+candidate profile.
+
+Compare meaning, context and actual work performed.
+
+For example, experience investigating transactions, account history
+and evidence may support investigation capability even when the job
+description uses different terminology.
+
+Distinguish carefully between:
+- professionally proven experience;
+- transferable experience;
+- developing knowledge;
+- stated career interest.
+
+
 General transferable skills such as communication, troubleshooting, documentation or Python are not sufficient when the role requires several years of specialized professional experience in areas such as:
 
 - advanced networking;
@@ -100,12 +135,34 @@ STEP 3 - Evaluate career direction alignment
 
 Evaluate whether the actual work moves the candidate in a professional direction that makes sense given:
 
+- competitive_role_families;
+- bridge_role_families;
+- target_role_families;
+- professional_experiences;
+- proven_capabilities;
+- transferable_capabilities;
+- developing_capabilities;
+- technical_tools;
+- domain_experience;
+- strengths;
+- professional summary;
 - current roles;
 - bridge roles;
 - target roles;
-- professional summary;
 - current skills;
 - growth skills.
+
+Use career direction separately from historical experience.
+
+Do not assume that the candidate's previous or current occupation is
+their desired future direction.
+
+A role may have high direction alignment even when the candidate is
+not yet fully competitive for it.
+
+A candidate may also be highly competitive for a role that has low
+direction alignment because it moves them away from their intended
+career path.
 
 Classify direction_alignment using exactly one:
 

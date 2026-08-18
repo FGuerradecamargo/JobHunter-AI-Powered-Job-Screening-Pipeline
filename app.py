@@ -1,5 +1,7 @@
 import streamlit as st
 
+from components.job_analysis_view import render_job_analysis
+
 from services.candidate_repository import CandidateRepository
 from services.session_auth import require_login, render_logout_button
 from services.database import (
@@ -322,104 +324,15 @@ def render_job(
         expanded=False,
     ):
 
-        recommendation = (
-                item.get("recommendation")
-                or "not_analyzed"
+        status_label = STATUS_LABELS.get(
+            status,
+            status,
         )
 
-        metric_columns = st.columns(4)
-
-        metric_columns[0].metric(
-            "Current fit",
-            current_fit,
+        render_job_analysis(
+            item,
+            status_label=status_label,
         )
-
-        metric_columns[1].metric(
-            "Growth value",
-            growth_value,
-        )
-
-        metric_columns[2].metric(
-            "Recommendation",
-            recommendation
-            .replace("_", " ")
-            .title(),
-        )
-
-        metric_columns[3].metric(
-            "Status",
-            STATUS_LABELS.get(
-                status,
-                status,
-            ),
-        )
-
-        st.write(
-            f"**Location:** {location}"
-        )
-
-        render_text_section(
-            "Quick overview",
-            simple_summary,
-            (
-                "A simple overview is not available for this analysis yet. "
-                "Open the technical details below."
-            ),
-        )
-
-        render_text_section(
-            "My recommendation",
-            simple_recommendation,
-            final_recommendation or "No recommendation available.",
-        )
-
-        with st.expander(
-                "View technical details",
-                expanded=False,
-        ):
-            first_row = st.columns(2)
-
-            with first_row[0]:
-                render_list(
-                    "What you already bring",
-                    requirements_met,
-                )
-
-            with first_row[1]:
-                render_list(
-                    "Main gaps",
-                    all_gaps,
-                )
-
-            st.divider()
-
-            second_row = st.columns(2)
-
-            with second_row[0]:
-                render_list(
-                    "Positive points",
-                    positive_points,
-                )
-
-            with second_row[1]:
-                render_list(
-                    "Personal tradeoffs",
-                    personal_tradeoffs,
-                )
-
-            st.divider()
-
-            render_text_section(
-                "Why this role may be worth considering",
-                reason,
-                "No explanation available.",
-            )
-
-            render_text_section(
-                "Full recommendation",
-                final_recommendation,
-                "No full recommendation available.",
-            )
 
         st.divider()
 
@@ -548,32 +461,29 @@ def main() -> None:
         selected_candidate_id
     )
 
-    metric_columns = st.columns(5)
-
-    metric_columns[0].metric(
-        "In review",
-        counts["in_review"],
+    rejected_total = (
+        counts["rejected_before_interview"]
+        + counts["rejected_after_interview"]
     )
 
-    metric_columns[1].metric(
+    metric_columns = st.columns(4)
+
+    metric_columns[0].metric(
         "Applied",
         counts["applied"],
     )
 
-    metric_columns[2].metric(
+    metric_columns[1].metric(
         "In process",
         counts["in_process"],
     )
 
-    metric_columns[3].metric(
-        "Rejected by company",
-        (
-                counts["rejected_before_interview"]
-                + counts["rejected_after_interview"]
-        ),
+    metric_columns[2].metric(
+        "Rejected",
+        rejected_total,
     )
 
-    metric_columns[4].metric(
+    metric_columns[3].metric(
         "Offers",
         counts["offer"],
     )
@@ -582,69 +492,61 @@ def main() -> None:
 
     tabs = st.tabs(
         [
-            f"In review ({counts['in_review']})",
-            f"Not applied ({counts['user_rejected']})",
             f"Applied ({counts['applied']})",
             f"In process ({counts['in_process']})",
-            (
-                "Rejected before interview "
-                f"({counts['rejected_before_interview']})"
-            ),
-            (
-                "Rejected in process "
-                f"({counts['rejected_after_interview']})"
-            ),
+            f"Rejected ({rejected_total})",
             f"Offers ({counts['offer']})",
-            f"System rejected ({counts['system_rejected']})",
         ]
     )
 
     with tabs[0]:
         render_job_section(
             candidate_id=selected_candidate_id,
-            status="in_review",
+            status="applied",
         )
 
     with tabs[1]:
         render_job_section(
             candidate_id=selected_candidate_id,
-            status="user_rejected",
+            status="in_process",
         )
 
     with tabs[2]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
-            status="applied",
-        )
+        if counts["rejected_before_interview"]:
+            st.subheader(
+                "Rejected before interview"
+            )
+
+            render_job_section(
+                candidate_id=selected_candidate_id,
+                status="rejected_before_interview",
+            )
+
+        if (
+            counts["rejected_before_interview"]
+            and counts["rejected_after_interview"]
+        ):
+            st.divider()
+
+        if counts["rejected_after_interview"]:
+            st.subheader(
+                "Rejected after interview"
+            )
+
+            render_job_section(
+                candidate_id=selected_candidate_id,
+                status="rejected_after_interview",
+            )
+
+        if not rejected_total:
+            st.info(
+                "No rejected applications."
+            )
 
     with tabs[3]:
         render_job_section(
             candidate_id=selected_candidate_id,
-            status="in_process",
-        )
-
-    with tabs[4]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
-            status="rejected_before_interview",
-        )
-
-    with tabs[5]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
-            status="rejected_after_interview",
-        )
-
-    with tabs[6]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
             status="offer",
-        )
-
-    with tabs[7]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
-            status="system_rejected",
         )
 
 

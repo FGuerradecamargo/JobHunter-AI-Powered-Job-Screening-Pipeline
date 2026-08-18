@@ -5,6 +5,13 @@ from models.job import Job
 
 
 class HardFilterAnalyzer:
+    CLOSED_PATTERNS = [
+        r"\bno longer accepting applications\b",
+        r"\bapplications are closed\b",
+        r"\bposition has been filled\b",
+        r"\bjob is no longer available\b",
+    ]
+
     NIGHT_PATTERNS = [
         r"\bnight shift\b",
         r"\bnight shifts\b",
@@ -14,46 +21,18 @@ class HardFilterAnalyzer:
         r"\bnight rotation\b",
     ]
 
-    CLOSED_PATTERNS = [
-        r"\bno longer accepting applications\b",
-        r"\bapplications are closed\b",
-        r"\bposition has been filled\b",
-        r"\bjob is no longer available\b",
+    ON_CALL_PATTERNS = [
+        r"\bovernight on[- ]call\b",
+        r"\b24/7 on[- ]call\b",
+        r"\b24x7 on[- ]call\b",
+        r"\bnight on[- ]call\b",
     ]
 
-    SPECIALIZED_TITLE_PATTERNS = {
-        "advanced network engineering": [
-            r"\bnetwork operations engineer\b",
-            r"\bnetwork engineer\b",
-            r"\bnetwork solutions engineer\b",
-            r"\btac engineer\b",
-        ],
-        "DevOps or SRE": [
-            r"\bsite reliability engineer\b",
-            r"\bsre\b",
-            r"\bdevops engineer\b",
-            r"\bplatform engineer\b",
-            r"\bcloud infrastructure engineer\b",
-        ],
-        "cybersecurity": [
-            r"\bsecurity analyst\b",
-            r"\bsecurity engineer\b",
-            r"\bthreat detection\b",
-            r"\bsoc analyst\b",
-        ],
-        "hardware or semiconductor engineering": [
-            r"\bapplications engineer\b",
-            r"\belectrical engineer\b",
-            r"\bsemiconductor\b",
-            r"\bhardware engineer\b",
-        ],
-        "pharmaceutical quality operations": [
-            r"\bqms\b",
-            r"\bquality systems\b",
-            r"\bmanufacturing quality\b",
-            r"\bvalidation engineer\b",
-        ],
-    }
+    RELOCATION_PATTERNS = [
+        r"\bmust relocate\b",
+        r"\brelocation required\b",
+        r"\bmandatory relocation\b",
+    ]
 
     REQUIRED_LANGUAGE_PATTERNS = {
         "german": [
@@ -91,53 +70,14 @@ class HardFilterAnalyzer:
             r"\bitalian speaker\b",
             r"\bitalian-speaking\b",
         ],
-    }
-
-    SENIOR_TITLE_PATTERNS = [
-        r"\bsenior\b",
-        r"\bsr\.?\b",
-        r"\bstaff\b",
-        r"\bprincipal\b",
-        r"\blead engineer\b",
-        r"\barchitect\b",
-    ]
-
-    SPECIALIZED_REQUIREMENT_PATTERNS = [
-        r"\b5\+ years\b",
-        r"\b6\+ years\b",
-        r"\b7\+ years\b",
-        r"\b8\+ years\b",
-        r"\bbgp\b",
-        r"\bospf\b",
-        r"\bmpls\b",
-        r"\bvxlan\b",
-        r"\bkubernetes\b",
-        r"\bproduction aws\b",
-        r"\bsite reliability\b",
-        r"\bthreat modeling\b",
-        r"\bsemiconductor\b",
-    ]
-
-    CLEAR_DOMAIN_MISMATCH_PATTERNS = {
-        "AML and investor operations": [
-            r"\baml investor operations\b",
-            r"\binvestor operations\b",
-            r"\banti-money laundering analyst\b",
-            r"\baml analyst\b",
-        ],
-        "software or systems development": [
-            r"\bsystems development engineer\b",
-            r"\bsoftware development engineer\b",
-            r"\bsoftware engineer\b",
+        "portuguese": [
+            r"\bfluent portuguese\b",
+            r"\bportuguese required\b",
+            r"\benglish and portuguese\b",
+            r"\bportuguese speaker\b",
+            r"\bportuguese-speaking\b",
         ],
     }
-
-    CLEAR_LEADERSHIP_TITLE_PATTERNS = [
-        r"\blead support engineer\b",
-        r"\bincident service management lead\b",
-        r"\btechnical support lead\b",
-        r"\bsupport engineering lead\b",
-    ]
 
     def __init__(
         self,
@@ -146,6 +86,11 @@ class HardFilterAnalyzer:
         self.spoken_languages = {
             language.lower()
             for language in profile.spoken_languages
+        }
+
+        self.hard_constraints = {
+            constraint.lower()
+            for constraint in profile.hard_constraints
         }
 
     @staticmethod
@@ -158,9 +103,18 @@ class HardFilterAnalyzer:
             for pattern in patterns
         )
 
+    def _has_constraint_signal(
+        self,
+        phrase: str,
+    ) -> bool:
+        return any(
+            phrase in constraint
+            for constraint in self.hard_constraints
+        )
+
     def analyze(
-            self,
-            job: Job,
+        self,
+        job: Job,
     ) -> dict:
         title = (job.title or "").lower()
         description = (job.description or "").lower()
@@ -169,79 +123,69 @@ class HardFilterAnalyzer:
         reasons: list[str] = []
 
         if self._matches(
-                job_text,
-                self.CLOSED_PATTERNS,
+            job_text,
+            self.CLOSED_PATTERNS,
         ):
             reasons.append(
                 "Job appears to be closed or unavailable."
             )
 
-        if self._matches(
+        if (
+            self._has_constraint_signal(
+                "night"
+            )
+            and self._matches(
                 job_text,
                 self.NIGHT_PATTERNS,
+            )
         ):
             reasons.append(
                 "Role explicitly includes night or overnight work."
             )
 
-        for language, patterns in (
-                self.REQUIRED_LANGUAGE_PATTERNS.items()
+        if (
+            self._has_constraint_signal(
+                "on-call"
+            )
+            and self._matches(
+                job_text,
+                self.ON_CALL_PATTERNS,
+            )
         ):
-            if (
-                    language not in self.spoken_languages
-                    and self._matches(job_text, patterns)
-            ):
-                reasons.append(
-                    f"Mandatory {language.title()} requirement "
-                    "is not present in the candidate profile."
-                )
-
-        for domain, patterns in (
-                self.SPECIALIZED_TITLE_PATTERNS.items()
-        ):
-            if self._matches(title, patterns):
-                reasons.append(
-                    "Role title indicates a specialized "
-                    f"{domain} position."
-                )
-                break
-
-        has_senior_title = self._matches(
-            title,
-            self.SENIOR_TITLE_PATTERNS,
-        )
-
-        has_specialized_requirements = self._matches(
-            job_text,
-            self.SPECIALIZED_REQUIREMENT_PATTERNS,
-        )
+            reasons.append(
+                "Role explicitly includes blocking overnight on-call work."
+            )
 
         if (
-                has_senior_title
-                and has_specialized_requirements
+            self._has_constraint_signal(
+                "relocation"
+            )
+            and self._matches(
+                job_text,
+                self.RELOCATION_PATTERNS,
+            )
         ):
             reasons.append(
-                "Role combines seniority with specialized "
-                "day-one technical requirements."
+                "Role explicitly requires relocation."
             )
 
-        for domain, patterns in (
-                self.CLEAR_DOMAIN_MISMATCH_PATTERNS.items()
+        if self._has_constraint_signal(
+            "language"
         ):
-            if self._matches(title, patterns):
-                reasons.append(
-                    "Role belongs to a clearly mismatched "
-                    f"domain: {domain}."
-                )
-                break
-
-        if self._matches(
-                title,
-                self.CLEAR_LEADERSHIP_TITLE_PATTERNS,
-        ):
-            reasons.append(
-                "Role requires an established lead-level profile."
-            )
+            for language, patterns in (
+                self.REQUIRED_LANGUAGE_PATTERNS.items()
+            ):
+                if (
+                    language not in self.spoken_languages
+                    and self._matches(
+                        job_text,
+                        patterns,
+                    )
+                ):
+                    reasons.append(
+                        f"Mandatory {language.title()} requirement "
+                        "is not present in the candidate profile."
+                    )
 
         return {
             "rejected": bool(reasons),

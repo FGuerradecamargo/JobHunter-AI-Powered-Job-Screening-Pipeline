@@ -3,6 +3,9 @@ from dataclasses import dataclass, field
 from models.candidate_constraints import CandidateConstraints
 from models.candidate_preferences import CandidatePreferences
 from models.candidate_priority import CandidatePriority
+from models.professional_experience_profile import (
+    ProfessionalExperienceProfile,
+)
 
 
 @dataclass
@@ -32,6 +35,44 @@ class Candidate:
     )
 
     development_areas: list[str] = field(
+        default_factory=list
+    )
+
+    professional_experiences: list[
+        ProfessionalExperienceProfile
+    ] = field(
+        default_factory=list
+    )
+
+    proven_capabilities: list[str] = field(
+        default_factory=list
+    )
+
+    transferable_capabilities: list[str] = field(
+        default_factory=list
+    )
+
+    developing_capabilities: list[str] = field(
+        default_factory=list
+    )
+
+    technical_tools: list[str] = field(
+        default_factory=list
+    )
+
+    domain_experience: list[str] = field(
+        default_factory=list
+    )
+
+    competitive_role_families: list[str] = field(
+        default_factory=list
+    )
+
+    bridge_role_families: list[str] = field(
+        default_factory=list
+    )
+
+    target_role_families: list[str] = field(
         default_factory=list
     )
 

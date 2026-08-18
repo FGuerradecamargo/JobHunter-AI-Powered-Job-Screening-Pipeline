@@ -1,9 +1,11 @@
-﻿from models.candidate import Candidate
+from models.candidate import Candidate
 from models.candidate_profile import CandidateProfile
+from models.objective_profile import ObjectiveProfile
 
 
 def candidate_to_profile(
     candidate: Candidate,
+    objective_profile: ObjectiveProfile | None = None,
 ) -> CandidateProfile:
     positive_preferences: list[str] = []
     negative_preferences: list[str] = []
@@ -94,8 +96,6 @@ def candidate_to_profile(
             "Mandatory relocation is a blocking conflict."
         )
 
-    salary_policy = ""
-
     if constraints.minimum_salary is not None:
         salary_policy = (
             "Minimum acceptable annual salary: "
@@ -107,27 +107,185 @@ def candidate_to_profile(
             "or justify the career opportunity."
         )
 
-    return CandidateProfile(
-        current_roles=[
-            candidate.current_role,
-        ],
-        bridge_roles=list(
-            candidate.target_roles
-        ),
-        target_roles=list(
-            candidate.target_roles
-        ),
-        current_skills=list(
-            candidate.skills
-        ),
-        growth_skills=list(
-            candidate.development_areas
-        ),
-        current_level=candidate.current_level,
-        professional_summary=(
+    if objective_profile is not None:
+        current_roles = list(
+            objective_profile.competitive_role_families
+        )
+
+        bridge_roles = list(
+            objective_profile.bridge_role_families
+        )
+
+        target_roles = list(
+            objective_profile.target_role_families
+        )
+
+        current_skills = list(
+            objective_profile.relevant_proven_capabilities
+        )
+
+        growth_skills = list(
+            objective_profile.relevant_developing_capabilities
+        )
+
+        professional_experiences = list(
+            objective_profile.relevant_experiences
+        )
+
+        proven_capabilities = list(
+            objective_profile.relevant_proven_capabilities
+        )
+
+        transferable_capabilities = list(
+            objective_profile.relevant_transferable_capabilities
+        )
+
+        developing_capabilities = list(
+            objective_profile.relevant_developing_capabilities
+        )
+
+        technical_tools = list(
+            objective_profile.relevant_tools
+        )
+
+        domain_experience = list(
+            objective_profile.relevant_domains
+        )
+
+        competitive_role_families = list(
+            objective_profile.competitive_role_families
+        )
+
+        bridge_role_families = list(
+            objective_profile.bridge_role_families
+        )
+
+        target_role_families = list(
+            objective_profile.target_role_families
+        )
+
+        strengths = list(
+            objective_profile.relevant_strengths
+        )
+
+        professional_summary = (
             candidate.professional_summary
-        ),
+            + "\n\nCurrent career objective: "
+            + objective_profile.objective_title
+            + ". "
+            + objective_profile.objective_description
+        )
+
+    else:
+        bridge_roles = (
+            list(candidate.bridge_role_families)
+            if candidate.bridge_role_families
+            else list(candidate.target_roles)
+        )
+
+        target_roles = (
+            list(candidate.target_role_families)
+            if candidate.target_role_families
+            else list(candidate.target_roles)
+        )
+
+        current_roles = (
+            list(candidate.competitive_role_families)
+            if candidate.competitive_role_families
+            else [candidate.current_role]
+        )
+
+        current_skills = (
+            list(candidate.proven_capabilities)
+            if candidate.proven_capabilities
+            else list(candidate.skills)
+        )
+
+        growth_skills = (
+            list(candidate.developing_capabilities)
+            if candidate.developing_capabilities
+            else list(candidate.development_areas)
+        )
+
+        professional_experiences = list(
+            candidate.professional_experiences
+        )
+
+        proven_capabilities = list(
+            candidate.proven_capabilities
+        )
+
+        transferable_capabilities = list(
+            candidate.transferable_capabilities
+        )
+
+        developing_capabilities = list(
+            candidate.developing_capabilities
+        )
+
+        technical_tools = list(
+            candidate.technical_tools
+        )
+
+        domain_experience = list(
+            candidate.domain_experience
+        )
+
+        competitive_role_families = list(
+            candidate.competitive_role_families
+        )
+
+        bridge_role_families = list(
+            candidate.bridge_role_families
+        )
+
+        target_role_families = list(
+            candidate.target_role_families
+        )
+
+        strengths = list(
+            candidate.strengths
+        )
+
+        professional_summary = (
+            candidate.professional_summary
+        )
+
+    return CandidateProfile(
+        current_roles=current_roles,
+        bridge_roles=bridge_roles,
+        target_roles=target_roles,
+        current_skills=current_skills,
+        growth_skills=growth_skills,
+        current_level=candidate.current_level,
+        professional_summary=professional_summary,
         job_search_urgency="selective",
+
+        professional_experiences=(
+            professional_experiences
+        ),
+        proven_capabilities=(
+            proven_capabilities
+        ),
+        transferable_capabilities=(
+            transferable_capabilities
+        ),
+        developing_capabilities=(
+            developing_capabilities
+        ),
+        technical_tools=technical_tools,
+        domain_experience=domain_experience,
+        competitive_role_families=(
+            competitive_role_families
+        ),
+        bridge_role_families=(
+            bridge_role_families
+        ),
+        target_role_families=(
+            target_role_families
+        ),
+        strengths=strengths,
+
         positive_preferences=positive_preferences,
         negative_preferences=negative_preferences,
         hard_constraints=hard_constraints,
