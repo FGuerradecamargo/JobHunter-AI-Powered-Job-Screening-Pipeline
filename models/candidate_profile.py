@@ -73,6 +73,10 @@ class CandidateProfile:
         default_factory=list
     )
 
+    career_updates: list[str] = field(
+        default_factory=list
+    )
+
     positive_preferences: list[str] = field(
         default_factory=list
     )

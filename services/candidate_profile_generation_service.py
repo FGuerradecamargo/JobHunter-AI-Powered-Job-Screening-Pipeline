@@ -18,12 +18,6 @@ from services.candidate_repository import CandidateRepository
 from services.career_update_repository import (
     CareerUpdateRepository,
 )
-from services.career_objective_repository import (
-    CareerObjectiveRepository,
-)
-from services.objective_profile_generation_service import (
-    ObjectiveProfileGenerationService,
-)
 
 
 class CandidateProfileGenerationService:
@@ -33,28 +27,12 @@ class CandidateProfileGenerationService:
         onboarding_repository: CandidateOnboardingRepository,
         candidate_repository: CandidateRepository,
         career_update_repository: CareerUpdateRepository,
-        career_objective_repository: (
-            CareerObjectiveRepository | None
-        ) = None,
-        objective_profile_generation_service: (
-            ObjectiveProfileGenerationService | None
-        ) = None,
     ) -> None:
         self.llm_client = llm_client
         self.onboarding_repository = onboarding_repository
         self.candidate_repository = candidate_repository
         self.career_update_repository = (
             career_update_repository
-        )
-        self.career_objective_repository = (
-            career_objective_repository
-            or CareerObjectiveRepository()
-        )
-        self.objective_profile_generation_service = (
-            objective_profile_generation_service
-            or ObjectiveProfileGenerationService(
-                llm_client=llm_client
-            )
         )
 
     def generate(
@@ -265,21 +243,5 @@ class CandidateProfileGenerationService:
         self.candidate_repository.save(
             candidate
         )
-
-        active_objective = (
-            self.career_objective_repository
-            .get_active(
-                candidate_id
-            )
-        )
-
-        if active_objective is not None:
-            (
-                self.objective_profile_generation_service
-                .generate(
-                    candidate=candidate,
-                    objective=active_objective,
-                )
-            )
 
         return candidate

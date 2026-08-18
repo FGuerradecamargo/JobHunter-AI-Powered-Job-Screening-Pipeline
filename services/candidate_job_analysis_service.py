@@ -23,8 +23,11 @@ from services.candidate_adapter import (
 from services.candidate_repository import (
     CandidateRepository,
 )
-from services.objective_profile_repository import (
-    ObjectiveProfileRepository,
+from services.career_objective_repository import (
+    CareerObjectiveRepository,
+)
+from services.career_update_repository import (
+    CareerUpdateRepository,
 )
 from services.database import (
     list_pending_candidate_jobs,
@@ -44,7 +47,7 @@ from services.recommenders.recommendation_engine import (
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v5"
+ANALYSIS_VERSION = "candidate-job-analysis-v6"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -119,15 +122,22 @@ def build_job_signature(
 
 def build_candidate_signature(
     candidate,
-    objective_profile=None,
+    career_objective=None,
+    career_updates=None,
 ) -> str:
     data = {
         "candidate": asdict(candidate),
+        "career_updates": [
+            asdict(update)
+            for update in (
+                career_updates or []
+            )
+        ],
     }
 
-    if objective_profile is not None:
-        data["objective_profile"] = asdict(
-            objective_profile
+    if career_objective is not None:
+        data["career_objective"] = asdict(
+            career_objective
         )
 
     return build_signature(
@@ -399,8 +409,11 @@ class CandidateJobAnalysisService:
             CandidateRepository()
         )
 
-        self.objective_profile_repository = (
-            ObjectiveProfileRepository()
+        self.career_objective_repository = (
+            CareerObjectiveRepository()
+        )
+        self.career_update_repository = (
+            CareerUpdateRepository()
         )
 
         self.enricher = JobEnricher()
@@ -429,16 +442,24 @@ class CandidateJobAnalysisService:
                 f"Candidate not found: {candidate_id}"
             )
 
-        objective_profile = (
-            self.objective_profile_repository
-            .get_active_for_candidate(
+        career_objective = (
+            self.career_objective_repository
+            .get_active(
+                candidate_id
+            )
+        )
+
+        career_updates = (
+            self.career_update_repository
+            .list_for_candidate(
                 candidate_id
             )
         )
 
         profile = candidate_to_profile(
             candidate,
-            objective_profile,
+            career_objective,
+            career_updates,
         )
 
         hard_filter = HardFilterAnalyzer(
@@ -448,7 +469,8 @@ class CandidateJobAnalysisService:
         candidate_signature = (
             build_candidate_signature(
                 candidate,
-                objective_profile,
+                career_objective,
+                career_updates,
             )
         )
 

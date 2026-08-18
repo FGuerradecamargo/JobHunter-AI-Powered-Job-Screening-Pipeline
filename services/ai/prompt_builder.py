@@ -72,6 +72,7 @@ Give particular weight to:
 - proven_capabilities;
 - transferable_capabilities;
 - developing_capabilities;
+- career_updates;
 - technical_tools;
 - domain_experience;
 - strengths;
@@ -80,6 +81,12 @@ Give particular weight to:
 - target_role_families.
 
 Professional experience evidence is stronger than a generic skill label.
+
+career_updates are newer professional facts recorded after the Master Career Profile
+was created. Treat them as current evidence and allow them to update your view of
+the candidate. Do not automatically interpret a course, newly learned skill,
+career intention or self-reported update as professional experience unless the
+update itself provides evidence of real-world professional use.
 
 Do not conclude that the candidate lacks a capability merely because
 the exact wording used in the job description does not appear in the
@@ -142,6 +149,7 @@ Evaluate whether the actual work moves the candidate in a professional direction
 - proven_capabilities;
 - transferable_capabilities;
 - developing_capabilities;
+- career_updates;
 - technical_tools;
 - domain_experience;
 - strengths;

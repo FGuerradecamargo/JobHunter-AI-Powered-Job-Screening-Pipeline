@@ -17,6 +17,8 @@ from services.candidate_profile_generation_service import (
     CandidateProfileGenerationService,
 )
 from services.candidate_repository import CandidateRepository
+from models.career_objective import CareerObjective
+from services.career_objective_repository import CareerObjectiveRepository
 from services.access_policy import AccessPolicy
 from services.session_auth import require_login, render_logout_button
 
@@ -41,6 +43,7 @@ onboarding_repository = CandidateOnboardingRepository()
 
 candidate_repository = CandidateRepository()
 career_update_repository = CareerUpdateRepository()
+career_objective_repository = CareerObjectiveRepository()
 
 profile_generation_service = (
     CandidateProfileGenerationService(
@@ -96,6 +99,10 @@ existing_onboarding = (
     onboarding_repository.get_onboarding(
         candidate_id
     )
+)
+
+generated_candidate = candidate_repository.get(
+    candidate_id
 )
 
 # Reset session-based fields when changing candidate/user.
@@ -618,6 +625,137 @@ if experiences:
                     st.rerun()
 
 # ---------------------------------------------------------
+# CURRENT CAREER OBJECTIVE
+# ---------------------------------------------------------
+
+st.divider()
+
+st.subheader("Current career objective")
+
+st.write(
+    "Tell JobHunter where you want your career to move next. "
+    "Your professional history remains evidence, while this "
+    "objective determines which opportunities and development "
+    "paths are relevant now."
+)
+
+active_objective = (
+    career_objective_repository.get_active(
+        candidate_id
+    )
+)
+
+objective_title = st.text_input(
+    "Objective title",
+    value=(
+        active_objective.title
+        if active_objective
+        else ""
+    ),
+    placeholder=(
+        "e.g. Technical and Process Operations"
+    ),
+    key=f"career_objective_title_{candidate_id}",
+)
+
+objective_description = st.text_area(
+    "Describe your career direction",
+    value=(
+        active_objective.description
+        if active_objective
+        else ""
+    ),
+    placeholder=(
+        "Describe the kinds of roles, work and progression "
+        "you want JobHunter to prioritize."
+    ),
+    height=140,
+    key=f"career_objective_description_{candidate_id}",
+)
+
+if st.button(
+    (
+        "Update career objective"
+        if active_objective
+        else "Save career objective"
+    ),
+    type="primary",
+    use_container_width=True,
+    key=f"save_career_objective_{candidate_id}",
+):
+    cleaned_title = objective_title.strip()
+    cleaned_description = (
+        objective_description.strip()
+    )
+
+    if not cleaned_title:
+        st.warning(
+            "Add a title for your career objective."
+        )
+
+    elif not cleaned_description:
+        st.warning(
+            "Describe your career direction before saving."
+        )
+
+    elif generated_candidate is None:
+        st.warning(
+            "Generate your professional profile before "
+            "creating a career objective."
+        )
+
+    else:
+        import uuid
+
+        objective = CareerObjective(
+            id=(
+                active_objective.id
+                if active_objective
+                else (
+                    "career_objective_"
+                    + uuid.uuid4().hex
+                )
+            ),
+            candidate_id=candidate_id,
+            title=cleaned_title,
+            description=cleaned_description,
+            active=True,
+            desired_role_families=(
+                list(
+                    active_objective
+                    .desired_role_families
+                )
+                if active_objective
+                else []
+            ),
+            created_at=(
+                active_objective.created_at
+                if active_objective
+                else ""
+            ),
+        )
+
+        try:
+            with st.spinner(
+                "Updating your career direction..."
+            ):
+                career_objective_repository.save(
+                    objective
+                )
+
+            st.success(
+                "Career objective updated."
+            )
+
+            st.rerun()
+
+        except Exception as exc:
+            st.error(
+                "Could not update career objective: "
+                f"{exc}"
+            )
+
+
 # ---------------------------------------------------------
 # CURRENT PRIORITIES
 # ---------------------------------------------------------
@@ -635,10 +773,6 @@ st.write(
 st.caption(
     "Positive priorities make matching jobs more attractive. "
     "Negative priorities flag trade-offs that you may want to review."
-)
-
-generated_candidate = candidate_repository.get(
-    candidate_id
 )
 
 priority_candidate = generated_candidate
@@ -859,9 +993,9 @@ else:
     )
 
     st.write(
-        "Add only what changed. JobHunter will preserve "
-        "your existing career history and use the new "
-        "information to update your profile."
+        "Add only what changed. JobHunter keeps it as "
+        "new professional evidence and considers it when "
+        "evaluating future opportunities."
     )
 
     career_update_type = st.selectbox(
@@ -901,15 +1035,7 @@ else:
     )
 
     profile_button_label = (
-        "Update professional profile"
-    )
-
-    spinner_message = (
-        "Updating your professional profile..."
-    )
-
-    success_message = (
-        "Professional profile updated."
+        "Save professional change"
     )
 
 if st.button(
@@ -931,46 +1057,56 @@ if st.button(
 
         import uuid
 
-        career_update_repository.save(
-            CareerUpdate(
-                id=(
-                    "career_update_"
-                    + uuid.uuid4().hex
-                ),
-                candidate_id=candidate_id,
-                update_type=career_update_type,
-                description=cleaned_update,
-            )
-        )
-
-    try:
-        with st.spinner(
-            spinner_message
-        ):
-            candidate = (
-                profile_generation_service.generate(
-                    candidate_id=candidate_id,
-                    candidate_name=(
-                        selected_user.display_name
+        try:
+            career_update_repository.save(
+                CareerUpdate(
+                    id=(
+                        "career_update_"
+                        + uuid.uuid4().hex
                     ),
+                    candidate_id=candidate_id,
+                    update_type=career_update_type,
+                    description=cleaned_update,
                 )
             )
 
-        st.success(
-            success_message
-        )
+            st.success(
+                "Professional change saved."
+            )
 
-        st.rerun()
+            st.rerun()
 
-    except Exception as exc:
-        st.error(
-            f"Could not update profile: {exc}"
-            if profile_exists
-            else (
+        except Exception as exc:
+            st.error(
+                "Could not save professional change: "
+                f"{exc}"
+            )
+
+    else:
+        try:
+            with st.spinner(
+                spinner_message
+            ):
+                candidate = (
+                    profile_generation_service.generate(
+                        candidate_id=candidate_id,
+                        candidate_name=(
+                            selected_user.display_name
+                        ),
+                    )
+                )
+
+            st.success(
+                success_message
+            )
+
+            st.rerun()
+
+        except Exception as exc:
+            st.error(
                 "Could not generate profile: "
                 f"{exc}"
             )
-        )
 
 if generated_candidate is not None:
     st.divider()

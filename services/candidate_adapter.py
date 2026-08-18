@@ -1,11 +1,13 @@
 from models.candidate import Candidate
 from models.candidate_profile import CandidateProfile
-from models.objective_profile import ObjectiveProfile
+from models.career_objective import CareerObjective
+from models.career_update import CareerUpdate
 
 
 def candidate_to_profile(
     candidate: Candidate,
-    objective_profile: ObjectiveProfile | None = None,
+    career_objective: CareerObjective | None = None,
+    career_updates: list[CareerUpdate] | None = None,
 ) -> CandidateProfile:
     positive_preferences: list[str] = []
     negative_preferences: list[str] = []
@@ -107,149 +109,96 @@ def candidate_to_profile(
             "or justify the career opportunity."
         )
 
-    if objective_profile is not None:
-        current_roles = list(
-            objective_profile.competitive_role_families
+    bridge_roles = (
+        list(candidate.bridge_role_families)
+        if candidate.bridge_role_families
+        else list(candidate.target_roles)
+    )
+
+    target_roles = (
+        list(candidate.target_role_families)
+        if candidate.target_role_families
+        else list(candidate.target_roles)
+    )
+
+    current_roles = (
+        list(candidate.competitive_role_families)
+        if candidate.competitive_role_families
+        else [candidate.current_role]
+    )
+
+    current_skills = (
+        list(candidate.proven_capabilities)
+        if candidate.proven_capabilities
+        else list(candidate.skills)
+    )
+
+    growth_skills = (
+        list(candidate.developing_capabilities)
+        if candidate.developing_capabilities
+        else list(candidate.development_areas)
+    )
+
+    professional_experiences = list(
+        candidate.professional_experiences
+    )
+
+    proven_capabilities = list(
+        candidate.proven_capabilities
+    )
+
+    transferable_capabilities = list(
+        candidate.transferable_capabilities
+    )
+
+    developing_capabilities = list(
+        candidate.developing_capabilities
+    )
+
+    technical_tools = list(
+        candidate.technical_tools
+    )
+
+    domain_experience = list(
+        candidate.domain_experience
+    )
+
+    competitive_role_families = list(
+        candidate.competitive_role_families
+    )
+
+    bridge_role_families = list(
+        candidate.bridge_role_families
+    )
+
+    target_role_families = list(
+        candidate.target_role_families
+    )
+
+    strengths = list(
+        candidate.strengths
+    )
+
+    professional_summary = (
+        candidate.professional_summary
+    )
+
+    if career_objective is not None:
+        professional_summary += (
+            "\n\nCURRENT CAREER OBJECTIVE:\n"
+            + career_objective.title
+            + "\n"
+            + career_objective.description
         )
 
-        bridge_roles = list(
-            objective_profile.bridge_role_families
-        )
+        if career_objective.desired_role_families:
+            target_roles = list(
+                career_objective.desired_role_families
+            )
 
-        target_roles = list(
-            objective_profile.target_role_families
-        )
-
-        current_skills = list(
-            objective_profile.relevant_proven_capabilities
-        )
-
-        growth_skills = list(
-            objective_profile.relevant_developing_capabilities
-        )
-
-        professional_experiences = list(
-            objective_profile.relevant_experiences
-        )
-
-        proven_capabilities = list(
-            objective_profile.relevant_proven_capabilities
-        )
-
-        transferable_capabilities = list(
-            objective_profile.relevant_transferable_capabilities
-        )
-
-        developing_capabilities = list(
-            objective_profile.relevant_developing_capabilities
-        )
-
-        technical_tools = list(
-            objective_profile.relevant_tools
-        )
-
-        domain_experience = list(
-            objective_profile.relevant_domains
-        )
-
-        competitive_role_families = list(
-            objective_profile.competitive_role_families
-        )
-
-        bridge_role_families = list(
-            objective_profile.bridge_role_families
-        )
-
-        target_role_families = list(
-            objective_profile.target_role_families
-        )
-
-        strengths = list(
-            objective_profile.relevant_strengths
-        )
-
-        professional_summary = (
-            candidate.professional_summary
-            + "\n\nCurrent career objective: "
-            + objective_profile.objective_title
-            + ". "
-            + objective_profile.objective_description
-        )
-
-    else:
-        bridge_roles = (
-            list(candidate.bridge_role_families)
-            if candidate.bridge_role_families
-            else list(candidate.target_roles)
-        )
-
-        target_roles = (
-            list(candidate.target_role_families)
-            if candidate.target_role_families
-            else list(candidate.target_roles)
-        )
-
-        current_roles = (
-            list(candidate.competitive_role_families)
-            if candidate.competitive_role_families
-            else [candidate.current_role]
-        )
-
-        current_skills = (
-            list(candidate.proven_capabilities)
-            if candidate.proven_capabilities
-            else list(candidate.skills)
-        )
-
-        growth_skills = (
-            list(candidate.developing_capabilities)
-            if candidate.developing_capabilities
-            else list(candidate.development_areas)
-        )
-
-        professional_experiences = list(
-            candidate.professional_experiences
-        )
-
-        proven_capabilities = list(
-            candidate.proven_capabilities
-        )
-
-        transferable_capabilities = list(
-            candidate.transferable_capabilities
-        )
-
-        developing_capabilities = list(
-            candidate.developing_capabilities
-        )
-
-        technical_tools = list(
-            candidate.technical_tools
-        )
-
-        domain_experience = list(
-            candidate.domain_experience
-        )
-
-        competitive_role_families = list(
-            candidate.competitive_role_families
-        )
-
-        bridge_role_families = list(
-            candidate.bridge_role_families
-        )
-
-        target_role_families = list(
-            candidate.target_role_families
-        )
-
-        strengths = list(
-            candidate.strengths
-        )
-
-        professional_summary = (
-            candidate.professional_summary
-        )
+            target_role_families = list(
+                career_objective.desired_role_families
+            )
 
     return CandidateProfile(
         current_roles=current_roles,
@@ -285,6 +234,17 @@ def candidate_to_profile(
             target_role_families
         ),
         strengths=strengths,
+
+        career_updates=[
+            (
+                update.update_type
+                + ": "
+                + update.description
+            )
+            for update in (
+                career_updates or []
+            )
+        ],
 
         positive_preferences=positive_preferences,
         negative_preferences=negative_preferences,
