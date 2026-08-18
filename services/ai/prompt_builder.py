@@ -310,6 +310,45 @@ The simple_recommendation must:
 - explain the main reason for the decision;
 - consider competitiveness, direction alignment and relevant trade-offs.
 
+STEP 8 - Build a tailored CV for approved opportunities
+
+Generate tailored_cv only when ALL of these are true:
+- direction_alignment is high;
+- competitive_status is competitive_now or bridge_opportunity;
+- hard_conflicts is empty.
+
+Otherwise tailored_cv must be null.
+
+The purpose of the tailored CV is:
+
+"What in this candidate's real professional evidence makes this application stronger?"
+
+Start from the job's real needs, then select the strongest truthful evidence
+from the candidate profile.
+
+You may:
+- select the most relevant experiences;
+- reduce emphasis on irrelevant experiences;
+- reorder evidence by relevance;
+- rewrite bullets to communicate existing evidence more clearly;
+- emphasize transferable capabilities when genuinely supported;
+- include relevant career_updates;
+- use terminology from the job when it accurately describes existing evidence.
+
+You must NOT:
+- invent responsibilities;
+- invent tools or technologies;
+- invent achievements or metrics;
+- invent seniority;
+- turn a course or developing skill into professional experience;
+- claim production experience that is not supported;
+- create evidence merely to match a keyword.
+
+Each experience must retain its real source_experience_id whenever available.
+
+The CV should be concise and application-oriented.
+Prefer evidence that directly increases the candidate's credibility for this specific role.
+
 Return only valid JSON using exactly this structure:
 
 {{
@@ -334,7 +373,8 @@ Return only valid JSON using exactly this structure:
   "reason": "",
   "final_reason": "",
   "simple_summary": "",
-  "simple_recommendation": ""
+  "simple_recommendation": "",
+  "tailored_cv": null
 }}
 
 Rules:
@@ -361,4 +401,21 @@ Rules:
 - simple_summary must not repeat the full technical analysis.
 - simple_recommendation must begin with Apply, Take a second look or Do not apply.
 - simple_recommendation must be concise and decision-oriented.
+- For an approved opportunity, tailored_cv must be an object using exactly this structure:
+  {{
+    "headline": "",
+    "professional_summary": "",
+    "key_skills": [],
+    "experiences": [
+      {{
+        "source_experience_id": "",
+        "company": "",
+        "role": "",
+        "tailored_bullets": []
+      }}
+    ],
+    "additional_relevant_information": []
+  }}
+- For any opportunity that does not satisfy the tailored CV approval conditions, tailored_cv must be null.
+- Every tailored CV statement must be supportable from the candidate profile or career_updates.
 """.strip()

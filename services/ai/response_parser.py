@@ -2,6 +2,10 @@
 from typing import Any
 
 from models.ai_recommendation import AIRecommendation
+from models.tailored_cv import (
+    TailoredCV,
+    TailoredCVExperience,
+)
 
 
 VALID_RECOMMENDATIONS = {
@@ -64,6 +68,95 @@ def validate_string_list(
         )
 
     return value
+
+
+def parse_tailored_cv(
+    value: Any,
+) -> TailoredCV | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, dict):
+        raise ValueError(
+            "tailored_cv must be an object or null"
+        )
+
+    raw_experiences = value.get(
+        "experiences",
+        [],
+    )
+
+    if not isinstance(raw_experiences, list):
+        raise ValueError(
+            "tailored_cv.experiences must be a list"
+        )
+
+    experiences: list[
+        TailoredCVExperience
+    ] = []
+
+    for item in raw_experiences:
+        if not isinstance(item, dict):
+            raise ValueError(
+                "Each tailored CV experience "
+                "must be an object"
+            )
+
+        experiences.append(
+            TailoredCVExperience(
+                source_experience_id=str(
+                    item.get(
+                        "source_experience_id",
+                        "",
+                    )
+                ),
+                company=str(
+                    item.get("company", "")
+                ),
+                role=str(
+                    item.get("role", "")
+                ),
+                tailored_bullets=(
+                    validate_string_list(
+                        item.get(
+                            "tailored_bullets"
+                        ),
+                        (
+                            "tailored_cv.experiences."
+                            "tailored_bullets"
+                        ),
+                    )
+                ),
+            )
+        )
+
+    return TailoredCV(
+        headline=str(
+            value.get("headline", "")
+        ),
+        professional_summary=str(
+            value.get(
+                "professional_summary",
+                "",
+            )
+        ),
+        key_skills=validate_string_list(
+            value.get("key_skills"),
+            "tailored_cv.key_skills",
+        ),
+        experiences=experiences,
+        additional_relevant_information=(
+            validate_string_list(
+                value.get(
+                    "additional_relevant_information"
+                ),
+                (
+                    "tailored_cv."
+                    "additional_relevant_information"
+                ),
+            )
+        ),
+    )
 
 
 def parse_response(
@@ -181,5 +274,9 @@ def parse_response(
         simple_recommendation=data.get(
             "simple_recommendation",
             "",
+        ),
+
+        tailored_cv=parse_tailored_cv(
+            data.get("tailored_cv")
         ),
     )

@@ -460,6 +460,122 @@ for job in review_jobs:
         tradeoffs.append(job)
 
 
+def render_tailored_cv(
+    analysis: dict,
+) -> None:
+    tailored_cv = analysis.get("tailored_cv")
+
+    if not tailored_cv:
+        return
+
+    st.divider()
+
+    with st.expander(
+        "Tailored CV",
+        expanded=False,
+    ):
+        st.caption(
+            "Generated from your real career evidence "
+            "for this specific opportunity."
+        )
+
+        headline = tailored_cv.get(
+            "headline",
+            "",
+        )
+
+        if headline:
+            st.markdown(
+                f"### {headline}"
+            )
+
+        professional_summary = tailored_cv.get(
+            "professional_summary",
+            "",
+        )
+
+        if professional_summary:
+            st.markdown(
+                "**Professional Summary**"
+            )
+            st.write(
+                professional_summary
+            )
+
+        key_skills = tailored_cv.get(
+            "key_skills",
+            [],
+        )
+
+        if key_skills:
+            st.markdown(
+                "**Key Skills**"
+            )
+
+            st.write(
+                " ? ".join(key_skills)
+            )
+
+        experiences = tailored_cv.get(
+            "experiences",
+            [],
+        )
+
+        if experiences:
+            st.markdown(
+                "**Relevant Experience**"
+            )
+
+            for experience in experiences:
+                company = experience.get(
+                    "company",
+                    "",
+                )
+
+                role = experience.get(
+                    "role",
+                    "",
+                )
+
+                if company and role:
+                    st.markdown(
+                        f"**{role} ? {company}**"
+                    )
+                elif role:
+                    st.markdown(
+                        f"**{role}**"
+                    )
+                elif company:
+                    st.markdown(
+                        f"**{company}**"
+                    )
+
+                for bullet in experience.get(
+                    "tailored_bullets",
+                    [],
+                ):
+                    st.markdown(
+                        f"- {bullet}"
+                    )
+
+        additional_information = (
+            tailored_cv.get(
+                "additional_relevant_information",
+                [],
+            )
+        )
+
+        if additional_information:
+            st.markdown(
+                "**Additional Relevant Information**"
+            )
+
+            for item in additional_information:
+                st.markdown(
+                    f"- {item}"
+                )
+
+
 def render_job(
     job: dict,
 ) -> None:
@@ -481,6 +597,10 @@ def render_job(
     ):
         render_job_analysis(
             job,
+        )
+
+        render_tailored_cv(
+            analysis,
         )
 
         st.divider()

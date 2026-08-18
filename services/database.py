@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from models.job import Job
 
 import json
+from services.analysis_signatures import build_job_signature_from_values
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -2000,12 +2001,14 @@ def list_pending_candidate_jobs(
                 candidate_job_analyses.candidate_signature,
                 candidate_job_analyses.job_signature,
                 candidate_job_analyses.recommendation,
-                candidate_job_analyses.status
+                candidate_job_analyses.status,
+                candidate_job_analyses.created_at
 
             FROM candidate_job_analyses
 
             INNER JOIN jobs
-                ON jobs.id = candidate_job_analyses.job_id
+                ON jobs.id =
+                    candidate_job_analyses.job_id
 
             WHERE
                 candidate_job_analyses.candidate_id = ?
@@ -2015,37 +2018,73 @@ def list_pending_candidate_jobs(
                     'system_rejected'
                 )
 
-                AND (
-                    candidate_job_analyses.recommendation IS NULL
-
-                    OR COALESCE(
-                        candidate_job_analyses.analysis_version,
-                        ''
-                    ) != COALESCE(?, '')
-
-                    OR COALESCE(
-                        candidate_job_analyses.candidate_signature,
-                        ''
-                    ) != COALESCE(?, '')
-                )
-
             ORDER BY
                 candidate_job_analyses.created_at ASC
-
-            LIMIT ?
             """,
             (
                 candidate_id,
-                analysis_version,
-                candidate_signature,
-                limit,
             ),
         ).fetchall()
 
-    return [
-        dict(row)
-        for row in rows
-    ]
+    pending_rows: list[dict[str, Any]] = []
+
+    for row in rows:
+        row_dict = dict(row)
+
+        stored_analysis_version = (
+            row_dict.get("analysis_version")
+        )
+
+        stored_candidate_signature = (
+            row_dict.get("candidate_signature")
+        )
+
+        stored_job_signature = (
+            row_dict.get("job_signature")
+        )
+
+        current_job_signature = (
+            build_job_signature_from_values(
+                job_id=row_dict.get("id"),
+                title=row_dict.get("title"),
+                company=row_dict.get("company"),
+                location=row_dict.get("location"),
+                remote=row_dict.get("remote"),
+                salary=row_dict.get("salary"),
+                description=row_dict.get(
+                    "description"
+                ),
+                url=row_dict.get("url"),
+            )
+        )
+
+        needs_analysis = (
+            row_dict.get("recommendation") is None
+            or (
+                stored_analysis_version or ""
+            ) != (
+                analysis_version or ""
+            )
+            or (
+                stored_candidate_signature or ""
+            ) != (
+                candidate_signature or ""
+            )
+            or (
+                stored_job_signature or ""
+            ) != current_job_signature
+        )
+
+        if not needs_analysis:
+            continue
+
+        pending_rows.append(row_dict)
+
+        if len(pending_rows) >= limit:
+            break
+
+    return pending_rows
+
 
 def update_shared_job_analysis_data(
     job: Job,

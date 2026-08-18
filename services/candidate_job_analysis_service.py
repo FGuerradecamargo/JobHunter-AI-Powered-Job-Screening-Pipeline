@@ -11,6 +11,9 @@ from services.ai.ai_recommendation_service import (
     AIRecommendationService,
 )
 from services.ai.openai_client import OpenAIClient
+from services.analysis_signatures import (
+    build_job_signature as build_shared_job_signature,
+)
 from services.analyzers.candidate_fit_analyzer import (
     CandidateFitAnalyzer,
 )
@@ -47,7 +50,7 @@ from services.recommenders.recommendation_engine import (
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v6"
+ANALYSIS_VERSION = "candidate-job-analysis-v7"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -106,18 +109,7 @@ def row_to_job(
 def build_job_signature(
     job: Job,
 ) -> str:
-    return build_signature(
-        {
-            "id": job.id,
-            "title": job.title,
-            "company": job.company,
-            "location": job.location,
-            "remote": job.remote,
-            "salary": job.salary,
-            "description": job.description,
-            "url": job.url,
-        }
-    )
+    return build_shared_job_signature(job)
 
 
 def build_candidate_signature(
@@ -684,6 +676,9 @@ class CandidateJobAnalysisService:
                     )
 
                     analysis["bucket"] = bucket
+
+                    if bucket == REJECT:
+                        analysis["tailored_cv"] = None
 
                     if bucket == BEST_MATCH:
                         analysis_status = "in_review"

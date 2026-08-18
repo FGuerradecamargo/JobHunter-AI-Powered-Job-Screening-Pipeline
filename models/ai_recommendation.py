@@ -1,5 +1,7 @@
 ﻿from dataclasses import dataclass, field
 
+from models.tailored_cv import TailoredCV
+
 
 @dataclass
 class AIRecommendation:
@@ -38,3 +40,5 @@ class AIRecommendation:
 
     simple_summary: str = ""
     simple_recommendation: str = ""
+
+    tailored_cv: TailoredCV | None = None
