@@ -6,8 +6,10 @@ from services.candidate_repository import CandidateRepository
 from services.session_auth import require_login, render_logout_button
 from services.database import (
     count_candidate_jobs_by_status,
+    get_candidate_application_outcome,
     initialize_database,
     list_candidate_jobs,
+    save_candidate_application_outcome,
     update_candidate_job_notes,
     update_candidate_job_status,
 )
@@ -222,6 +224,168 @@ def render_status_buttons(
             )
 
 
+def render_application_outcome(
+    candidate_id: str,
+    job_id: str,
+    status: str,
+) -> None:
+    if status not in {
+        "in_process",
+        "rejected_before_interview",
+        "rejected_after_interview",
+        "offer",
+    }:
+        return
+
+    outcome = (
+        get_candidate_application_outcome(
+            candidate_id=candidate_id,
+            job_id=job_id,
+        )
+        or {}
+    )
+
+    st.divider()
+    st.subheader("Application Outcome")
+
+    interview_stage = st.text_input(
+        "Interview stage",
+        value=outcome.get(
+            "interview_stage",
+            "",
+        ),
+        placeholder=(
+            "Example: recruiter screen, "
+            "technical interview, final round"
+        ),
+        key=f"outcome_stage_{candidate_id}_{job_id}",
+    )
+
+    rejection_reason = ""
+
+    if status in {
+        "rejected_before_interview",
+        "rejected_after_interview",
+    }:
+        rejection_reason = st.text_area(
+            "Rejection reason",
+            value=outcome.get(
+                "rejection_reason",
+                "",
+            ),
+            placeholder=(
+                "What reason did the company give, "
+                "if any?"
+            ),
+            key=(
+                f"outcome_rejection_"
+                f"{candidate_id}_{job_id}"
+            ),
+        )
+
+    recruiter_feedback = st.text_area(
+        "Recruiter / company feedback",
+        value=outcome.get(
+            "recruiter_feedback",
+            "",
+        ),
+        placeholder=(
+            "Paste or summarize any feedback "
+            "you received."
+        ),
+        key=(
+            f"outcome_feedback_"
+            f"{candidate_id}_{job_id}"
+        ),
+    )
+
+    candidate_notes = st.text_area(
+        "Your notes",
+        value=outcome.get(
+            "candidate_notes",
+            "",
+        ),
+        placeholder=(
+            "What happened? What stood out?"
+        ),
+        key=(
+            f"outcome_notes_"
+            f"{candidate_id}_{job_id}"
+        ),
+    )
+
+    lessons_learned = st.text_area(
+        "Lessons learned",
+        value=outcome.get(
+            "lessons_learned",
+            "",
+        ),
+        placeholder=(
+            "Anything you want the system to "
+            "remember for future applications."
+        ),
+        key=(
+            f"outcome_lessons_"
+            f"{candidate_id}_{job_id}"
+        ),
+    )
+
+    offer_salary = ""
+    offer_currency = ""
+
+    if status == "offer":
+        offer_columns = st.columns(2)
+
+        with offer_columns[0]:
+            offer_salary = st.text_input(
+                "Offer salary",
+                value=outcome.get(
+                    "offer_salary",
+                    "",
+                ),
+                key=(
+                    f"outcome_salary_"
+                    f"{candidate_id}_{job_id}"
+                ),
+            )
+
+        with offer_columns[1]:
+            offer_currency = st.text_input(
+                "Currency",
+                value=outcome.get(
+                    "offer_currency",
+                    "",
+                ),
+                placeholder="EUR",
+                key=(
+                    f"outcome_currency_"
+                    f"{candidate_id}_{job_id}"
+                ),
+            )
+
+    if st.button(
+        "Save outcome",
+        key=f"save_outcome_{candidate_id}_{job_id}",
+        use_container_width=True,
+    ):
+        save_candidate_application_outcome(
+            candidate_id=candidate_id,
+            job_id=job_id,
+            final_status=status,
+            interview_stage=interview_stage,
+            rejection_reason=rejection_reason,
+            recruiter_feedback=recruiter_feedback,
+            candidate_notes=candidate_notes,
+            offer_salary=offer_salary,
+            offer_currency=offer_currency,
+            lessons_learned=lessons_learned,
+        )
+
+        st.toast(
+            "Application outcome saved."
+        )
+
+
 def render_job(
     candidate_id: str,
     item: dict,
@@ -430,6 +594,12 @@ def render_job(
             candidate_id=candidate_id,
             job_id=job_id,
             current_status=status,
+        )
+
+        render_application_outcome(
+            candidate_id=candidate_id,
+            job_id=job_id,
+            status=status,
         )
 
         st.subheader("Notes")

@@ -560,6 +560,45 @@ def initialize_postgres_database() -> None:
         )
 
 
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS
+            candidate_application_outcomes (
+                candidate_id TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+
+                final_status TEXT NOT NULL DEFAULT '',
+                interview_stage TEXT NOT NULL DEFAULT '',
+                rejection_reason TEXT NOT NULL DEFAULT '',
+                recruiter_feedback TEXT NOT NULL DEFAULT '',
+                candidate_notes TEXT NOT NULL DEFAULT '',
+
+                offer_salary TEXT NOT NULL DEFAULT '',
+                offer_currency TEXT NOT NULL DEFAULT '',
+
+                lessons_learned TEXT NOT NULL DEFAULT '',
+
+                outcome_date TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                PRIMARY KEY (
+                    candidate_id,
+                    job_id
+                ),
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (job_id)
+                    REFERENCES jobs(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+
 class PostgresConnectionAdapter:
     def __init__(self, connection):
         self._connection = connection
@@ -891,13 +930,6 @@ def initialize_sqlite_database() -> None:
             )
             """
         )
-
-        def initialize_database() -> None:
-            if is_postgres():
-                initialize_postgres_database()
-                return
-
-            initialize_sqlite_database()
 
         # ==================================================
         # Migrations for existing databases
@@ -2191,3 +2223,167 @@ def save_candidate_job_analysis(
                 "Candidate-job relationship was not found: "
                 f"{candidate_id} / {job_id}"
             )
+
+def save_candidate_application_outcome(
+    candidate_id: str,
+    job_id: str,
+    final_status: str = "",
+    interview_stage: str = "",
+    rejection_reason: str = "",
+    recruiter_feedback: str = "",
+    candidate_notes: str = "",
+    offer_salary: str = "",
+    offer_currency: str = "",
+    lessons_learned: str = "",
+    outcome_date: str | None = None,
+) -> None:
+    now = utc_now()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO candidate_application_outcomes (
+                candidate_id,
+                job_id,
+                final_status,
+                interview_stage,
+                rejection_reason,
+                recruiter_feedback,
+                candidate_notes,
+                offer_salary,
+                offer_currency,
+                lessons_learned,
+                outcome_date,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            ON CONFLICT(candidate_id, job_id)
+            DO UPDATE SET
+                final_status = excluded.final_status,
+                interview_stage = excluded.interview_stage,
+                rejection_reason = excluded.rejection_reason,
+                recruiter_feedback = excluded.recruiter_feedback,
+                candidate_notes = excluded.candidate_notes,
+                offer_salary = excluded.offer_salary,
+                offer_currency = excluded.offer_currency,
+                lessons_learned = excluded.lessons_learned,
+                outcome_date = excluded.outcome_date,
+                updated_at = excluded.updated_at
+            """,
+            (
+                candidate_id,
+                job_id,
+                final_status,
+                interview_stage,
+                rejection_reason,
+                recruiter_feedback,
+                candidate_notes,
+                offer_salary,
+                offer_currency,
+                lessons_learned,
+                outcome_date,
+                now,
+                now,
+            ),
+        )
+
+
+def get_candidate_application_outcome(
+    candidate_id: str,
+    job_id: str,
+) -> dict[str, Any] | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM candidate_application_outcomes
+            WHERE candidate_id = ?
+              AND job_id = ?
+            """,
+            (
+                candidate_id,
+                job_id,
+            ),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return dict(row)
+
+
+def list_candidate_application_outcomes(
+    candidate_id: str,
+) -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                outcomes.candidate_id,
+                outcomes.job_id,
+                outcomes.final_status,
+                outcomes.interview_stage,
+                outcomes.rejection_reason,
+                outcomes.recruiter_feedback,
+                outcomes.candidate_notes,
+                outcomes.offer_salary,
+                outcomes.offer_currency,
+                outcomes.lessons_learned,
+                outcomes.outcome_date,
+                outcomes.created_at,
+                outcomes.updated_at,
+
+                jobs.title,
+                jobs.company,
+                jobs.location,
+
+                candidate_job_analyses.recommendation,
+                candidate_job_analyses.competitive_status,
+                candidate_job_analyses.current_fit,
+                candidate_job_analyses.growth_value,
+                candidate_job_analyses.analysis_json
+
+            FROM candidate_application_outcomes AS outcomes
+
+            INNER JOIN jobs
+                ON jobs.id = outcomes.job_id
+
+            INNER JOIN candidate_job_analyses
+                ON candidate_job_analyses.candidate_id =
+                    outcomes.candidate_id
+                AND candidate_job_analyses.job_id =
+                    outcomes.job_id
+
+            WHERE outcomes.candidate_id = ?
+
+            ORDER BY outcomes.updated_at DESC
+            """,
+            (
+                candidate_id,
+            ),
+        ).fetchall()
+
+    results: list[dict[str, Any]] = []
+
+    for row in rows:
+        item = dict(row)
+
+        analysis_json = item.pop(
+            "analysis_json",
+            "{}",
+        )
+
+        try:
+            item["analysis"] = json.loads(
+                analysis_json or "{}"
+            )
+        except (TypeError, json.JSONDecodeError):
+            item["analysis"] = {}
+
+        results.append(item)
+
+    return results
+
