@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -179,7 +183,7 @@ def handle_oauth_callback() -> None:
         st.error(
             "Could not complete Gmail connection."
         )
-        st.exception(error)
+        logger.exception("Could not complete Gmail connection.")
         return
 
     st.query_params.clear()

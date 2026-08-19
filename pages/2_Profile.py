@@ -1,4 +1,7 @@
+import logging
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
@@ -27,7 +30,7 @@ render_logout_button()
 
 st.set_page_config(
     page_title="Professional Profile",
-    page_icon="ðŸ‘¤",
+    page_icon="\U0001F464",
     layout="wide",
 )
 
@@ -73,7 +76,7 @@ if AccessPolicy.can_view_all_users(
         "Profile",
         accessible_users,
         format_func=lambda user: (
-            f"{user.display_name} â€” {user.email}"
+            f"{user.display_name} - {user.email}"
         ),
     )
 
@@ -223,14 +226,14 @@ if st.session_state.languages:
 
         with col_language_name:
             st.write(
-                f"â€¢ {language}"
+                f"- {language}"
             )
 
         with col_remove:
             if st.button(
                 "Remove",
                 key=(
-                    f"remove_language_{index}"
+                    f"- {language}"
                 ),
                 use_container_width=True,
             ):
@@ -362,7 +365,7 @@ st.subheader("Your work history")
 
 st.write(
     "Add each company you worked for. "
-    "Tell the story naturally â€” the system will "
+    "Tell the story naturally - the system will "
     "structure it later."
 )
 
@@ -504,7 +507,7 @@ if experiences:
     for experience in experiences:
         with st.expander(
             f"{experience.company} "
-            f"â€” {experience.start_date}"
+            f"- {experience.start_date}"
         ):
             edit_company = st.text_input(
                 "Company",
@@ -749,10 +752,13 @@ if st.button(
 
             st.rerun()
 
-        except Exception as exc:
+        except Exception:
+            logger.exception(
+                "Could not update career objective."
+            )
             st.error(
-                "Could not update career objective: "
-                f"{exc}"
+                "Could not update career objective. "
+                "Please try again."
             )
 
 
@@ -1076,10 +1082,13 @@ if st.button(
 
             st.rerun()
 
-        except Exception as exc:
+        except Exception:
+            logger.exception(
+                "Could not save professional change."
+            )
             st.error(
-                "Could not save professional change: "
-                f"{exc}"
+                "Could not save professional change. "
+                "Please try again."
             )
 
     else:
@@ -1102,10 +1111,13 @@ if st.button(
 
             st.rerun()
 
-        except Exception as exc:
+        except Exception:
+            logger.exception(
+                "Could not generate profile."
+            )
             st.error(
-                "Could not generate profile: "
-                f"{exc}"
+                "Could not generate profile. "
+                "Please try again."
             )
 
 if generated_candidate is not None:

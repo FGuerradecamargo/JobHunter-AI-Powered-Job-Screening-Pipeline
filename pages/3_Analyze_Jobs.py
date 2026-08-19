@@ -1,6 +1,9 @@
+import logging
 import os
 import hashlib
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 import streamlit as st
 
@@ -177,7 +180,7 @@ if gmail_connection is not None:
                 st.error(
                     "Could not synchronize Gmail."
                 )
-                st.exception(error)
+                logger.exception("Could not synchronize Gmail.")
 
 else:
     st.caption(
