@@ -599,6 +599,27 @@ def initialize_postgres_database() -> None:
         )
 
 
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS
+            candidate_career_development (
+                candidate_id TEXT PRIMARY KEY,
+
+                context_signature TEXT NOT NULL,
+                recommendation_json TEXT NOT NULL DEFAULT '{}',
+                analysis_version TEXT NOT NULL,
+
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+
 class PostgresConnectionAdapter:
     def __init__(self, connection):
         self._connection = connection
@@ -2386,4 +2407,88 @@ def list_candidate_application_outcomes(
         results.append(item)
 
     return results
+
+def get_candidate_career_development(
+    candidate_id: str,
+) -> dict[str, Any] | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM candidate_career_development
+            WHERE candidate_id = ?
+            """,
+            (
+                candidate_id,
+            ),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    item = dict(row)
+
+    try:
+        item["recommendation"] = json.loads(
+            item.pop(
+                "recommendation_json",
+                "{}",
+            )
+            or "{}"
+        )
+    except (
+        TypeError,
+        json.JSONDecodeError,
+    ):
+        item["recommendation"] = {}
+
+    return item
+
+
+def save_candidate_career_development(
+    candidate_id: str,
+    context_signature: str,
+    recommendation: dict[str, Any],
+    analysis_version: str,
+) -> None:
+    now = utc_now()
+
+    recommendation_json = json.dumps(
+        recommendation,
+        ensure_ascii=False,
+    )
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO candidate_career_development (
+                candidate_id,
+                context_signature,
+                recommendation_json,
+                analysis_version,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+
+            ON CONFLICT(candidate_id)
+            DO UPDATE SET
+                context_signature =
+                    excluded.context_signature,
+                recommendation_json =
+                    excluded.recommendation_json,
+                analysis_version =
+                    excluded.analysis_version,
+                updated_at =
+                    excluded.updated_at
+            """,
+            (
+                candidate_id,
+                context_signature,
+                recommendation_json,
+                analysis_version,
+                now,
+                now,
+            ),
+        )
 
