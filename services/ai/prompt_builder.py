@@ -349,6 +349,32 @@ Each experience must retain its real source_experience_id whenever available.
 The CV should be concise and application-oriented.
 Prefer evidence that directly increases the candidate's credibility for this specific role.
 
+STEP 9 - Prepare the candidate for a possible interview
+
+Generate interview_prep under the same approval conditions used for tailored_cv.
+
+The candidate may never need this material.
+Generate it now because all relevant job and candidate context is already available,
+but it may only be shown later if the application progresses.
+
+The purpose is not to predict exact interview questions.
+
+The purpose is to answer:
+
+1. What kind of person is the company trying to hire?
+2. What should this candidate demonstrate in an interview?
+3. Which real experiences provide the strongest evidence?
+4. Which gaps, uncertainties or weak points require careful positioning?
+5. Which themes are likely to matter in an interview for this role?
+6. What central professional narrative should the candidate communicate?
+
+Use the real job description and the candidate's real evidence.
+
+Do not invent interview stages, questions, technologies, responsibilities,
+achievements or professional experience.
+
+Keep the preparation practical, concise and specific to this opportunity.
+
 Return only valid JSON using exactly this structure:
 
 {{
@@ -374,7 +400,8 @@ Return only valid JSON using exactly this structure:
   "final_reason": "",
   "simple_summary": "",
   "simple_recommendation": "",
-  "tailored_cv": null
+  "tailored_cv": null,
+  "interview_prep": null
 }}
 
 Rules:
@@ -418,4 +445,16 @@ Rules:
   }}
 - For any opportunity that does not satisfy the tailored CV approval conditions, tailored_cv must be null.
 - Every tailored CV statement must be supportable from the candidate profile or career_updates.
+- For an approved opportunity, interview_prep must be an object using exactly this structure:
+  {{
+    "what_the_company_needs": "",
+    "what_you_should_demonstrate": [],
+    "strongest_evidence": [],
+    "points_to_be_careful_with": [],
+    "likely_interview_topics": [],
+    "positioning": ""
+  }}
+- interview_prep must follow the same approval conditions as tailored_cv.
+- If tailored_cv must be null, interview_prep must also be null.
+- Interview preparation must be grounded in the actual job description and candidate evidence.
 """.strip()

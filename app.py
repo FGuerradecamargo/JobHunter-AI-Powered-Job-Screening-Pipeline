@@ -334,6 +334,96 @@ def render_job(
             status_label=status_label,
         )
 
+        if status == "in_process":
+            interview_prep = analysis.get(
+                "interview_prep"
+            )
+
+            if interview_prep:
+                st.divider()
+                st.subheader(
+                    "Interview Preparation"
+                )
+
+                what_the_company_needs = (
+                    interview_prep.get(
+                        "what_the_company_needs",
+                        "",
+                    )
+                )
+
+                if what_the_company_needs:
+                    st.markdown(
+                        "**What the company needs**"
+                    )
+                    st.write(
+                        what_the_company_needs
+                    )
+
+                what_you_should_demonstrate = (
+                    interview_prep.get(
+                        "what_you_should_demonstrate",
+                        [],
+                    )
+                )
+
+                if what_you_should_demonstrate:
+                    render_list(
+                        "What you should demonstrate",
+                        what_you_should_demonstrate,
+                    )
+
+                strongest_evidence = (
+                    interview_prep.get(
+                        "strongest_evidence",
+                        [],
+                    )
+                )
+
+                if strongest_evidence:
+                    render_list(
+                        "Your strongest evidence",
+                        strongest_evidence,
+                    )
+
+                points_to_be_careful_with = (
+                    interview_prep.get(
+                        "points_to_be_careful_with",
+                        [],
+                    )
+                )
+
+                if points_to_be_careful_with:
+                    render_list(
+                        "Points to be careful with",
+                        points_to_be_careful_with,
+                    )
+
+                likely_interview_topics = (
+                    interview_prep.get(
+                        "likely_interview_topics",
+                        [],
+                    )
+                )
+
+                if likely_interview_topics:
+                    render_list(
+                        "Likely interview topics",
+                        likely_interview_topics,
+                    )
+
+                positioning = interview_prep.get(
+                    "positioning",
+                    "",
+                )
+
+                if positioning:
+                    render_text_section(
+                        "Your positioning",
+                        positioning,
+                        "No positioning guidance available.",
+                    )
+
         st.divider()
 
         render_status_buttons(

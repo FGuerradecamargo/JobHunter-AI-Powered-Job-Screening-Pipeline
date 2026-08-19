@@ -50,7 +50,7 @@ from services.recommenders.recommendation_engine import (
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v8"
+ANALYSIS_VERSION = "candidate-job-analysis-v9"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -682,6 +682,7 @@ class CandidateJobAnalysisService:
 
                     if bucket == REJECT:
                         analysis["tailored_cv"] = None
+                        analysis["interview_prep"] = None
 
                     if bucket == BEST_MATCH:
                         analysis_status = "in_review"

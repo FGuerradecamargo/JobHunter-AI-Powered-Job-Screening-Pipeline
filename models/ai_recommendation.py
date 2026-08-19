@@ -1,6 +1,7 @@
 ﻿from dataclasses import dataclass, field
 
 from models.tailored_cv import TailoredCV
+from models.interview_prep import InterviewPrep
 
 
 @dataclass
@@ -42,3 +43,4 @@ class AIRecommendation:
     simple_recommendation: str = ""
 
     tailored_cv: TailoredCV | None = None
+    interview_prep: InterviewPrep | None = None

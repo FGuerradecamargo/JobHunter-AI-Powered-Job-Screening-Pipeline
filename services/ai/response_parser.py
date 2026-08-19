@@ -6,6 +6,7 @@ from models.tailored_cv import (
     TailoredCV,
     TailoredCVExperience,
 )
+from models.interview_prep import InterviewPrep
 
 
 VALID_RECOMMENDATIONS = {
@@ -159,6 +160,70 @@ def parse_tailored_cv(
     )
 
 
+def parse_interview_prep(
+    value: Any,
+) -> InterviewPrep | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, dict):
+        raise ValueError(
+            "interview_prep must be an object or null"
+        )
+
+    return InterviewPrep(
+        what_the_company_needs=str(
+            value.get(
+                "what_the_company_needs",
+                "",
+            )
+        ),
+        what_you_should_demonstrate=(
+            validate_string_list(
+                value.get(
+                    "what_you_should_demonstrate"
+                ),
+                (
+                    "interview_prep."
+                    "what_you_should_demonstrate"
+                ),
+            )
+        ),
+        strongest_evidence=validate_string_list(
+            value.get("strongest_evidence"),
+            "interview_prep.strongest_evidence",
+        ),
+        points_to_be_careful_with=(
+            validate_string_list(
+                value.get(
+                    "points_to_be_careful_with"
+                ),
+                (
+                    "interview_prep."
+                    "points_to_be_careful_with"
+                ),
+            )
+        ),
+        likely_interview_topics=(
+            validate_string_list(
+                value.get(
+                    "likely_interview_topics"
+                ),
+                (
+                    "interview_prep."
+                    "likely_interview_topics"
+                ),
+            )
+        ),
+        positioning=str(
+            value.get(
+                "positioning",
+                "",
+            )
+        ),
+    )
+
+
 def parse_response(
     response: str,
     job_id: str,
@@ -278,5 +343,9 @@ def parse_response(
 
         tailored_cv=parse_tailored_cv(
             data.get("tailored_cv")
+        ),
+
+        interview_prep=parse_interview_prep(
+            data.get("interview_prep")
         ),
     )
