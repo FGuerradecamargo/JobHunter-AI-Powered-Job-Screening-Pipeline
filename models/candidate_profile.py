@@ -31,6 +31,9 @@ class CandidateProfile:
     professional_summary: str = ""
     job_search_urgency: str = "balanced"
 
+    career_objective_title: str = ""
+    career_objective_description: str = ""
+
     professional_experiences: list[
         ProfessionalExperienceProfile
     ] = field(

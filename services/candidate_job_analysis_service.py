@@ -50,7 +50,7 @@ from services.recommenders.recommendation_engine import (
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v7"
+ANALYSIS_VERSION = "candidate-job-analysis-v8"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -523,7 +523,10 @@ class CandidateJobAnalysisService:
                 )
 
                 matcher_analysis = (
-                    self.matcher.analyze(job)
+                    self.matcher.analyze(
+                        job,
+                        profile,
+                    )
                 )
 
                 job.score = matcher_analysis[

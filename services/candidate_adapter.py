@@ -183,7 +183,17 @@ def candidate_to_profile(
         candidate.professional_summary
     )
 
+    career_objective_title = ""
+    career_objective_description = ""
+
     if career_objective is not None:
+        career_objective_title = (
+            career_objective.title
+        )
+
+        career_objective_description = (
+            career_objective.description
+        )
         professional_summary += (
             "\n\nCURRENT CAREER OBJECTIVE:\n"
             + career_objective.title
@@ -209,6 +219,13 @@ def candidate_to_profile(
         current_level=candidate.current_level,
         professional_summary=professional_summary,
         job_search_urgency="selective",
+
+        career_objective_title=(
+            career_objective_title
+        ),
+        career_objective_description=(
+            career_objective_description
+        ),
 
         professional_experiences=(
             professional_experiences
