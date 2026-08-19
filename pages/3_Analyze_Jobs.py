@@ -21,6 +21,8 @@ from services.candidate_job_analysis_service import (
     ANALYSIS_VERSION,
     build_candidate_signature,
 )
+from services.cv_renderer import render_tailored_cv_docx
+
 from services.database import (
     ensure_candidate_job_analysis,
     list_candidate_jobs,
@@ -462,23 +464,18 @@ for job in review_jobs:
 
 def render_tailored_cv(
     analysis: dict,
+    candidate_name: str,
+    company: str,
+    title: str,
 ) -> None:
-    tailored_cv = analysis.get("tailored_cv")
+    tailored_cv = analysis.get(
+        "tailored_cv"
+    )
 
     if not tailored_cv:
         return
 
-    st.divider()
-
-    with st.expander(
-        "Tailored CV",
-        expanded=False,
-    ):
-        st.caption(
-            "Generated from your real career evidence "
-            "for this specific opportunity."
-        )
-
+    with st.expander("Tailored CV"):
         headline = tailored_cv.get(
             "headline",
             "",
@@ -489,14 +486,16 @@ def render_tailored_cv(
                 f"### {headline}"
             )
 
-        professional_summary = tailored_cv.get(
-            "professional_summary",
-            "",
+        professional_summary = (
+            tailored_cv.get(
+                "professional_summary",
+                "",
+            )
         )
 
         if professional_summary:
-            st.markdown(
-                "**Professional Summary**"
+            st.subheader(
+                "Professional Summary"
             )
             st.write(
                 professional_summary
@@ -508,13 +507,14 @@ def render_tailored_cv(
         )
 
         if key_skills:
-            st.markdown(
-                "**Key Skills**"
+            st.subheader(
+                "Key Skills"
             )
 
-            st.write(
-                " ? ".join(key_skills)
-            )
+            for skill in key_skills:
+                st.write(
+                    f"- {skill}"
+                )
 
         experiences = tailored_cv.get(
             "experiences",
@@ -522,39 +522,46 @@ def render_tailored_cv(
         )
 
         if experiences:
-            st.markdown(
-                "**Relevant Experience**"
+            st.subheader(
+                "Relevant Experience"
             )
 
             for experience in experiences:
-                company = experience.get(
-                    "company",
-                    "",
-                )
-
                 role = experience.get(
                     "role",
                     "",
                 )
 
-                if company and role:
-                    st.markdown(
-                        f"**{role} ? {company}**"
+                company_name = (
+                    experience.get(
+                        "company",
+                        "",
                     )
-                elif role:
+                )
+
+                heading_parts = [
+                    value
+                    for value in [
+                        role,
+                        company_name,
+                    ]
+                    if value
+                ]
+
+                if heading_parts:
                     st.markdown(
-                        f"**{role}**"
-                    )
-                elif company:
-                    st.markdown(
-                        f"**{company}**"
+                        "**"
+                        + " - ".join(
+                            heading_parts
+                        )
+                        + "**"
                     )
 
                 for bullet in experience.get(
                     "tailored_bullets",
                     [],
                 ):
-                    st.markdown(
+                    st.write(
                         f"- {bullet}"
                     )
 
@@ -566,14 +573,37 @@ def render_tailored_cv(
         )
 
         if additional_information:
-            st.markdown(
-                "**Additional Relevant Information**"
+            st.subheader(
+                "Additional Relevant Information"
             )
 
             for item in additional_information:
-                st.markdown(
+                st.write(
                     f"- {item}"
                 )
+
+        docx_data = render_tailored_cv_docx(
+            candidate_name=candidate_name,
+            tailored_cv=tailored_cv,
+        )
+
+        filename = build_cv_filename(
+            candidate_name=candidate_name,
+            company=company,
+            title=title,
+        )
+
+        st.download_button(
+            "Download CV (.docx)",
+            data=docx_data,
+            file_name=filename,
+            mime=(
+                "application/vnd.openxmlformats-"
+                "officedocument.wordprocessingml.document"
+            ),
+            use_container_width=True,
+        )
+
 
 
 def render_job(
@@ -600,7 +630,10 @@ def render_job(
         )
 
         render_tailored_cv(
-            analysis,
+            analysis=analysis,
+            candidate_name=candidate.name,
+            company=company,
+            title=title,
         )
 
         st.divider()
