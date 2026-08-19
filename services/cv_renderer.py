@@ -4,6 +4,21 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import (
+    ParagraphStyle,
+    getSampleStyleSheet,
+)
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    ListFlowable,
+    ListItem,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+)
+
 
 def _set_default_font(document: Document) -> None:
     styles = document.styles
@@ -158,3 +173,239 @@ def render_tailored_cv_docx(
     document.save(buffer)
 
     return buffer.getvalue()
+
+def render_tailored_cv_pdf(
+    candidate_name: str,
+    tailored_cv: dict,
+) -> bytes:
+    buffer = BytesIO()
+
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=18 * mm,
+        leftMargin=18 * mm,
+        topMargin=16 * mm,
+        bottomMargin=16 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "CVTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        alignment=TA_CENTER,
+        spaceAfter=4,
+    )
+
+    headline_style = ParagraphStyle(
+        "CVHeadline",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=10,
+        leading=13,
+        alignment=TA_CENTER,
+        spaceAfter=12,
+    )
+
+    heading_style = ParagraphStyle(
+        "CVHeading",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=14,
+        spaceBefore=8,
+        spaceAfter=5,
+    )
+
+    body_style = ParagraphStyle(
+        "CVBody",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=9.5,
+        leading=13,
+        spaceAfter=6,
+    )
+
+    role_style = ParagraphStyle(
+        "CVRole",
+        parent=styles["BodyText"],
+        fontName="Helvetica-Bold",
+        fontSize=10,
+        leading=13,
+        spaceBefore=5,
+        spaceAfter=3,
+    )
+
+    story = []
+
+    story.append(
+        Paragraph(
+            candidate_name,
+            title_style,
+        )
+    )
+
+    headline = tailored_cv.get(
+        "headline",
+        "",
+    )
+
+    if headline:
+        story.append(
+            Paragraph(
+                headline,
+                headline_style,
+            )
+        )
+
+    professional_summary = tailored_cv.get(
+        "professional_summary",
+        "",
+    )
+
+    if professional_summary:
+        story.append(
+            Paragraph(
+                "Professional Summary",
+                heading_style,
+            )
+        )
+
+        story.append(
+            Paragraph(
+                professional_summary,
+                body_style,
+            )
+        )
+
+    key_skills = tailored_cv.get(
+        "key_skills",
+        [],
+    )
+
+    if key_skills:
+        story.append(
+            Paragraph(
+                "Key Skills",
+                heading_style,
+            )
+        )
+
+        story.append(
+            Paragraph(
+                " | ".join(key_skills),
+                body_style,
+            )
+        )
+
+    experiences = tailored_cv.get(
+        "experiences",
+        [],
+    )
+
+    if experiences:
+        story.append(
+            Paragraph(
+                "Professional Experience",
+                heading_style,
+            )
+        )
+
+        for experience in experiences:
+            role = experience.get(
+                "role",
+                "",
+            )
+
+            company = experience.get(
+                "company",
+                "",
+            )
+
+            heading_parts = [
+                value
+                for value in [
+                    role,
+                    company,
+                ]
+                if value
+            ]
+
+            if heading_parts:
+                story.append(
+                    Paragraph(
+                        " - ".join(heading_parts),
+                        role_style,
+                    )
+                )
+
+            bullets = experience.get(
+                "tailored_bullets",
+                [],
+            )
+
+            if bullets:
+                bullet_items = [
+                    ListItem(
+                        Paragraph(
+                            bullet,
+                            body_style,
+                        )
+                    )
+                    for bullet in bullets
+                ]
+
+                story.append(
+                    ListFlowable(
+                        bullet_items,
+                        bulletType="bullet",
+                        leftIndent=14,
+                    )
+                )
+
+                story.append(
+                    Spacer(
+                        1,
+                        4,
+                    )
+                )
+
+    additional_information = tailored_cv.get(
+        "additional_relevant_information",
+        [],
+    )
+
+    if additional_information:
+        story.append(
+            Paragraph(
+                "Additional Relevant Information",
+                heading_style,
+            )
+        )
+
+        bullet_items = [
+            ListItem(
+                Paragraph(
+                    item,
+                    body_style,
+                )
+            )
+            for item in additional_information
+        ]
+
+        story.append(
+            ListFlowable(
+                bullet_items,
+                bulletType="bullet",
+                leftIndent=14,
+            )
+        )
+
+    document.build(story)
+
+    return buffer.getvalue()
+

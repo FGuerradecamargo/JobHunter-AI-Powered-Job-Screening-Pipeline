@@ -21,7 +21,10 @@ from services.candidate_job_analysis_service import (
     ANALYSIS_VERSION,
     build_candidate_signature,
 )
-from services.cv_renderer import render_tailored_cv_docx
+from services.cv_renderer import (
+    render_tailored_cv_docx,
+    render_tailored_cv_pdf,
+)
 
 from services.database import (
     ensure_candidate_job_analysis,
@@ -587,22 +590,44 @@ def render_tailored_cv(
             tailored_cv=tailored_cv,
         )
 
-        filename = build_cv_filename(
+        pdf_data = render_tailored_cv_pdf(
+            candidate_name=candidate_name,
+            tailored_cv=tailored_cv,
+        )
+
+        docx_filename = build_cv_filename(
             candidate_name=candidate_name,
             company=company,
             title=title,
         )
 
-        st.download_button(
-            "Download CV (.docx)",
-            data=docx_data,
-            file_name=filename,
-            mime=(
-                "application/vnd.openxmlformats-"
-                "officedocument.wordprocessingml.document"
-            ),
-            use_container_width=True,
+        pdf_filename = (
+            docx_filename.removesuffix(".docx")
+            + ".pdf"
         )
+
+        download_columns = st.columns(2)
+
+        with download_columns[0]:
+            st.download_button(
+                "Download CV (.docx)",
+                data=docx_data,
+                file_name=docx_filename,
+                mime=(
+                    "application/vnd.openxmlformats-"
+                    "officedocument.wordprocessingml.document"
+                ),
+                use_container_width=True,
+            )
+
+        with download_columns[1]:
+            st.download_button(
+                "Download CV (.pdf)",
+                data=pdf_data,
+                file_name=pdf_filename,
+                mime="application/pdf",
+                use_container_width=True,
+            )
 
 
 
