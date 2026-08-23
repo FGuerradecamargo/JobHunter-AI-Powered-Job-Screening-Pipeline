@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import os
 import hashlib
 from urllib.parse import urlparse
@@ -40,7 +40,7 @@ from services.database import (
 
 st.set_page_config(
     page_title="Analyze Jobs",
-    page_icon="🔎",
+    page_icon="ðŸ”Ž",
     layout="wide",
 )
 
@@ -367,6 +367,7 @@ if st.button(
             "analyzed": 0,
             "hard_rejected": 0,
             "matcher_rejected": 0,
+            "matcher_review": 0,
             "ai_analyses_created": 0,
             "ai_approved": 0,
             "ai_rejected": 0,
@@ -423,7 +424,7 @@ if scan_result:
         f"{total_scanned} jobs scanned."
     )
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3, col4 = st.columns(4)
 
     col1.metric(
         "Best Matches",
@@ -434,12 +435,69 @@ if scan_result:
     )
 
     col2.metric(
-        "Trade-offs",
+        "Good Opportunities",
         scan_result.get(
-            "tradeoff",
+            "good_opportunity",
             0,
         ),
     )
+
+    col3.metric(
+        "Potential",
+        scan_result.get(
+            "potential",
+            0,
+        ),
+    )
+
+    col4.metric(
+        "AI Analyzed",
+        scan_result.get(
+            "ai_analyses_created",
+            0,
+        ),
+    )
+
+    detail_col1, detail_col2, detail_col3 = (
+        st.columns(3)
+    )
+
+    detail_col1.metric(
+        "Matcher Rejected",
+        scan_result.get(
+            "matcher_rejected",
+            0,
+        ),
+    )
+
+    detail_col2.metric(
+        "Hard Rejected",
+        scan_result.get(
+            "hard_rejected",
+            0,
+        ),
+    )
+
+    detail_col3.metric(
+        "AI Rejected",
+        scan_result.get(
+            "ai_rejected",
+            0,
+        ),
+    )
+
+    failed = scan_result.get(
+        "failed",
+        0,
+    )
+
+    if failed:
+        st.warning(
+            f"{failed} job(s) failed during analysis."
+        )
+
+        for error in scan_result.get("errors", []):
+            st.code(str(error))
 
 
 review_jobs = list_candidate_jobs(
@@ -449,7 +507,8 @@ review_jobs = list_candidate_jobs(
 
 
 best_matches = []
-tradeoffs = []
+potential_jobs = []
+good_opportunities = []
 
 for job in review_jobs:
     analysis = job.get(
@@ -457,15 +516,58 @@ for job in review_jobs:
         {},
     )
 
-    bucket = analysis.get(
-        "bucket"
+    bucket = (
+        analysis.get("bucket")
+        or analysis.get("recommendation")
     )
 
     if bucket == "best_match":
         best_matches.append(job)
 
-    elif bucket == "tradeoff":
-        tradeoffs.append(job)
+    elif bucket == "potential":
+        potential_jobs.append(job)
+
+    elif bucket == "good_opportunity":
+        good_opportunities.append(job)
+
+
+def build_cv_filename(
+    candidate_name: str,
+    company: str,
+    title: str,
+) -> str:
+    def clean(value: str) -> str:
+        value = value.strip()
+
+        safe = "".join(
+            character
+            if character.isalnum()
+            else "_"
+            for character in value
+        )
+
+        while "__" in safe:
+            safe = safe.replace(
+                "__",
+                "_",
+            )
+
+        return safe.strip("_")
+
+    parts = [
+        clean(candidate_name),
+        clean(company),
+        clean(title),
+        "CV",
+    ]
+
+    parts = [
+        part
+        for part in parts
+        if part
+    ]
+
+    return "_".join(parts)
 
 
 def render_tailored_cv(
@@ -752,7 +854,8 @@ def render_job(
 
 if (
     best_matches
-    or tradeoffs
+    or potential_jobs
+    or good_opportunities
 ):
     st.divider()
 
@@ -762,22 +865,37 @@ if (
     ):
         if not best_matches:
             st.info(
-                "No best matches found in this scan."
+                "No best matches found."
             )
 
         for job in best_matches:
             render_job(job)
 
     with st.expander(
-        "Good Opportunities with Trade-offs "
-        f"({len(tradeoffs)})"
+        f"Potential ({len(potential_jobs)})",
+        expanded=(
+            not best_matches
+            and bool(potential_jobs)
+        ),
     ):
-        if not tradeoffs:
+        if not potential_jobs:
             st.info(
-                "No trade-off opportunities found."
+                "No potential opportunities found."
             )
 
-        for job in tradeoffs:
+        for job in potential_jobs:
+            render_job(job)
+
+    with st.expander(
+        "Good Opportunities "
+        f"({len(good_opportunities)})"
+    ):
+        if not good_opportunities:
+            st.info(
+                "No good opportunities found."
+            )
+
+        for job in good_opportunities:
             render_job(job)
 
 elif scan_result:
@@ -785,3 +903,5 @@ elif scan_result:
         "No competitive opportunities were found "
         "in this scan."
     )
+
+

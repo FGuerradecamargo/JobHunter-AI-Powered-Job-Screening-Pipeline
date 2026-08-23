@@ -1,4 +1,4 @@
-﻿import json
+import json
 from typing import Any
 
 from models.ai_recommendation import AIRecommendation
@@ -10,11 +10,10 @@ from models.interview_prep import InterviewPrep
 
 
 VALID_RECOMMENDATIONS = {
-    "recommended_apply",
-    "worth_second_look",
-    "interview_practice_only",
-    "not_competitive_now",
-    "personally_unsuitable",
+    "best_match",
+    "potential",
+    "good_opportunity",
+    "reject",
 }
 
 VALID_COMPETITIVE_STATUSES = {
@@ -349,3 +348,4 @@ def parse_response(
             data.get("interview_prep")
         ),
     )
+

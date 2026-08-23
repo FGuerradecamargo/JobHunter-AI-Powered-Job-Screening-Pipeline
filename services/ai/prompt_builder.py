@@ -1,14 +1,22 @@
-﻿from dataclasses import asdict
+from dataclasses import asdict
 import json
 
 from models.candidate_profile import CandidateProfile
 from models.job import Job
+from models.job_profile import JobProfile
 
 
 def build_prompt(
     job: Job,
+    job_profile: JobProfile,
     candidate_profile: CandidateProfile,
 ) -> str:
+    job_profile_json = json.dumps(
+        asdict(job_profile),
+        ensure_ascii=False,
+        indent=2,
+    )
+
     profile_json = json.dumps(
         asdict(candidate_profile),
         ensure_ascii=False,
@@ -276,40 +284,35 @@ The simple_summary must:
 - avoid jargon where a simpler explanation is possible;
 - normally stay below 170 words.
 
-STEP 7 - Final recommendation
+STEP 7 - Final classification
 
 Choose exactly one:
 
-- recommended_apply
-- worth_second_look
-- interview_practice_only
-- not_competitive_now
-- personally_unsuitable
+- best_match
+- potential
+- good_opportunity
+- reject
 
-Use:
+Definitions:
 
-recommended_apply:
-The candidate can compete and the role is attractive enough to justify applying.
+best_match:
+The candidate is realistically competitive for the role, the role strongly supports the candidate's professional direction, and there are no meaningful personal or structural trade-offs.
 
-worth_second_look:
-The candidate can compete, but the role includes relevant personal trade-offs or uncertainties that deserve manual review.
+potential:
+The candidate has enough relevant foundation to plausibly compete, but would not currently be considered a strong candidate compared with well-qualified applicants. Important gaps remain, but the opportunity is still realistic enough to consider.
 
-interview_practice_only:
-The candidate is unlikely to win against well-qualified candidates, but applying may still be useful for interview experience or market testing.
+good_opportunity:
+The candidate is realistically competitive and the role is professionally relevant, but there are meaningful trade-offs such as salary, schedule, contract type, location, level, work model, or strategic direction.
 
-not_competitive_now:
-The candidate lacks central requirements or the expected professional level.
+reject:
+Use when the candidate is not realistically competitive, the role is a false positive for the intended professional direction, or the role conflicts with a genuine hard constraint.
 
-personally_unsuitable:
-The candidate can potentially compete, but the role conflicts with a genuine hard constraint.
+Important:
 
-The simple_recommendation must:
-- begin with one direct decision:
-  "Apply.", "Take a second look.", or "Do not apply.";
-- contain no more than 3 short sentences;
-- explain the main reason for the decision;
-- consider competitiveness, direction alignment and relevant trade-offs.
-
+- Do not classify a role as potential merely because it is interesting or offers growth.
+- Potential means the candidate can plausibly compete but is not yet a strong candidate.
+- Good opportunity means the candidate can compete strongly enough, but the opportunity has relevant trade-offs.
+- Best match requires both strong competitiveness and strong opportunity quality.
 STEP 8 - Build a tailored CV for approved opportunities
 
 Generate tailored_cv only when ALL of these are true:
@@ -378,7 +381,7 @@ Keep the preparation practical, concise and specific to this opportunity.
 Return only valid JSON using exactly this structure:
 
 {{
-  "recommendation": "recommended_apply",
+  "recommendation": "best_match",
   "competitive_status": "competitive_now",
   "current_fit": 0,
   "growth_value": 0,
@@ -426,7 +429,7 @@ Rules:
 - simple_summary must explain the role in friendly, simple and conversational language.
 - simple_summary must describe what the company needs, what the candidate already brings and the main unclear or missing area.
 - simple_summary must not repeat the full technical analysis.
-- simple_recommendation must begin with Apply, Take a second look or Do not apply.
+- simple_recommendation must clearly explain the final classification in concise language.
 - simple_recommendation must be concise and decision-oriented.
 - For an approved opportunity, tailored_cv must be an object using exactly this structure:
   {{
@@ -458,3 +461,6 @@ Rules:
 - If tailored_cv must be null, interview_prep must also be null.
 - Interview preparation must be grounded in the actual job description and candidate evidence.
 """.strip()
+
+
+

@@ -1,4 +1,3 @@
-ï»¿from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import time
@@ -39,8 +38,6 @@ from services.database import (
     update_shared_job_analysis_data,
 )
 from services.job_enricher import JobEnricher
-from services.job_profile_manager import JobProfileManager
-from services.ai.job_profile_service import JobProfileService
 from services.job_matcher import JobMatcher
 from services.job_bucket_classifier import (
     classify_job_bucket,
@@ -53,7 +50,7 @@ from services.recommenders.recommendation_engine import (
 )
 
 
-ANALYSIS_VERSION = "candidate-job-analysis-v15"
+ANALYSIS_VERSION = "candidate-job-analysis-v9"
 REQUEST_DELAY_SECONDS = 2
 
 
@@ -364,14 +361,14 @@ def ai_analysis_should_be_visible(
         "step down",
         "downlevel",
         "below the candidate's current level",
-        "below the candidateÃ¢â‚¬â„¢s current level",
+        "below the candidateÔÇÖs current level",
         "less technical than the candidate's current",
-        "less technical than the candidateÃ¢â‚¬â„¢s current",
+        "less technical than the candidateÔÇÖs current",
         "career direction is more internal it desktop support",
         "not a direct match for the candidate's target",
-        "not a direct match for the candidateÃ¢â‚¬â„¢s target",
+        "not a direct match for the candidateÔÇÖs target",
         "outside the candidate's target direction",
-        "outside the candidateÃ¢â‚¬â„¢s target direction",
+        "outside the candidateÔÇÖs target direction",
     }
 
     if any(
@@ -423,12 +420,6 @@ class CandidateJobAnalysisService:
             OpenAIClient()
         )
 
-        self.job_profile_manager = JobProfileManager(
-            JobProfileService(
-                OpenAIClient()
-            )
-        )
-
     def analyze_pending(
         self,
         candidate_id: str,
@@ -445,12 +436,16 @@ class CandidateJobAnalysisService:
 
         career_objective = (
             self.career_objective_repository
-            .get_active(candidate_id)
+            .get_active(
+                candidate_id
+            )
         )
 
         career_updates = (
             self.career_update_repository
-            .list_for_candidate(candidate_id)
+            .list_for_candidate(
+                candidate_id
+            )
         )
 
         profile = candidate_to_profile(
@@ -483,30 +478,17 @@ class CandidateJobAnalysisService:
             "analyzed": 0,
             "hard_rejected": 0,
             "matcher_rejected": 0,
-            "matcher_review": 0,
             "ai_analyses_created": 0,
             "ai_approved": 0,
             "ai_rejected": 0,
             "best_match": 0,
-            "potential": 0,
-            "good_opportunity": 0,
-
-            # temporary compatibility with old UI
             "tradeoff": 0,
-
             "descriptions_reused": 0,
             "descriptions_fetched": 0,
             "descriptions_failed": 0,
             "failed": 0,
             "errors": [],
         }
-
-        ai_queue: list[dict[str, Any]] = []
-
-        # =============================================
-        # PHASE 1
-        # Enrich -> Job Profile -> Hard Filter
-        # =============================================
 
         for row in pending_rows:
             job = row_to_job(row)
@@ -516,7 +498,6 @@ class CandidateJobAnalysisService:
                     result[
                         "descriptions_reused"
                     ] += 1
-
                 else:
                     self.enricher.enrich(job)
 
@@ -528,7 +509,6 @@ class CandidateJobAnalysisService:
                         update_shared_job_analysis_data(
                             job
                         )
-
                     else:
                         result[
                             "descriptions_failed"
@@ -538,107 +518,220 @@ class CandidateJobAnalysisService:
                         REQUEST_DELAY_SECONDS
                     )
 
-                job_profile = (
-                    self.job_profile_manager
-                    .get_or_create(job)
+                hard_filter_result = (
+                    hard_filter.analyze(job)
                 )
 
-                hard_filter_result = (
-                    hard_filter.analyze(
+                matcher_analysis = (
+                    self.matcher.analyze(
                         job,
-                        job_profile,
+                        profile,
+                    )
+                )
+
+                job.score = matcher_analysis[
+                    "score"
+                ]
+
+                job.reasons = matcher_analysis[
+                    "reasons"
+                ]
+
+                job.classification = (
+                    self.matcher.classify(job)
+                )
+
+                fit_analysis = (
+                    self.fit_analyzer.analyze(
+                        job,
+                        profile,
+                    )
+                )
+
+                deterministic_decision = (
+                    self.recommendation_engine.recommend(
+                        current_fit=fit_analysis[
+                            "current_fit"
+                        ],
+                        growth_value=fit_analysis[
+                            "growth_value"
+                        ],
                     )
                 )
 
                 if hard_filter_result["rejected"]:
-                    rejection_reasons = (
-                        hard_filter_result["reasons"]
+                    analysis = (
+                        build_rule_rejection_analysis(
+                            job=job,
+                            reasons=hard_filter_result[
+                                "reasons"
+                            ],
+                            matcher_analysis=(
+                                matcher_analysis
+                            ),
+                            fit_analysis=fit_analysis,
+                            rejection_type=(
+                                "hard_filter"
+                            ),
+                        )
+                    )
+
+                    analysis["bucket"] = REJECT
+                    analysis_status = "system_rejected"
+
+                    result["hard_rejected"] += 1
+
+                elif (
+                    job.classification
+                    == self.matcher.NOT_RELEVANT
+                ):
+                    matcher_reasons = (
+                        matcher_analysis["reasons"]
                         or [
-                            "The role failed a hard constraint."
+                            (
+                                "The role did not reach "
+                                "the minimum relevance score."
+                            )
                         ]
                     )
 
-                    analysis = {
-                        "job_id": job.id,
-                        "recommendation": "reject",
-                        "competitive_status": (
-                            "not_competitive_now"
-                        ),
-                        "current_fit": 0,
-                        "growth_value": 0,
-                        "direction_alignment": "low",
-                        "job_level": (
-                            job_profile.seniority
-                        ),
-                        "candidate_level": "",
-                        "level_assessment": "",
-                        "core_requirements": (
-                            job_profile
-                            .must_have_capabilities
-                        ),
-                        "requirements_met": [],
-                        "strengths": [],
-                        "development_gaps": [],
-                        "structural_gaps": (
-                            rejection_reasons
-                        ),
-                        "positive_points": [],
-                        "personal_negatives": [],
-                        "priority_matches": [],
-                        "priority_conflicts": [],
-                        "hard_conflicts": (
-                            rejection_reasons
-                        ),
-                        "reason": (
-                            rejection_reasons[0]
-                        ),
-                        "final_reason": (
-                            "Rejected by a hard "
-                            "constraint before candidate "
-                            "AI analysis."
-                        ),
-                        "simple_summary": (
-                            job_profile.summary
-                        ),
-                        "simple_recommendation": (
-                            "Reject. A hard constraint "
-                            "blocks this opportunity."
-                        ),
-                        "tailored_cv": None,
-                        "interview_prep": None,
-                        "bucket": "reject",
-                        "rule_rejection_type": (
-                            "hard_filter"
-                        ),
-                    }
-
-                    save_candidate_job_analysis(
-                        candidate_id=candidate_id,
-                        job_id=job.id,
-                        analysis=analysis,
-                        job_signature=(
-                            build_job_signature(job)
-                        ),
-                        candidate_signature=(
-                            candidate_signature
-                        ),
-                        analysis_version=(
-                            ANALYSIS_VERSION
-                        ),
-                        status="system_rejected",
+                    analysis = (
+                        build_rule_rejection_analysis(
+                            job=job,
+                            reasons=matcher_reasons,
+                            matcher_analysis=(
+                                matcher_analysis
+                            ),
+                            fit_analysis=fit_analysis,
+                            rejection_type="matcher",
+                        )
                     )
 
-                    result["hard_rejected"] += 1
-                    result["analyzed"] += 1
+                    analysis["bucket"] = REJECT
+                    analysis_status = "system_rejected"
 
-                    continue
+                    result[
+                        "matcher_rejected"
+                    ] += 1
 
-                ai_queue.append(
+                else:
+                    ai_analysis = (
+                        self.ai_service.analyze(
+                            job=job,
+                            candidate_profile=profile,
+                        )
+                    )
+
+                    analysis = asdict(
+                        ai_analysis
+                    )
+
+                    analysis[
+                        "deterministic_analysis"
+                    ] = {
+                        "score": matcher_analysis[
+                            "score"
+                        ],
+                        "reasons": matcher_analysis[
+                            "reasons"
+                        ],
+                        "classification": (
+                            job.classification
+                        ),
+                        "current_fit": (
+                            fit_analysis[
+                                "current_fit"
+                            ]
+                        ),
+                        "growth_value": (
+                            fit_analysis[
+                                "growth_value"
+                            ]
+                        ),
+                        "current_fit_reasons": (
+                            fit_analysis[
+                                "current_fit_reasons"
+                            ]
+                        ),
+                        "growth_reasons": (
+                            fit_analysis[
+                                "growth_reasons"
+                            ]
+                        ),
+                        "recommendation": (
+                            deterministic_decision[
+                                "recommendation"
+                            ]
+                        ),
+                        "recommendation_message": (
+                            deterministic_decision[
+                                "message"
+                            ]
+                        ),
+                    }
+
+                    result[
+                        "ai_analyses_created"
+                    ] += 1
+
+                    bucket = classify_job_bucket(
+                        analysis
+                    )
+
+                    analysis["bucket"] = bucket
+
+                    if bucket == REJECT:
+                        analysis["tailored_cv"] = None
+                        analysis["interview_prep"] = None
+
+                    if bucket == BEST_MATCH:
+                        analysis_status = "in_review"
+                        result["best_match"] += 1
+                        result["ai_approved"] += 1
+
+                    elif bucket == TRADEOFF:
+                        analysis_status = "in_review"
+                        result["tradeoff"] += 1
+                        result["ai_approved"] += 1
+
+                    else:
+                        analysis_status = "system_rejected"
+                        result["ai_rejected"] += 1
+
+                job_signature = (
+                    build_job_signature(job)
+                )
+
+                save_candidate_job_analysis(
+                    candidate_id=candidate_id,
+                    job_id=job.id,
+                    analysis=analysis,
+                    job_signature=job_signature,
+                    candidate_signature=(
+                        candidate_signature
+                    ),
+                    analysis_version=(
+                        ANALYSIS_VERSION
+                    ),
+                    status=analysis_status,
+                )
+
+                result["analyzed"] += 1
+
+            except RateLimitError:
+                result["failed"] += 1
+
+                result["errors"].append(
                     {
-                        "job": job,
-                        "job_profile": job_profile,
+                        "job_id": job.id,
+                        "title": job.title,
+                        "error": (
+                            "OpenAI API quota unavailable."
+                        ),
                     }
                 )
+
+                break
 
             except Exception as error:
                 result["failed"] += 1
@@ -651,164 +744,4 @@ class CandidateJobAnalysisService:
                     }
                 )
 
-        # =============================================
-        # PHASE 2
-        # AI candidate comparison
-        # =============================================
-
-        if not ai_queue:
-            return result
-
-        def analyze_with_ai(
-            item: dict[str, Any],
-        ):
-            job = item["job"]
-            job_profile = item["job_profile"]
-
-            ai_analysis = (
-                self.ai_service.analyze(
-                    job=job,
-                    job_profile=job_profile,
-                    candidate_profile=profile,
-                )
-            )
-
-            return item, ai_analysis
-
-        quota_exhausted = False
-
-        with ThreadPoolExecutor(
-            max_workers=4
-        ) as executor:
-            futures = {
-                executor.submit(
-                    analyze_with_ai,
-                    item,
-                ): item
-                for item in ai_queue
-            }
-
-            for future in as_completed(futures):
-                item = futures[future]
-                job = item["job"]
-
-                try:
-                    _, ai_analysis = (
-                        future.result()
-                    )
-
-                    analysis = asdict(
-                        ai_analysis
-                    )
-
-                    bucket = analysis.get(
-                        "recommendation",
-                        "reject",
-                    )
-
-                    if bucket not in {
-                        "best_match",
-                        "potential",
-                        "good_opportunity",
-                        "reject",
-                    }:
-                        bucket = "reject"
-
-                    analysis["bucket"] = bucket
-
-                    result[
-                        "ai_analyses_created"
-                    ] += 1
-
-                    if bucket == "best_match":
-                        analysis_status = "in_review"
-                        result["best_match"] += 1
-                        result["ai_approved"] += 1
-
-                    elif bucket == "potential":
-                        analysis_status = "in_review"
-                        result["potential"] += 1
-                        result["ai_approved"] += 1
-
-                    elif bucket == "good_opportunity":
-                        analysis_status = "in_review"
-                        result[
-                            "good_opportunity"
-                        ] += 1
-
-                        # old UI compatibility
-                        result["tradeoff"] += 1
-
-                        result["ai_approved"] += 1
-
-                    else:
-                        analysis_status = (
-                            "system_rejected"
-                        )
-
-                        analysis[
-                            "tailored_cv"
-                        ] = None
-
-                        analysis[
-                            "interview_prep"
-                        ] = None
-
-                        result["ai_rejected"] += 1
-
-                    save_candidate_job_analysis(
-                        candidate_id=candidate_id,
-                        job_id=job.id,
-                        analysis=analysis,
-                        job_signature=(
-                            build_job_signature(job)
-                        ),
-                        candidate_signature=(
-                            candidate_signature
-                        ),
-                        analysis_version=(
-                            ANALYSIS_VERSION
-                        ),
-                        status=analysis_status,
-                    )
-
-                    result["analyzed"] += 1
-
-                except RateLimitError:
-                    result["failed"] += 1
-
-                    result["errors"].append(
-                        {
-                            "job_id": job.id,
-                            "title": job.title,
-                            "error": (
-                                "OpenAI API quota "
-                                "unavailable."
-                            ),
-                        }
-                    )
-
-                    quota_exhausted = True
-
-                    for pending in futures:
-                        if not pending.done():
-                            pending.cancel()
-
-                    break
-
-                except Exception as error:
-                    result["failed"] += 1
-
-                    result["errors"].append(
-                        {
-                            "job_id": job.id,
-                            "title": job.title,
-                            "error": str(error),
-                        }
-                    )
-
-        if quota_exhausted:
-            return result
-
         return result
-
