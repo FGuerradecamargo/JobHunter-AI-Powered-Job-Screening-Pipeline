@@ -315,12 +315,17 @@ Important:
 - Best match requires both strong competitiveness and strong opportunity quality.
 STEP 8 - Build a tailored CV for approved opportunities
 
-Generate tailored_cv only when ALL of these are true:
-- direction_alignment is high;
-- competitive_status is competitive_now or bridge_opportunity;
-- hard_conflicts is empty.
+Generate tailored_cv whenever the final recommendation is:
+- best_match;
+- potential;
+- good_opportunity.
 
-Otherwise tailored_cv must be null.
+If the final recommendation is reject, tailored_cv must be null.
+
+The CV generation decision must follow the final recommendation.
+Do not suppress tailored_cv because of direction_alignment, competitive_status,
+development gaps, priority conflicts or opportunity trade-offs when the final
+recommendation is best_match, potential or good_opportunity.
 
 The purpose of the tailored CV is:
 
@@ -354,7 +359,8 @@ Prefer evidence that directly increases the candidate's credibility for this spe
 
 STEP 9 - Prepare the candidate for a possible interview
 
-Generate interview_prep under the same approval conditions used for tailored_cv.
+Generate interview_prep whenever tailored_cv is generated.
+For reject recommendations, interview_prep must be null.
 
 The candidate may never need this material.
 Generate it now because all relevant job and candidate context is already available,
@@ -403,6 +409,12 @@ Return only valid JSON using exactly this structure:
   "final_reason": "",
   "simple_summary": "",
   "simple_recommendation": "",
+  "market_signal": {{
+    "role_family": "",
+    "best_match_blockers": [],
+    "market_strengths": [],
+    "what_would_raise_fit": []
+  }},
   "tailored_cv": null,
   "interview_prep": null
 }}
@@ -431,6 +443,23 @@ Rules:
 - simple_summary must not repeat the full technical analysis.
 - simple_recommendation must clearly explain the final classification in concise language.
 - simple_recommendation must be concise and decision-oriented.
+
+Market signal rules:
+- market_signal must always be populated, including for reject recommendations.
+- role_family must describe the actual professional market/family of this role using a short normalized label.
+- best_match_blockers must identify the most important professional competitiveness reasons this candidate did not achieve a stronger Best Match classification for this specific role.
+- best_match_blockers must focus on evidence, capability, experience, domain knowledge, seniority or professional credibility.
+- Do not include salary, location, onsite/remote model, schedule, commute or other personal opportunity preferences in best_match_blockers. Those belong to priority conflicts or opportunity trade-offs, not market competitiveness.
+- If the recommendation is best_match, best_match_blockers may be empty or contain only minor remaining limitations.
+- market_strengths must identify the candidate evidence that increases competitiveness for this role and similar roles in this market family.
+- what_would_raise_fit must identify specific, realistic evidence, experience or capability that would materially improve competitiveness for this role.
+- Do not invent missing experience.
+- Do not use generic advice such as "gain more experience" when a more specific gap can be identified.
+- Keep all market_signal list items short, concrete and suitable for aggregation across many jobs.
+- Write market_signal list items as canonical noun-phrase labels, not full sentences.
+- Do not write candidate-specific prefixes such as "No", "Lacks", "Missing", "Candidate lacks" or "Needs".
+- Prefer stable labels such as "Direct AML/KYC experience", "Banking regulatory experience", "Enterprise troubleshooting depth", "Fraud investigation", or "Python/Selenium automation".
+- Use the same label whenever the underlying signal is materially the same across different jobs.
 - For an approved opportunity, tailored_cv must be an object using exactly this structure:
   {{
     "headline": "",
@@ -446,7 +475,8 @@ Rules:
     ],
     "additional_relevant_information": []
   }}
-- For any opportunity that does not satisfy the tailored CV approval conditions, tailored_cv must be null.
+- For best_match, potential and good_opportunity, tailored_cv must be a populated object.
+- For reject, tailored_cv must be null.
 - Every tailored CV statement must be supportable from the candidate profile or career_updates.
 - For an approved opportunity, interview_prep must be an object using exactly this structure:
   {{
@@ -457,8 +487,8 @@ Rules:
     "likely_interview_topics": [],
     "positioning": ""
   }}
-- interview_prep must follow the same approval conditions as tailored_cv.
-- If tailored_cv must be null, interview_prep must also be null.
+- For best_match, potential and good_opportunity, interview_prep must be a populated object.
+- For reject, interview_prep must be null.
 - Interview preparation must be grounded in the actual job description and candidate evidence.
 """.strip()
 

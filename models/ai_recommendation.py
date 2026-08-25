@@ -2,6 +2,7 @@
 
 from models.tailored_cv import TailoredCV
 from models.interview_prep import InterviewPrep
+from models.market_signal import MarketSignal
 
 
 @dataclass
@@ -41,6 +42,8 @@ class AIRecommendation:
 
     simple_summary: str = ""
     simple_recommendation: str = ""
+
+    market_signal: MarketSignal | None = None
 
     tailored_cv: TailoredCV | None = None
     interview_prep: InterviewPrep | None = None

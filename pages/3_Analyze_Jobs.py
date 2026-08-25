@@ -28,6 +28,9 @@ from services.cv_renderer import (
     render_tailored_cv_docx,
     render_tailored_cv_pdf,
 )
+from services.market_position_service import (
+    build_market_position,
+)
 
 from services.database import (
     ensure_candidate_job_analysis,
@@ -500,6 +503,244 @@ if scan_result:
             st.code(str(error))
 
 
+# =========================================================
+# Market Position
+# =========================================================
+
+if scan_result:
+    market_position = build_market_position(
+        candidate_id=candidate_id,
+        batch_signals=scan_result.get(
+            "batch_market_signals",
+            [],
+        ),
+    )
+
+    current_market = market_position.get(
+        "current_batch",
+        {},
+    )
+
+    historical_market = market_position.get(
+        "historical",
+        {},
+    )
+
+    st.divider()
+    st.subheader("Market Position")
+
+    current_sample = current_market.get(
+        "sample_size",
+        0,
+    )
+
+    historical_sample = historical_market.get(
+        "sample_size",
+        0,
+    )
+
+    st.caption(
+        f"Current batch: {current_sample} AI-analyzed jobs "
+        f"? Historical signal: {historical_sample} jobs"
+    )
+
+    current_role_families = current_market.get(
+        "role_families",
+        [],
+    )
+
+    historical_role_families = historical_market.get(
+        "role_families",
+        [],
+    )
+
+    if current_role_families:
+        strongest_current = current_role_families[0][
+            "label"
+        ]
+
+        st.markdown(
+            "### Current Market Position"
+        )
+
+        st.write(
+            "Your strongest current market appears to be:"
+        )
+
+        st.markdown(
+            f"**{strongest_current}**"
+        )
+
+    # -----------------------------------------------------
+    # Why no Best Matches
+    # -----------------------------------------------------
+
+    st.markdown(
+        "### Why aren't I seeing Best Matches?"
+    )
+
+    current_blockers = current_market.get(
+        "best_match_blockers",
+        [],
+    )
+
+    historical_blockers = historical_market.get(
+        "best_match_blockers",
+        [],
+    )
+
+    st.markdown("**Current Batch**")
+
+    if current_blockers:
+        for item in current_blockers[:5]:
+            st.write(
+                f"- {item['label']} "
+                f"({item['count']} signal(s))"
+            )
+    else:
+        st.write(
+            "Not enough current-batch evidence yet."
+        )
+
+    st.markdown("**Long-term Signal**")
+
+    if historical_blockers:
+        for item in historical_blockers[:5]:
+            st.write(
+                f"- {item['label']} "
+                f"({item['count']} signal(s))"
+            )
+    else:
+        st.write(
+            "Historical market evidence is still building."
+        )
+
+    # -----------------------------------------------------
+    # Why no interviews
+    # -----------------------------------------------------
+
+    st.markdown(
+        "### Why am I not getting interviews?"
+    )
+
+    if current_blockers:
+        top_labels = [
+            item["label"]
+            for item in current_blockers[:3]
+        ]
+
+        st.write(
+            "In the current batch, the strongest "
+            "pre-interview competitiveness signals are:"
+        )
+
+        for label in top_labels:
+            st.write(f"- {label}")
+    else:
+        st.write(
+            "There is not enough current evidence "
+            "to identify a consistent pre-interview pattern."
+        )
+
+    if historical_blockers:
+        st.write(
+            "Across the historical signal, the most "
+            "persistent blockers are:"
+        )
+
+        for item in historical_blockers[:3]:
+            st.write(
+                f"- {item['label']} "
+                f"({item['count']} signal(s))"
+            )
+
+    # -----------------------------------------------------
+    # Where competitive
+    # -----------------------------------------------------
+
+    st.markdown(
+        "### Where am I currently competitive?"
+    )
+
+    st.markdown("**Current Batch**")
+
+    if current_role_families:
+        for item in current_role_families[:5]:
+            st.write(
+                f"- {item['label']} "
+                f"({item['count']} signal(s))"
+            )
+    else:
+        st.write(
+            "No clear current role-family signal yet."
+        )
+
+    st.markdown("**Long-term Signal**")
+
+    if historical_role_families:
+        for item in historical_role_families[:5]:
+            st.write(
+                f"- {item['label']} "
+                f"({item['count']} signal(s))"
+            )
+    else:
+        st.write(
+            "Historical role-family signal is still building."
+        )
+
+    # -----------------------------------------------------
+    # Recurring gaps
+    # -----------------------------------------------------
+
+    st.markdown(
+        "### Main recurring gaps"
+    )
+
+    recurring_gaps = historical_market.get(
+        "what_would_raise_fit",
+        [],
+    )
+
+    if recurring_gaps:
+        for item in recurring_gaps[:7]:
+            st.write(
+                f"- {item['label']} "
+                f"({item['count']} signal(s))"
+            )
+    else:
+        st.write(
+            "Not enough historical evidence yet."
+        )
+
+    # -----------------------------------------------------
+    # What should change now
+    # -----------------------------------------------------
+
+    st.markdown(
+        "### What should I change now?"
+    )
+
+    current_raise_fit = current_market.get(
+        "what_would_raise_fit",
+        [],
+    )
+
+    if current_raise_fit:
+        st.write(
+            "The highest-value short-term changes "
+            "suggested by this batch are:"
+        )
+
+        for item in current_raise_fit[:5]:
+            st.write(
+                f"- {item['label']}"
+            )
+    else:
+        st.write(
+            "No strong short-term change signal yet."
+        )
+
+
 review_jobs = list_candidate_jobs(
     candidate_id=candidate_id,
     status="in_review",
@@ -567,7 +808,7 @@ def build_cv_filename(
         if part
     ]
 
-    return "_".join(parts)
+    return "_".join(parts) + ".docx"
 
 
 def render_tailored_cv(

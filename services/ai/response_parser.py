@@ -7,6 +7,7 @@ from models.tailored_cv import (
     TailoredCVExperience,
 )
 from models.interview_prep import InterviewPrep
+from models.market_signal import MarketSignal
 
 
 VALID_RECOMMENDATIONS = {
@@ -68,6 +69,45 @@ def validate_string_list(
         )
 
     return value
+
+
+def parse_market_signal(
+    value: Any,
+) -> MarketSignal:
+    if value is None:
+        return MarketSignal()
+
+    if not isinstance(value, dict):
+        raise ValueError(
+            "market_signal must be an object"
+        )
+
+    return MarketSignal(
+        role_family=str(
+            value.get(
+                "role_family",
+                "",
+            )
+        ),
+        best_match_blockers=validate_string_list(
+            value.get(
+                "best_match_blockers"
+            ),
+            "market_signal.best_match_blockers",
+        ),
+        market_strengths=validate_string_list(
+            value.get(
+                "market_strengths"
+            ),
+            "market_signal.market_strengths",
+        ),
+        what_would_raise_fit=validate_string_list(
+            value.get(
+                "what_would_raise_fit"
+            ),
+            "market_signal.what_would_raise_fit",
+        ),
+    )
 
 
 def parse_tailored_cv(
@@ -338,6 +378,10 @@ def parse_response(
         simple_recommendation=data.get(
             "simple_recommendation",
             "",
+        ),
+
+        market_signal=parse_market_signal(
+            data.get("market_signal")
         ),
 
         tailored_cv=parse_tailored_cv(

@@ -499,6 +499,10 @@ class CandidateJobAnalysisService:
             "descriptions_failed": 0,
             "failed": 0,
             "errors": [],
+
+            # Market Position ? current execution only
+            "batch_market_signals": [],
+            "batch_ai_job_ids": [],
         }
 
         ai_queue: list[dict[str, Any]] = []
@@ -715,6 +719,29 @@ class CandidateJobAnalysisService:
                         bucket = "reject"
 
                     analysis["bucket"] = bucket
+
+                    market_signal = analysis.get(
+                        "market_signal"
+                    )
+
+                    if market_signal:
+                        result[
+                            "batch_market_signals"
+                        ].append(
+                            {
+                                "job_id": job.id,
+                                "recommendation": bucket,
+                                "current_fit": analysis.get(
+                                    "current_fit",
+                                    0,
+                                ),
+                                "market_signal": market_signal,
+                            }
+                        )
+
+                    result[
+                        "batch_ai_job_ids"
+                    ].append(job.id)
 
                     result[
                         "ai_analyses_created"

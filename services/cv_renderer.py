@@ -1,15 +1,14 @@
 ﻿from io import BytesIO
+from xml.sax.saxutils import escape
 
 from docx import Document
+from docx.enum.section import WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt
+from docx.shared import Inches, Pt
 
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import (
-    ParagraphStyle,
-    getSampleStyleSheet,
-)
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
     ListFlowable,
@@ -20,30 +19,89 @@ from reportlab.platypus import (
 )
 
 
-def _set_default_font(document: Document) -> None:
-    styles = document.styles
+# =========================================================
+# Shared helpers
+# =========================================================
 
-    normal_style = styles["Normal"]
-    normal_style.font.name = "Arial"
-    normal_style.font.size = Pt(10)
+def _clean_text(value) -> str:
+    if value is None:
+        return ""
 
-    for style_name in [
-        "Title",
-        "Heading 1",
-        "Heading 2",
-    ]:
-        style = styles[style_name]
-        style.font.name = "Arial"
+    text = str(value).strip()
+
+    replacements = {
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u00a0": " ",
+    }
+
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    return text
 
 
-def _add_bullet(
+# =========================================================
+# DOCX
+# =========================================================
+
+def _configure_docx(document: Document) -> None:
+    section = document.sections[0]
+
+    section.top_margin = Inches(0.55)
+    section.bottom_margin = Inches(0.55)
+    section.left_margin = Inches(0.65)
+    section.right_margin = Inches(0.65)
+
+    normal = document.styles["Normal"]
+    normal.font.name = "Arial"
+    normal.font.size = Pt(9.5)
+
+    normal.paragraph_format.space_after = Pt(3)
+    normal.paragraph_format.line_spacing = 1.0
+
+
+def _add_docx_section_heading(
+    document: Document,
+    title: str,
+) -> None:
+    paragraph = document.add_paragraph()
+
+    paragraph.paragraph_format.space_before = Pt(8)
+    paragraph.paragraph_format.space_after = Pt(3)
+
+    run = paragraph.add_run(
+        _clean_text(title).upper()
+    )
+
+    run.bold = True
+    run.font.name = "Arial"
+    run.font.size = Pt(10.5)
+
+
+def _add_docx_bullet(
     document: Document,
     text: str,
 ) -> None:
     paragraph = document.add_paragraph(
         style="List Bullet"
     )
-    paragraph.add_run(text)
+
+    paragraph.paragraph_format.left_indent = Inches(0.18)
+    paragraph.paragraph_format.first_line_indent = Inches(-0.12)
+    paragraph.paragraph_format.space_after = Pt(2)
+    paragraph.paragraph_format.line_spacing = 1.0
+
+    run = paragraph.add_run(
+        _clean_text(text)
+    )
+
+    run.font.name = "Arial"
+    run.font.size = Pt(9.2)
 
 
 def render_tailored_cv_docx(
@@ -52,55 +110,88 @@ def render_tailored_cv_docx(
 ) -> bytes:
     document = Document()
 
-    _set_default_font(document)
+    _configure_docx(document)
 
-    title = document.add_paragraph()
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # -----------------------------------------------------
+    # Header
+    # -----------------------------------------------------
 
-    run = title.add_run(candidate_name)
+    name_paragraph = document.add_paragraph()
+    name_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    name_paragraph.paragraph_format.space_after = Pt(2)
+
+    run = name_paragraph.add_run(
+        _clean_text(candidate_name).upper()
+    )
+
     run.bold = True
-    run.font.size = Pt(18)
+    run.font.name = "Arial"
+    run.font.size = Pt(17)
 
-    headline = tailored_cv.get(
-        "headline",
-        "",
+    headline = _clean_text(
+        tailored_cv.get("headline", "")
     )
 
     if headline:
-        paragraph = document.add_paragraph()
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        headline_paragraph = document.add_paragraph()
+        headline_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        headline_paragraph.paragraph_format.space_after = Pt(7)
 
-        run = paragraph.add_run(headline)
+        run = headline_paragraph.add_run(headline)
         run.bold = True
-        run.font.size = Pt(11)
+        run.font.name = "Arial"
+        run.font.size = Pt(10.2)
 
-    professional_summary = tailored_cv.get(
-        "professional_summary",
-        "",
+    # -----------------------------------------------------
+    # Summary
+    # -----------------------------------------------------
+
+    summary = _clean_text(
+        tailored_cv.get(
+            "professional_summary",
+            "",
+        )
     )
 
-    if professional_summary:
-        document.add_heading(
+    if summary:
+        _add_docx_section_heading(
+            document,
             "Professional Summary",
-            level=1,
-        )
-        document.add_paragraph(
-            professional_summary
         )
 
-    key_skills = tailored_cv.get(
-        "key_skills",
-        [],
-    )
+        paragraph = document.add_paragraph(summary)
+        paragraph.paragraph_format.space_after = Pt(4)
+        paragraph.paragraph_format.line_spacing = 1.0
 
-    if key_skills:
-        document.add_heading(
-            "Key Skills",
-            level=1,
+    # -----------------------------------------------------
+    # Skills
+    # -----------------------------------------------------
+
+    skills = [
+        _clean_text(item)
+        for item in tailored_cv.get(
+            "key_skills",
+            [],
         )
-        document.add_paragraph(
-            " | ".join(key_skills)
+        if _clean_text(item)
+    ]
+
+    if skills:
+        _add_docx_section_heading(
+            document,
+            "Core Skills",
         )
+
+        paragraph = document.add_paragraph(
+            " | ".join(skills)
+        )
+
+        paragraph.paragraph_format.space_after = Pt(4)
+        paragraph.paragraph_format.line_spacing = 1.0
+
+    # -----------------------------------------------------
+    # Experience
+    # -----------------------------------------------------
 
     experiences = tailored_cv.get(
         "experiences",
@@ -108,63 +199,71 @@ def render_tailored_cv_docx(
     )
 
     if experiences:
-        document.add_heading(
+        _add_docx_section_heading(
+            document,
             "Professional Experience",
-            level=1,
         )
 
         for experience in experiences:
-            role = experience.get(
-                "role",
-                "",
+            role = _clean_text(
+                experience.get("role", "")
             )
 
-            company = experience.get(
-                "company",
-                "",
+            company = _clean_text(
+                experience.get("company", "")
             )
 
-            heading_parts = [
+            heading = " | ".join(
                 value
                 for value in [
-                    role,
                     company,
+                    role,
                 ]
                 if value
-            ]
-
-            if heading_parts:
-                paragraph = document.add_paragraph()
-
-                run = paragraph.add_run(
-                    " - ".join(heading_parts)
-                )
-                run.bold = True
-
-            bullets = experience.get(
-                "tailored_bullets",
-                [],
             )
 
-            for bullet in bullets:
-                _add_bullet(
-                    document,
-                    bullet,
-                )
+            if heading:
+                paragraph = document.add_paragraph()
 
-    additional_information = tailored_cv.get(
-        "additional_relevant_information",
-        [],
-    )
+                paragraph.paragraph_format.space_before = Pt(4)
+                paragraph.paragraph_format.space_after = Pt(2)
 
-    if additional_information:
-        document.add_heading(
-            "Additional Relevant Information",
-            level=1,
+                run = paragraph.add_run(heading)
+                run.bold = True
+                run.font.name = "Arial"
+                run.font.size = Pt(9.8)
+
+            for bullet in experience.get(
+                "tailored_bullets",
+                [],
+            ):
+                if _clean_text(bullet):
+                    _add_docx_bullet(
+                        document,
+                        bullet,
+                    )
+
+    # -----------------------------------------------------
+    # Additional information
+    # -----------------------------------------------------
+
+    additional = [
+        _clean_text(item)
+        for item in tailored_cv.get(
+            "additional_relevant_information",
+            [],
+        )
+        if _clean_text(item)
+    ]
+
+    if additional:
+        _add_docx_section_heading(
+            document,
+            "Additional Information",
         )
 
-        for item in additional_information:
-            _add_bullet(
+        for item in additional:
+            _add_docx_bullet(
                 document,
                 item,
             )
@@ -172,7 +271,19 @@ def render_tailored_cv_docx(
     buffer = BytesIO()
     document.save(buffer)
 
-    return buffer.getvalue()
+    data = buffer.getvalue()
+
+    if not data.startswith(b"PK"):
+        raise ValueError(
+            "Generated DOCX is invalid."
+        )
+
+    return data
+
+
+# =========================================================
+# PDF
+# =========================================================
 
 def render_tailored_cv_pdf(
     candidate_name: str,
@@ -183,124 +294,152 @@ def render_tailored_cv_pdf(
     document = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=18 * mm,
-        leftMargin=18 * mm,
-        topMargin=16 * mm,
-        bottomMargin=16 * mm,
+        rightMargin=15 * mm,
+        leftMargin=15 * mm,
+        topMargin=13 * mm,
+        bottomMargin=13 * mm,
     )
 
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
         "CVTitle",
-        parent=styles["Title"],
+        parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=18,
-        leading=22,
+        fontSize=16,
+        leading=18,
         alignment=TA_CENTER,
-        spaceAfter=4,
+        spaceAfter=2,
     )
 
     headline_style = ParagraphStyle(
         "CVHeadline",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=10,
-        leading=13,
+        fontSize=9.5,
+        leading=12,
         alignment=TA_CENTER,
-        spaceAfter=12,
+        spaceAfter=8,
     )
 
-    heading_style = ParagraphStyle(
-        "CVHeading",
-        parent=styles["Heading2"],
+    section_style = ParagraphStyle(
+        "CVSection",
+        parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=11,
-        leading=14,
-        spaceBefore=8,
-        spaceAfter=5,
+        fontSize=10,
+        leading=12,
+        spaceBefore=7,
+        spaceAfter=3,
     )
 
     body_style = ParagraphStyle(
         "CVBody",
-        parent=styles["BodyText"],
+        parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=9.5,
-        leading=13,
-        spaceAfter=6,
+        fontSize=8.8,
+        leading=11.2,
+        spaceAfter=3,
     )
 
     role_style = ParagraphStyle(
         "CVRole",
-        parent=styles["BodyText"],
+        parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=10,
-        leading=13,
-        spaceBefore=5,
-        spaceAfter=3,
+        fontSize=9.2,
+        leading=11.5,
+        spaceBefore=4,
+        spaceAfter=2,
     )
 
     story = []
 
+    def pdf_text(value) -> str:
+        return escape(
+            _clean_text(value)
+        )
+
+    # -----------------------------------------------------
+    # Header
+    # -----------------------------------------------------
+
     story.append(
         Paragraph(
-            candidate_name,
+            pdf_text(candidate_name).upper(),
             title_style,
         )
     )
 
-    headline = tailored_cv.get(
-        "headline",
-        "",
+    headline = _clean_text(
+        tailored_cv.get("headline", "")
     )
 
     if headline:
         story.append(
             Paragraph(
-                headline,
+                pdf_text(headline),
                 headline_style,
             )
         )
 
-    professional_summary = tailored_cv.get(
-        "professional_summary",
-        "",
+    # -----------------------------------------------------
+    # Summary
+    # -----------------------------------------------------
+
+    summary = _clean_text(
+        tailored_cv.get(
+            "professional_summary",
+            "",
+        )
     )
 
-    if professional_summary:
+    if summary:
         story.append(
             Paragraph(
-                "Professional Summary",
-                heading_style,
+                "PROFESSIONAL SUMMARY",
+                section_style,
             )
         )
 
         story.append(
             Paragraph(
-                professional_summary,
+                pdf_text(summary),
                 body_style,
             )
         )
 
-    key_skills = tailored_cv.get(
-        "key_skills",
-        [],
-    )
+    # -----------------------------------------------------
+    # Skills
+    # -----------------------------------------------------
 
-    if key_skills:
+    skills = [
+        _clean_text(item)
+        for item in tailored_cv.get(
+            "key_skills",
+            [],
+        )
+        if _clean_text(item)
+    ]
+
+    if skills:
         story.append(
             Paragraph(
-                "Key Skills",
-                heading_style,
+                "CORE SKILLS",
+                section_style,
             )
         )
 
         story.append(
             Paragraph(
-                " | ".join(key_skills),
+                pdf_text(
+                    " | ".join(skills)
+                ),
                 body_style,
             )
         )
+
+    # -----------------------------------------------------
+    # Experience
+    # -----------------------------------------------------
 
     experiences = tailored_cv.get(
         "experiences",
@@ -310,102 +449,113 @@ def render_tailored_cv_pdf(
     if experiences:
         story.append(
             Paragraph(
-                "Professional Experience",
-                heading_style,
+                "PROFESSIONAL EXPERIENCE",
+                section_style,
             )
         )
 
         for experience in experiences:
-            role = experience.get(
-                "role",
-                "",
+            role = _clean_text(
+                experience.get("role", "")
             )
 
-            company = experience.get(
-                "company",
-                "",
+            company = _clean_text(
+                experience.get("company", "")
             )
 
-            heading_parts = [
+            heading = " | ".join(
                 value
                 for value in [
-                    role,
                     company,
+                    role,
                 ]
                 if value
-            ]
+            )
 
-            if heading_parts:
+            if heading:
                 story.append(
                     Paragraph(
-                        " - ".join(heading_parts),
+                        pdf_text(heading),
                         role_style,
                     )
                 )
 
-            bullets = experience.get(
-                "tailored_bullets",
-                [],
-            )
+            bullets = [
+                _clean_text(item)
+                for item in experience.get(
+                    "tailored_bullets",
+                    [],
+                )
+                if _clean_text(item)
+            ]
 
             if bullets:
-                bullet_items = [
-                    ListItem(
-                        Paragraph(
-                            bullet,
-                            body_style,
-                        )
-                    )
-                    for bullet in bullets
-                ]
-
                 story.append(
                     ListFlowable(
-                        bullet_items,
+                        [
+                            ListItem(
+                                Paragraph(
+                                    pdf_text(bullet),
+                                    body_style,
+                                ),
+                                leftIndent=8,
+                            )
+                            for bullet in bullets
+                        ],
                         bulletType="bullet",
-                        leftIndent=14,
+                        leftIndent=13,
+                        bulletFontName="Helvetica",
+                        bulletFontSize=5.5,
+                        spaceAfter=0.5,
                     )
                 )
 
-                story.append(
-                    Spacer(
-                        1,
-                        4,
-                    )
-                )
+    # -----------------------------------------------------
+    # Additional
+    # -----------------------------------------------------
 
-    additional_information = tailored_cv.get(
-        "additional_relevant_information",
-        [],
-    )
+    additional = [
+        _clean_text(item)
+        for item in tailored_cv.get(
+            "additional_relevant_information",
+            [],
+        )
+        if _clean_text(item)
+    ]
 
-    if additional_information:
+    if additional:
         story.append(
             Paragraph(
-                "Additional Relevant Information",
-                heading_style,
+                "ADDITIONAL INFORMATION",
+                section_style,
             )
         )
 
-        bullet_items = [
-            ListItem(
-                Paragraph(
-                    item,
-                    body_style,
-                )
-            )
-            for item in additional_information
-        ]
-
         story.append(
             ListFlowable(
-                bullet_items,
+                [
+                    ListItem(
+                        Paragraph(
+                            pdf_text(item),
+                            body_style,
+                        ),
+                        leftIndent=8,
+                    )
+                    for item in additional
+                ],
                 bulletType="bullet",
-                leftIndent=14,
+                leftIndent=13,
+                bulletFontSize=6,
             )
         )
 
     document.build(story)
 
-    return buffer.getvalue()
+    data = buffer.getvalue()
 
+    if not data.startswith(b"%PDF-"):
+        raise ValueError(
+            "Generated PDF is invalid."
+        )
+
+    return data
