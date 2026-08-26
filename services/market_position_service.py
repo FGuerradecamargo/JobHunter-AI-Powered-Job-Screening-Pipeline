@@ -155,11 +155,9 @@ def _aggregate(
         "sample_size": len(signals),
         "competitive_sample_size": competitive_jobs,
         "near_market_sample_size": near_market_jobs,
-
         "recommendations": dict(
             recommendation_counter
         ),
-
         "average_fit": (
             round(
                 sum(fit_scores)
@@ -169,22 +167,18 @@ def _aggregate(
             if fit_scores
             else None
         ),
-
         "role_families": _top_signals(
             competitive_roles,
             limit=5,
         ),
-
         "best_match_blockers": _top_signals(
             near_market_blockers,
             limit=7,
         ),
-
         "market_strengths": _top_signals(
             competitive_strengths,
             limit=7,
         ),
-
         "what_would_raise_fit": _top_signals(
             near_market_raise_fit,
             limit=7,
