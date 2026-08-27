@@ -1,8 +1,7 @@
-﻿from collections import Counter
-
-from models.career_development_context import (
+﻿from models.career_development_context import (
     CareerDevelopmentContext,
 )
+
 from services.career_objective_repository import (
     CareerObjectiveRepository,
 )
@@ -12,55 +11,10 @@ from services.career_update_repository import (
 from services.database import (
     count_candidate_jobs_by_status,
     list_candidate_application_outcomes,
-    list_candidate_jobs,
 )
-
-
-def _normalize_items(
-    items: list[str],
-) -> list[str]:
-    normalized = []
-
-    for item in items:
-        value = str(item).strip()
-
-        if value:
-            normalized.append(value)
-
-    return normalized
-
-
-def _rank_recurring(
-    values: list[str],
-) -> list[dict]:
-    counter = Counter(
-        value.casefold()
-        for value in values
-        if value.strip()
-    )
-
-    canonical = {}
-
-    for value in values:
-        clean = value.strip()
-
-        if clean:
-            canonical.setdefault(
-                clean.casefold(),
-                clean,
-            )
-
-    ranked = []
-
-    for normalized, count in counter.most_common():
-        ranked.append(
-            {
-                "text": canonical[normalized],
-                "count": count,
-            }
-        )
-
-    return ranked
+from services.market_position_service import (
+    build_market_position,
+)
 
 
 def build_career_development_context(
@@ -92,61 +46,17 @@ def build_career_development_context(
         )
     )
 
-    analysis_statuses = [
-        "in_review",
-        "applied",
-        "rejected_before_interview",
-        "in_process",
-        "rejected_after_interview",
-        "offer",
-    ]
+    market_position = build_market_position(
+        candidate_id=candidate_id,
+        batch_signals=[],
+    )
 
-    analyzed_jobs = []
-
-    for status in analysis_statuses:
-        analyzed_jobs.extend(
-            list_candidate_jobs(
-                candidate_id=candidate_id,
-                status=status,
-            )
-        )
-
-    development_gaps = []
-    structural_gaps = []
-    requirements_met = []
-
-    for job in analyzed_jobs:
-        analysis = job.get(
-            "analysis",
+    historical_market = (
+        market_position.get(
+            "historical",
             {},
         )
-
-        development_gaps.extend(
-            _normalize_items(
-                analysis.get(
-                    "development_gaps",
-                    [],
-                )
-            )
-        )
-
-        structural_gaps.extend(
-            _normalize_items(
-                analysis.get(
-                    "structural_gaps",
-                    [],
-                )
-            )
-        )
-
-        requirements_met.extend(
-            _normalize_items(
-                analysis.get(
-                    "requirements_met",
-                    [],
-                )
-            )
-        )
+    )
 
     outcomes = (
         list_candidate_application_outcomes(
@@ -178,8 +88,11 @@ def build_career_development_context(
             for update in career_updates
         ],
 
-        analyzed_jobs_count=len(
-            analyzed_jobs
+        analyzed_jobs_count=(
+            historical_market.get(
+                "sample_size",
+                0,
+            )
         ),
 
         applied_jobs_count=statuses.get(
@@ -211,21 +124,31 @@ def build_career_development_context(
             0,
         ),
 
-        recurring_development_gaps=(
-            _rank_recurring(
-                development_gaps
+        market_role_families=(
+            historical_market.get(
+                "role_families",
+                [],
             )
         ),
 
-        recurring_structural_gaps=(
-            _rank_recurring(
-                structural_gaps
+        market_strengths=(
+            historical_market.get(
+                "market_strengths",
+                [],
             )
         ),
 
-        recurring_requirements_met=(
-            _rank_recurring(
-                requirements_met
+        market_blockers=(
+            historical_market.get(
+                "best_match_blockers",
+                [],
+            )
+        ),
+
+        market_fit_opportunities=(
+            historical_market.get(
+                "what_would_raise_fit",
+                [],
             )
         ),
 

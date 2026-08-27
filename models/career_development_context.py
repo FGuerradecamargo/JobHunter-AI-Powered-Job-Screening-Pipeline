@@ -19,15 +19,17 @@ class CareerDevelopmentContext:
     rejected_after_interview_count: int = 0
     offers_count: int = 0
 
-    recurring_development_gaps: list[dict] = field(
+    # Historical Market Position signals
+    market_role_families: list[dict] = field(
         default_factory=list
     )
-
-    recurring_structural_gaps: list[dict] = field(
+    market_strengths: list[dict] = field(
         default_factory=list
     )
-
-    recurring_requirements_met: list[dict] = field(
+    market_blockers: list[dict] = field(
+        default_factory=list
+    )
+    market_fit_opportunities: list[dict] = field(
         default_factory=list
     )
 

@@ -17,7 +17,7 @@ from services.database import (
 
 
 CAREER_DEVELOPMENT_VERSION = (
-    "career-development-v1"
+    "career-development-v2"
 )
 
 

@@ -1,25 +1,32 @@
-import logging
+﻿import logging
+
 import streamlit as st
 from openai import RateLimitError
 
 from services.career_development_manager import (
     get_or_generate_career_development,
 )
-logger = logging.getLogger(__name__)
-
 from services.session_auth import (
     require_login,
     render_logout_button,
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 st.set_page_config(
-    page_title="Improvement",
+    page_title="Career Development",
     page_icon="📈",
     layout="wide",
 )
 
-st.title("Career Improvement")
+st.title("Career Development")
+
+st.caption(
+    "A practical look at where you are and what may be worth "
+    "focusing on next."
+)
 
 current_user = require_login()
 render_logout_button()
@@ -33,25 +40,17 @@ if not candidate_id:
     st.stop()
 
 
-def render_list(
-    title: str,
-    items: list[str],
-) -> None:
-    st.subheader(title)
-
-    if not items:
-        st.caption(
-            "Not enough information yet."
-        )
-        return
-
-    for item in items:
-        st.write(f"- {item}")
+def clean_items(items) -> list[str]:
+    return [
+        str(item).strip()
+        for item in (items or [])
+        if str(item).strip()
+    ]
 
 
 try:
     with st.spinner(
-        "Analyzing your career development priorities..."
+        "Looking at your career direction and recent market signals..."
     ):
         recommendation = (
             get_or_generate_career_development(
@@ -59,61 +58,71 @@ try:
             )
         )
 
-except RateLimitError as error:
+except RateLimitError:
     logger.exception(
-        "OpenAI quota unavailable for career improvement."
-    )
-
-    error_code = getattr(
-        getattr(error, "body", None),
-        "code",
-        None,
+        "OpenAI quota unavailable for career development."
     )
 
     st.warning(
-        "Career Improvement could not be generated because "
-        "the AI service currently has no available API credit."
-    )
-
-    st.caption(
-        "Your career data is safe. No recommendation was saved, "
-        "and you can try again after API credit is available."
+        "I couldn't update your career development view "
+        "right now because the AI service is temporarily unavailable."
     )
 
     st.stop()
 
 except Exception:
     logger.exception(
-        "Could not generate career improvement analysis."
+        "Could not generate career development analysis."
     )
 
     st.error(
-        "Could not generate your career improvement analysis. "
-        "Please try again later."
+        "I couldn't update your career development view "
+        "right now. Please try again later."
     )
 
     st.stop()
 
 
-current_position = recommendation.get(
-    "current_position",
-    "",
+# =========================================================
+# WHERE YOU ARE NOW
+# =========================================================
+
+current_position = str(
+    recommendation.get(
+        "current_position",
+        "",
+    )
+).strip()
+
+strengths = clean_items(
+    recommendation.get(
+        "strengths_to_leverage",
+        [],
+    )
 )
+
+market_patterns = clean_items(
+    recommendation.get(
+        "market_patterns",
+        [],
+    )
+)
+
+st.subheader("Where you are now")
 
 if current_position:
-    st.subheader("Where you are now")
     st.write(current_position)
 
+for item in strengths:
+    st.write(item)
 
-confidence = recommendation.get(
-    "data_confidence",
-    "low",
-)
+for item in market_patterns:
+    st.write(item)
 
-st.caption(
-    f"Analysis confidence: {confidence.title()}"
-)
 
+# =========================================================
+# WHAT TO FOCUS ON
+# =========================================================
 
 priorities = [
     priority
@@ -128,101 +137,121 @@ priorities = [
     )
 ]
 
-st.divider()
-st.header("Development Priorities")
+st.subheader("What I’d focus on next")
 
 if not priorities:
     st.info(
-        "Not enough data to identify clear "
-        "development priorities yet."
+        "There isn't enough consistent market evidence yet "
+        "to recommend a clear development priority."
     )
 
-for index, priority in enumerate(
-    priorities,
-    start=1,
-):
-    area = priority.get(
-        "area",
-        "Development area",
-    )
+for priority in priorities:
+    area = str(
+        priority.get(
+            "area",
+            "",
+        )
+    ).strip()
 
-    level = priority.get(
-        "priority",
-        "medium",
-    )
-
-    with st.expander(
-        f"{index}. {area} [{level.upper()}]",
-        expanded=index == 1,
-    ):
-        why = priority.get(
+    why = str(
+        priority.get(
             "why_it_matters",
             "",
         )
+    ).strip()
 
-        if why:
-            st.markdown(
-                "**Why it matters**"
-            )
-            st.write(why)
-
-        evidence = priority.get(
-            "evidence",
-            [],
-        )
-
-        if evidence:
-            st.markdown(
-                "**Evidence behind this priority**"
-            )
-
-            for item in evidence:
-                st.write(
-                    f"- {item}"
-                )
-
-        action = priority.get(
+    action = str(
+        priority.get(
             "suggested_action",
             "",
         )
+    ).strip()
 
-        if action:
-            st.markdown(
-                "**Next action**"
-            )
-            st.write(action)
+    st.markdown(
+        f"#### {area}"
+    )
+
+    if why:
+        st.write(why)
+
+    if action:
+        st.markdown(
+            f"**What I’d do:** {action}"
+        )
 
 
-st.divider()
+# =========================================================
+# APPLICATION SIGNAL
+# =========================================================
 
-render_list(
-    "Strengths to leverage",
-    recommendation.get(
-        "strengths_to_leverage",
-        [],
-    ),
-)
-
-render_list(
-    "Patterns in opportunities",
-    recommendation.get(
-        "market_patterns",
-        [],
-    ),
-)
-
-render_list(
-    "Patterns in applications",
+application_patterns = clean_items(
     recommendation.get(
         "application_patterns",
         [],
-    ),
+    )
 )
 
-render_list(
-    "Next best moves",
+if application_patterns:
+    st.markdown("#### One more thing")
+
+    for item in application_patterns:
+        st.write(item)
+
+
+# =========================================================
+# NEXT MOVES
+# =========================================================
+
+next_moves = clean_items(
     recommendation.get(
         "next_best_moves",
         [],
+    )
+)
+
+if next_moves:
+    st.subheader("Your next moves")
+
+    for index, move in enumerate(
+        next_moves,
+        start=1,
+    ):
+        st.markdown(
+            f"**{index}.** {move}"
+        )
+
+
+# =========================================================
+# QUIET CONFIDENCE NOTE
+# =========================================================
+
+confidence = str(
+    recommendation.get(
+        "data_confidence",
+        "low",
+    )
+).strip().lower()
+
+confidence_messages = {
+    "high": (
+        "This guidance is based on a strong recurring pattern "
+        "in your market and career data."
     ),
+    "medium": (
+        "There is a useful pattern forming here, although it may "
+        "change as we collect more market and application data."
+    ),
+    "low": (
+        "This is still an early reading and should become more "
+        "useful as more market and application data comes in."
+    ),
+}
+
+st.divider()
+
+st.caption(
+    confidence_messages.get(
+        confidence,
+        confidence_messages["low"],
+    )
 )
