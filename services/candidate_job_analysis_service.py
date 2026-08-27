@@ -482,17 +482,12 @@ class CandidateJobAnalysisService:
             "selected": len(pending_rows),
             "analyzed": 0,
             "hard_rejected": 0,
-            "matcher_rejected": 0,
-            "matcher_review": 0,
             "ai_analyses_created": 0,
             "ai_approved": 0,
             "ai_rejected": 0,
             "best_match": 0,
             "potential": 0,
             "good_opportunity": 0,
-
-            # temporary compatibility with old UI
-            "tradeoff": 0,
 
             "descriptions_reused": 0,
             "descriptions_fetched": 0,
@@ -762,9 +757,6 @@ class CandidateJobAnalysisService:
                         result[
                             "good_opportunity"
                         ] += 1
-
-                        # old UI compatibility
-                        result["tradeoff"] += 1
 
                         result["ai_approved"] += 1
 

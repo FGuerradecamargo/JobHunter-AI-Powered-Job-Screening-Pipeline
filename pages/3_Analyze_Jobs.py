@@ -369,13 +369,10 @@ if st.button(
             "selected": 0,
             "analyzed": 0,
             "hard_rejected": 0,
-            "matcher_rejected": 0,
-            "matcher_review": 0,
             "ai_analyses_created": 0,
             "ai_approved": 0,
             "ai_rejected": 0,
             "best_match": 0,
-            "tradeoff": 0,
             "failed": 0,
             "errors": [],
         }
@@ -438,7 +435,7 @@ if scan_result:
     )
 
     col2.metric(
-        "Good Opportunities",
+        "Competitive",
         scan_result.get(
             "good_opportunity",
             0,
@@ -461,19 +458,9 @@ if scan_result:
         ),
     )
 
-    detail_col1, detail_col2, detail_col3 = (
-        st.columns(3)
-    )
+    detail_col1, detail_col2 = st.columns(2)
 
     detail_col1.metric(
-        "Matcher Rejected",
-        scan_result.get(
-            "matcher_rejected",
-            0,
-        ),
-    )
-
-    detail_col2.metric(
         "Hard Rejected",
         scan_result.get(
             "hard_rejected",
@@ -481,7 +468,7 @@ if scan_result:
         ),
     )
 
-    detail_col3.metric(
+    detail_col2.metric(
         "AI Rejected",
         scan_result.get(
             "ai_rejected",
@@ -772,6 +759,15 @@ for job in review_jobs:
         good_opportunities.append(job)
 
 
+def clean_display_bullet(value: str) -> str:
+    text = str(value or "").strip()
+
+    while text.startswith(("-", "*", "?")):
+        text = text[1:].strip()
+
+    return text
+
+
 def build_cv_filename(
     candidate_name: str,
     company: str,
@@ -910,9 +906,14 @@ def render_tailored_cv(
                     "tailored_bullets",
                     [],
                 ):
-                    st.write(
-                        f"- {bullet}"
+                    clean_bullet = clean_display_bullet(
+                        bullet
                     )
+
+                    if clean_bullet:
+                        st.markdown(
+                            f"- {clean_bullet}"
+                        )
 
         additional_information = (
             tailored_cv.get(
@@ -927,9 +928,14 @@ def render_tailored_cv(
             )
 
             for item in additional_information:
-                st.write(
-                    f"- {item}"
+                clean_item = clean_display_bullet(
+                    item
                 )
+
+                if clean_item:
+                    st.markdown(
+                        f"- {clean_item}"
+                    )
 
         docx_data = render_tailored_cv_docx(
             candidate_name=candidate_name,
@@ -1128,12 +1134,12 @@ if (
             render_job(job)
 
     with st.expander(
-        "Good Opportunities "
+        "Competitive "
         f"({len(good_opportunities)})"
     ):
         if not good_opportunities:
             st.info(
-                "No good opportunities found."
+                "No competitive opportunities found."
             )
 
         for job in good_opportunities:
