@@ -1,4 +1,4 @@
-﻿from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import time
@@ -52,6 +52,8 @@ from services.recommenders.recommendation_engine import (
     RecommendationEngine,
 )
 
+
+from services.ai_usage_budget import AIUsageBudget
 
 ANALYSIS_VERSION = "candidate-job-analysis-v15"
 REQUEST_DELAY_SECONDS = 2
@@ -433,6 +435,8 @@ class CandidateJobAnalysisService:
         self,
         candidate_id: str,
         limit: int = 5,
+        target_opportunities: int | None = None,
+        ai_budget: AIUsageBudget | None = None,
     ) -> dict[str, Any]:
         candidate = self.candidate_repository.get(
             candidate_id
@@ -482,6 +486,7 @@ class CandidateJobAnalysisService:
             "selected": len(pending_rows),
             "analyzed": 0,
             "hard_rejected": 0,
+            "ai_eligible": 0,
             "ai_analyses_created": 0,
             "ai_approved": 0,
             "ai_rejected": 0,
@@ -489,13 +494,17 @@ class CandidateJobAnalysisService:
             "potential": 0,
             "good_opportunity": 0,
 
+            "opportunities_found": 0,
+            "target_reached": False,
+            "usage_limit_reached": False,
+            "provider_quota_exhausted": False,
+
             "descriptions_reused": 0,
             "descriptions_fetched": 0,
             "descriptions_failed": 0,
             "failed": 0,
             "errors": [],
 
-            # Market Position ? current execution only
             "batch_market_signals": [],
             "batch_ai_job_ids": [],
         }
@@ -650,13 +659,20 @@ class CandidateJobAnalysisService:
                     }
                 )
 
-        # =============================================
-        # PHASE 2
-        # AI candidate comparison
-        # =============================================
+        result["ai_eligible"] = len(
+            ai_queue
+        )
 
         if not ai_queue:
             return result
+
+        # =============================================
+        # PHASE 2
+        # Candidate-specific AI comparison
+        #
+        # Run in small waves so we do not spend AI calls
+        # after the requested opportunity target is met.
+        # =============================================
 
         def analyze_with_ai(
             item: dict[str, Any],
@@ -674,160 +690,285 @@ class CandidateJobAnalysisService:
 
             return item, ai_analysis
 
-        quota_exhausted = False
+        queue_index = 0
+        opportunities_found = 0
 
-        with ThreadPoolExecutor(
-            max_workers=4
-        ) as executor:
-            futures = {
-                executor.submit(
-                    analyze_with_ai,
-                    item,
-                ): item
-                for item in ai_queue
-            }
+        while queue_index < len(ai_queue):
+            if (
+                target_opportunities is not None
+                and opportunities_found
+                >= target_opportunities
+            ):
+                break
 
-            for future in as_completed(futures):
-                item = futures[future]
-                job = item["job"]
+            if (
+                ai_budget is not None
+                and ai_budget.exhausted
+            ):
+                result[
+                    "usage_limit_reached"
+                ] = True
 
-                try:
-                    _, ai_analysis = (
-                        future.result()
-                    )
+                break
 
-                    analysis = asdict(
-                        ai_analysis
-                    )
+            remaining_jobs = (
+                len(ai_queue)
+                - queue_index
+            )
 
-                    bucket = analysis.get(
-                        "recommendation",
-                        "reject",
-                    )
+            wave_size = min(
+                4,
+                remaining_jobs,
+            )
 
-                    if bucket not in {
-                        "best_match",
-                        "potential",
-                        "good_opportunity",
-                        "reject",
-                    }:
-                        bucket = "reject"
+            if target_opportunities is not None:
+                remaining_target = max(
+                    1,
+                    target_opportunities
+                    - opportunities_found,
+                )
 
-                    analysis["bucket"] = bucket
+                wave_size = min(
+                    wave_size,
+                    remaining_target,
+                )
 
-                    market_signal = analysis.get(
-                        "market_signal"
-                    )
+            if (
+                ai_budget is not None
+                and ai_budget.remaining is not None
+            ):
+                wave_size = min(
+                    wave_size,
+                    ai_budget.remaining,
+                )
 
-                    if market_signal:
+            if wave_size <= 0:
+                result[
+                    "usage_limit_reached"
+                ] = True
+
+                break
+
+            wave = ai_queue[
+                queue_index:
+                queue_index + wave_size
+            ]
+
+            queue_index += wave_size
+
+            provider_quota_exhausted = False
+
+            with ThreadPoolExecutor(
+                max_workers=wave_size
+            ) as executor:
+                futures = {
+                    executor.submit(
+                        analyze_with_ai,
+                        item,
+                    ): item
+                    for item in wave
+                }
+
+                for future in as_completed(futures):
+                    item = futures[future]
+                    job = item["job"]
+
+                    try:
+                        _, ai_analysis = (
+                            future.result()
+                        )
+
+                        # The AI call happened. Count it even
+                        # if persistence later fails.
+                        if ai_budget is not None:
+                            ai_budget.consume()
+
+                        analysis = asdict(
+                            ai_analysis
+                        )
+
+                        bucket = analysis.get(
+                            "recommendation",
+                            "reject",
+                        )
+
+                        if bucket not in {
+                            "best_match",
+                            "potential",
+                            "good_opportunity",
+                            "reject",
+                        }:
+                            bucket = "reject"
+
+                        analysis["bucket"] = bucket
+
+                        market_signal = analysis.get(
+                            "market_signal"
+                        )
+
+                        if market_signal:
+                            result[
+                                "batch_market_signals"
+                            ].append(
+                                {
+                                    "job_id": job.id,
+                                    "recommendation": bucket,
+                                    "current_fit": (
+                                        analysis.get(
+                                            "current_fit",
+                                            0,
+                                        )
+                                    ),
+                                    "market_signal": (
+                                        market_signal
+                                    ),
+                                }
+                            )
+
                         result[
-                            "batch_market_signals"
-                        ].append(
+                            "batch_ai_job_ids"
+                        ].append(job.id)
+
+                        result[
+                            "ai_analyses_created"
+                        ] += 1
+
+                        if bucket == "best_match":
+                            analysis_status = (
+                                "in_review"
+                            )
+
+                            result[
+                                "best_match"
+                            ] += 1
+
+                            result[
+                                "ai_approved"
+                            ] += 1
+
+                            opportunities_found += 1
+
+                        elif bucket == "potential":
+                            analysis_status = (
+                                "in_review"
+                            )
+
+                            result[
+                                "potential"
+                            ] += 1
+
+                            result[
+                                "ai_approved"
+                            ] += 1
+
+                            opportunities_found += 1
+
+                        elif bucket == "good_opportunity":
+                            analysis_status = (
+                                "in_review"
+                            )
+
+                            result[
+                                "good_opportunity"
+                            ] += 1
+
+                            result[
+                                "ai_approved"
+                            ] += 1
+
+                            opportunities_found += 1
+
+                        else:
+                            analysis_status = (
+                                "system_rejected"
+                            )
+
+                            analysis[
+                                "tailored_cv"
+                            ] = None
+
+                            analysis[
+                                "interview_prep"
+                            ] = None
+
+                            result[
+                                "ai_rejected"
+                            ] += 1
+
+                        save_candidate_job_analysis(
+                            candidate_id=candidate_id,
+                            job_id=job.id,
+                            analysis=analysis,
+                            job_signature=(
+                                build_job_signature(job)
+                            ),
+                            candidate_signature=(
+                                candidate_signature
+                            ),
+                            analysis_version=(
+                                ANALYSIS_VERSION
+                            ),
+                            status=analysis_status,
+                        )
+
+                        result[
+                            "analyzed"
+                        ] += 1
+
+                    except RateLimitError:
+                        result["failed"] += 1
+
+                        result[
+                            "provider_quota_exhausted"
+                        ] = True
+
+                        result["errors"].append(
                             {
                                 "job_id": job.id,
-                                "recommendation": bucket,
-                                "current_fit": analysis.get(
-                                    "current_fit",
-                                    0,
+                                "title": job.title,
+                                "error": (
+                                    "OpenAI API quota "
+                                    "unavailable."
                                 ),
-                                "market_signal": market_signal,
                             }
                         )
 
-                    result[
-                        "batch_ai_job_ids"
-                    ].append(job.id)
+                        provider_quota_exhausted = True
 
-                    result[
-                        "ai_analyses_created"
-                    ] += 1
+                    except Exception as error:
+                        result["failed"] += 1
 
-                    if bucket == "best_match":
-                        analysis_status = "in_review"
-                        result["best_match"] += 1
-                        result["ai_approved"] += 1
-
-                    elif bucket == "potential":
-                        analysis_status = "in_review"
-                        result["potential"] += 1
-                        result["ai_approved"] += 1
-
-                    elif bucket == "good_opportunity":
-                        analysis_status = "in_review"
-                        result[
-                            "good_opportunity"
-                        ] += 1
-
-                        result["ai_approved"] += 1
-
-                    else:
-                        analysis_status = (
-                            "system_rejected"
+                        result["errors"].append(
+                            {
+                                "job_id": job.id,
+                                "title": job.title,
+                                "error": str(error),
+                            }
                         )
 
-                        analysis[
-                            "tailored_cv"
-                        ] = None
+            if provider_quota_exhausted:
+                break
 
-                        analysis[
-                            "interview_prep"
-                        ] = None
+        result[
+            "opportunities_found"
+        ] = result["ai_approved"]
 
-                        result["ai_rejected"] += 1
+        if target_opportunities is not None:
+            result[
+                "target_reached"
+            ] = (
+                result["opportunities_found"]
+                >= target_opportunities
+            )
 
-                    save_candidate_job_analysis(
-                        candidate_id=candidate_id,
-                        job_id=job.id,
-                        analysis=analysis,
-                        job_signature=(
-                            build_job_signature(job)
-                        ),
-                        candidate_signature=(
-                            candidate_signature
-                        ),
-                        analysis_version=(
-                            ANALYSIS_VERSION
-                        ),
-                        status=analysis_status,
-                    )
-
-                    result["analyzed"] += 1
-
-                except RateLimitError:
-                    result["failed"] += 1
-
-                    result["errors"].append(
-                        {
-                            "job_id": job.id,
-                            "title": job.title,
-                            "error": (
-                                "OpenAI API quota "
-                                "unavailable."
-                            ),
-                        }
-                    )
-
-                    quota_exhausted = True
-
-                    for pending in futures:
-                        if not pending.done():
-                            pending.cancel()
-
-                    break
-
-                except Exception as error:
-                    result["failed"] += 1
-
-                    result["errors"].append(
-                        {
-                            "job_id": job.id,
-                            "title": job.title,
-                            "error": str(error),
-                        }
-                    )
-
-        if quota_exhausted:
-            return result
+        if (
+            ai_budget is not None
+            and ai_budget.exhausted
+            and not result["target_reached"]
+        ):
+            result[
+                "usage_limit_reached"
+            ] = True
 
         return result
 

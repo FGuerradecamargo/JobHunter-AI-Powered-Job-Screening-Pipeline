@@ -1,25 +1,57 @@
-﻿import streamlit as st
+import streamlit as st
+
+
+def _normalize_list_items(
+    items,
+) -> list[str]:
+    if not items:
+        return []
+
+    if isinstance(items, str):
+        raw_items = items.splitlines()
+    elif isinstance(items, (list, tuple, set)):
+        raw_items = items
+    else:
+        raw_items = [items]
+
+    cleaned = []
+
+    for item in raw_items:
+        value = str(item or "").strip()
+
+        while value.startswith(
+            ("-", "*", "?")
+        ):
+            value = value[1:].strip()
+
+        if value:
+            cleaned.append(value)
+
+    return cleaned
 
 
 def _render_list(
     title: str,
-    items: list,
+    items,
 ) -> None:
     st.markdown(
         f"**{title}**"
     )
 
-    if not items:
+    clean_items = _normalize_list_items(
+        items
+    )
+
+    if not clean_items:
         st.caption(
             "Nothing significant identified."
         )
         return
 
-    for item in items:
-        if item:
-            st.markdown(
-                f"- {item}"
-            )
+    for item in clean_items:
+        st.markdown(
+            f"- {item}"
+        )
 
 
 def _render_text_section(

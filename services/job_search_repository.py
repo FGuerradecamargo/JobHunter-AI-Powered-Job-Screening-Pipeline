@@ -20,7 +20,7 @@ class JobSearchRepository:
             )
 
             category_filter = (
-                f"WHERE category IN ({placeholders})"
+                f"AND category IN ({placeholders})"
             )
 
             params.extend(categories)
@@ -38,6 +38,8 @@ class JobSearchRepository:
                 sub_category,
                 created_at
             FROM jobs
+
+            WHERE archived_at IS NULL
 
             {category_filter}
 
@@ -94,6 +96,7 @@ class JobSearchRepository:
 
             WHERE
                 job_sources.user_id = %s
+                AND jobs.archived_at IS NULL
 
                 {category_filter}
 
@@ -143,26 +146,30 @@ class JobSearchRepository:
                 AND candidate_job_analyses.candidate_id = %s
 
             WHERE
-                candidate_job_analyses.job_id IS NULL
+                jobs.archived_at IS NULL
 
-                OR (
-                    candidate_job_analyses.status IN (
-                        'in_review',
-                        'system_rejected'
-                    )
+                AND (
+                    candidate_job_analyses.job_id IS NULL
 
-                    AND (
-                        candidate_job_analyses.recommendation IS NULL
+                    OR (
+                        candidate_job_analyses.status IN (
+                            'in_review',
+                            'system_rejected'
+                        )
 
-                        OR COALESCE(
-                            candidate_job_analyses.analysis_version,
-                            ''
-                        ) != %s
+                        AND (
+                            candidate_job_analyses.recommendation IS NULL
 
-                        OR COALESCE(
-                            candidate_job_analyses.candidate_signature,
-                            ''
-                        ) != %s
+                            OR COALESCE(
+                                candidate_job_analyses.analysis_version,
+                                ''
+                            ) != %s
+
+                            OR COALESCE(
+                                candidate_job_analyses.candidate_signature,
+                                ''
+                            ) != %s
+                        )
                     )
                 )
 
@@ -181,4 +188,66 @@ class JobSearchRepository:
                     limit,
                 ),
             ).fetchall()
+
+
+    def count_jobs_to_analyze_for_candidate(
+        self,
+        candidate_id: str,
+        analysis_version: str,
+        candidate_signature: str,
+    ) -> int:
+        query = """
+            SELECT COUNT(*) AS total
+
+            FROM jobs
+
+            LEFT JOIN candidate_job_analyses
+                ON candidate_job_analyses.job_id = jobs.id
+                AND candidate_job_analyses.candidate_id = %s
+
+            WHERE
+                jobs.archived_at IS NULL
+
+                AND (
+                    candidate_job_analyses.job_id IS NULL
+
+                    OR (
+                        candidate_job_analyses.status IN (
+                            'in_review',
+                            'system_rejected'
+                        )
+
+                        AND (
+                            candidate_job_analyses.recommendation IS NULL
+
+                            OR COALESCE(
+                                candidate_job_analyses.analysis_version,
+                                ''
+                            ) != %s
+
+                            OR COALESCE(
+                                candidate_job_analyses.candidate_signature,
+                                ''
+                            ) != %s
+                        )
+                    )
+                )
+        """
+
+        with get_connection() as connection:
+            row = connection.execute(
+                query,
+                (
+                    candidate_id,
+                    analysis_version,
+                    candidate_signature,
+                ),
+            ).fetchone()
+
+        if not row:
+            return 0
+
+        return int(
+            row["total"]
+        )
 

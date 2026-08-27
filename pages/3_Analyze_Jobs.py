@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import os
 import hashlib
 from urllib.parse import urlparse
@@ -15,6 +15,8 @@ from services.job_search_repository import JobSearchRepository
 from services.job_source_repository import JobSourceRepository
 from services.session_auth import require_login, render_logout_button
 from services.candidate_repository import CandidateRepository
+from services.career_objective_repository import CareerObjectiveRepository
+from services.career_update_repository import CareerUpdateRepository
 from services.gmail_connection_repository import GmailConnectionRepository
 from services.gmail_message_repository import GmailMessageRepository
 from services.gmail_job_processor import GmailJobProcessor
@@ -31,6 +33,8 @@ from services.cv_renderer import (
 from services.market_position_service import (
     build_market_position,
 )
+
+from services.ai_usage_budget import AIUsageBudget
 
 from services.database import (
     ensure_candidate_job_analysis,
@@ -335,75 +339,349 @@ with st.expander(
 
 st.divider()
 
+career_objective = (
+    CareerObjectiveRepository()
+    .get_active(candidate_id)
+)
+
+career_updates = (
+    CareerUpdateRepository()
+    .list_for_candidate(candidate_id)
+)
+
 candidate_signature = build_candidate_signature(
-    candidate
+    candidate,
+    career_objective,
+    career_updates,
 )
 
 
-limit = st.selectbox(
-    "Maximum new jobs to analyze",
-    [
-        25,
-        50,
-        100,
-        200,
-    ],
-    index=1,
-)
+OPPORTUNITY_TARGETS = {
+    "Quick - 5 opportunities": 5,
+    "Standard - 10 opportunities": 10,
+    "Deep - 15 opportunities": 15,
+}
+
+INTERNAL_SCREENING_BATCH = 20
 
 
-if st.button(
-    "Find opportunities for me",
-    type="primary",
-    use_container_width=True,
-):
-    jobs = repository.list_jobs_to_analyze_for_candidate(
+def empty_scan_result() -> dict:
+    return {
+        "selected": 0,
+        "analyzed": 0,
+        "hard_rejected": 0,
+        "ai_eligible": 0,
+        "ai_analyses_created": 0,
+        "ai_approved": 0,
+        "ai_rejected": 0,
+        "best_match": 0,
+        "potential": 0,
+        "good_opportunity": 0,
+        "opportunities_found": 0,
+        "target_reached": False,
+        "usage_limit_reached": False,
+        "provider_quota_exhausted": False,
+        "descriptions_reused": 0,
+        "descriptions_fetched": 0,
+        "descriptions_failed": 0,
+        "failed": 0,
+        "errors": [],
+        "batch_market_signals": [],
+        "batch_ai_job_ids": [],
+    }
+
+
+def merge_scan_result(
+    total: dict,
+    batch: dict,
+) -> None:
+    numeric_keys = (
+        "selected",
+        "analyzed",
+        "hard_rejected",
+        "ai_eligible",
+        "ai_analyses_created",
+        "ai_approved",
+        "ai_rejected",
+        "best_match",
+        "potential",
+        "good_opportunity",
+        "opportunities_found",
+        "descriptions_reused",
+        "descriptions_fetched",
+        "descriptions_failed",
+        "failed",
+    )
+
+    for key in numeric_keys:
+        total[key] = (
+            total.get(key, 0)
+            + batch.get(key, 0)
+        )
+
+    total["errors"].extend(
+        batch.get(
+            "errors",
+            [],
+        )
+    )
+
+    total["batch_market_signals"].extend(
+        batch.get(
+            "batch_market_signals",
+            [],
+        )
+    )
+
+    total["batch_ai_job_ids"].extend(
+        batch.get(
+            "batch_ai_job_ids",
+            [],
+        )
+    )
+
+    total["usage_limit_reached"] = (
+        total.get(
+            "usage_limit_reached",
+            False,
+        )
+        or batch.get(
+            "usage_limit_reached",
+            False,
+        )
+    )
+
+    total["provider_quota_exhausted"] = (
+        total.get(
+            "provider_quota_exhausted",
+            False,
+        )
+        or batch.get(
+            "provider_quota_exhausted",
+            False,
+        )
+    )
+
+
+if "scan_in_progress" not in st.session_state:
+    st.session_state["scan_in_progress"] = False
+
+if "scan_requested" not in st.session_state:
+    st.session_state["scan_requested"] = False
+
+
+def request_opportunity_scan() -> None:
+    st.session_state["scan_requested"] = True
+    st.session_state["scan_in_progress"] = True
+
+
+pool_available = (
+    repository
+    .count_jobs_to_analyze_for_candidate(
         candidate_id=candidate_id,
         analysis_version=ANALYSIS_VERSION,
         candidate_signature=candidate_signature,
-        limit=limit,
+    )
+)
+
+st.caption(
+    f"{pool_available} job(s) currently available to screen."
+)
+
+target_label = st.selectbox(
+    "How many opportunities would you like me to find?",
+    list(
+        OPPORTUNITY_TARGETS.keys()
+    ),
+    index=1,
+    disabled=st.session_state[
+        "scan_in_progress"
+    ],
+)
+
+target_opportunities = (
+    OPPORTUNITY_TARGETS[
+        target_label
+    ]
+)
+
+
+st.button(
+    (
+        "Searching for opportunities..."
+        if st.session_state["scan_in_progress"]
+        else "Find opportunities for me"
+    ),
+    type="primary",
+    use_container_width=True,
+    disabled=st.session_state[
+        "scan_in_progress"
+    ],
+    on_click=request_opportunity_scan,
+)
+
+
+if st.session_state["scan_in_progress"]:
+    st.info(
+        "I'm working through the available jobs now. "
+        "This can take a few minutes, especially when there are "
+        "many roles to screen. Please keep this page open and "
+        "don't refresh it while the search is running. "
+        "If you fancy one, this is a good time to grab a coffee "
+        "or a cup of tea - I'll keep working here."
     )
 
-    if not jobs:
-        st.session_state["last_scan_result"] = {
-            "selected": 0,
-            "analyzed": 0,
-            "hard_rejected": 0,
-            "ai_analyses_created": 0,
-            "ai_approved": 0,
-            "ai_rejected": 0,
-            "best_match": 0,
-            "failed": 0,
-            "errors": [],
-        }
 
-        st.session_state["last_scan_total"] = 0
-        st.session_state["last_links_created"] = 0
+if st.session_state.pop(
+    "scan_requested",
+    False,
+):
+    aggregate = empty_scan_result()
 
-        st.rerun()
+    # Unlimited for now.
+    #
+    # Later this comes from the user's subscription
+    # allowance and/or extra analysis credits.
+    ai_budget = (
+        AIUsageBudget.unlimited()
+    )
 
     links_created = 0
 
-    for job in jobs:
-        created = ensure_candidate_job_analysis(
-            candidate_id=candidate_id,
-            job_id=job["id"],
+    try:
+        while (
+            aggregate["opportunities_found"]
+            < target_opportunities
+        ):
+            jobs = (
+                repository
+                .list_jobs_to_analyze_for_candidate(
+                    candidate_id=candidate_id,
+                    analysis_version=ANALYSIS_VERSION,
+                    candidate_signature=candidate_signature,
+                    limit=INTERNAL_SCREENING_BATCH,
+                )
+            )
+
+            if not jobs:
+                break
+
+            for job in jobs:
+                created = (
+                    ensure_candidate_job_analysis(
+                        candidate_id=candidate_id,
+                        job_id=job["id"],
+                    )
+                )
+
+                if created:
+                    links_created += 1
+
+            remaining_target = (
+                target_opportunities
+                - aggregate[
+                    "opportunities_found"
+                ]
+            )
+
+            with st.spinner(
+                "Screening jobs and looking for "
+                "relevant opportunities..."
+            ):
+                batch_result = (
+                    analysis_service.analyze_pending(
+                        candidate_id=candidate_id,
+                        limit=len(jobs),
+                        target_opportunities=(
+                            remaining_target
+                        ),
+                        ai_budget=ai_budget,
+                    )
+                )
+
+            merge_scan_result(
+                aggregate,
+                batch_result,
+            )
+
+            if (
+                batch_result.get(
+                    "usage_limit_reached",
+                    False,
+                )
+                or batch_result.get(
+                    "provider_quota_exhausted",
+                    False,
+                )
+            ):
+                break
+
+            # Avoid an endless loop if nothing in the
+            # selected batch can be persisted/analyzed.
+            if (
+                batch_result.get(
+                    "analyzed",
+                    0,
+                ) == 0
+            ):
+                break
+
+        aggregate[
+            "opportunities_found"
+        ] = aggregate[
+            "ai_approved"
+        ]
+
+        aggregate[
+            "target_reached"
+        ] = (
+            aggregate[
+                "opportunities_found"
+            ]
+            >= target_opportunities
         )
 
-        if created:
-            links_created += 1
-
-    with st.spinner(
-        "Analyzing new opportunities from the global pool..."
-    ):
-        result = analysis_service.analyze_pending(
-            candidate_id=candidate_id,
-            limit=len(jobs),
+        pool_remaining = (
+            repository
+            .count_jobs_to_analyze_for_candidate(
+                candidate_id=candidate_id,
+                analysis_version=ANALYSIS_VERSION,
+                candidate_signature=candidate_signature,
+            )
         )
 
-    st.session_state["last_scan_result"] = result
-    st.session_state["last_scan_total"] = len(jobs)
-    st.session_state["last_links_created"] = links_created
+        st.session_state[
+            "last_scan_result"
+        ] = aggregate
+
+        st.session_state[
+            "last_scan_total"
+        ] = aggregate[
+            "selected"
+        ]
+
+        st.session_state[
+            "last_links_created"
+        ] = links_created
+
+        st.session_state[
+            "last_scan_target"
+        ] = target_opportunities
+
+        st.session_state[
+            "last_pool_remaining"
+        ] = pool_remaining
+
+    except Exception:
+        st.session_state[
+            "scan_in_progress"
+        ] = False
+
+        raise
+
+    st.session_state[
+        "scan_in_progress"
+    ] = False
 
     st.rerun()
 
@@ -420,8 +698,58 @@ if scan_result:
         0,
     )
 
+    target_requested = st.session_state.get(
+        "last_scan_target",
+        0,
+    )
+
+    pool_remaining = st.session_state.get(
+        "last_pool_remaining",
+        0,
+    )
+
+    opportunities_found = scan_result.get(
+        "ai_approved",
+        0,
+    )
+
+    hard_rejected = scan_result.get(
+        "hard_rejected",
+        0,
+    )
+
+    ai_analyzed = scan_result.get(
+        "ai_analyses_created",
+        0,
+    )
+
+    if (
+        target_requested
+        and opportunities_found >= target_requested
+    ):
+        st.success(
+            f"I found {opportunities_found} relevant opportunities "
+            f"for you after reviewing {total_scanned} jobs."
+        )
+
+    elif pool_remaining == 0:
+        st.info(
+            f"I found {opportunities_found} relevant opportunities. "
+            "I've now worked through everything currently available "
+            "in the pool."
+        )
+
+    else:
+        st.info(
+            f"I found {opportunities_found} relevant opportunities "
+            f"so far after reviewing {total_scanned} jobs."
+        )
+
     st.caption(
-        f"{total_scanned} jobs scanned."
+        f"Of those, {hard_rejected} were ruled out before the "
+        f"candidate-specific AI comparison, while {ai_analyzed} "
+        f"needed a deeper analysis. "
+        f"There are {pool_remaining} jobs left to screen."
     )
 
     col1, col2, col3, col4 = st.columns(4)
@@ -513,9 +841,6 @@ if scan_result:
         {},
     )
 
-    st.divider()
-    st.subheader("Market Position")
-
     current_sample = current_market.get(
         "sample_size",
         0,
@@ -524,11 +849,6 @@ if scan_result:
     historical_sample = historical_market.get(
         "sample_size",
         0,
-    )
-
-    st.caption(
-        f"Current batch: {current_sample} AI-analyzed jobs "
-        f"? Historical signal: {historical_sample} jobs"
     )
 
     current_role_families = current_market.get(
@@ -541,31 +861,6 @@ if scan_result:
         [],
     )
 
-    if current_role_families:
-        strongest_current = current_role_families[0][
-            "label"
-        ]
-
-        st.markdown(
-            "### Current Market Position"
-        )
-
-        st.write(
-            "Your strongest current market appears to be:"
-        )
-
-        st.markdown(
-            f"**{strongest_current}**"
-        )
-
-    # -----------------------------------------------------
-    # Why no Best Matches
-    # -----------------------------------------------------
-
-    st.markdown(
-        "### Why aren't I seeing Best Matches?"
-    )
-
     current_blockers = current_market.get(
         "best_match_blockers",
         [],
@@ -576,111 +871,9 @@ if scan_result:
         [],
     )
 
-    st.markdown("**Current Batch**")
-
-    if current_blockers:
-        for item in current_blockers[:5]:
-            st.write(
-                f"- {item['label']} "
-                f"({item['count']} signal(s))"
-            )
-    else:
-        st.write(
-            "Not enough current-batch evidence yet."
-        )
-
-    st.markdown("**Long-term Signal**")
-
-    if historical_blockers:
-        for item in historical_blockers[:5]:
-            st.write(
-                f"- {item['label']} "
-                f"({item['count']} signal(s))"
-            )
-    else:
-        st.write(
-            "Historical market evidence is still building."
-        )
-
-    # -----------------------------------------------------
-    # Why no interviews
-    # -----------------------------------------------------
-
-    st.markdown(
-        "### Why am I not getting interviews?"
-    )
-
-    if current_blockers:
-        top_labels = [
-            item["label"]
-            for item in current_blockers[:3]
-        ]
-
-        st.write(
-            "In the current batch, the strongest "
-            "pre-interview competitiveness signals are:"
-        )
-
-        for label in top_labels:
-            st.write(f"- {label}")
-    else:
-        st.write(
-            "There is not enough current evidence "
-            "to identify a consistent pre-interview pattern."
-        )
-
-    if historical_blockers:
-        st.write(
-            "Across the historical signal, the most "
-            "persistent blockers are:"
-        )
-
-        for item in historical_blockers[:3]:
-            st.write(
-                f"- {item['label']} "
-                f"({item['count']} signal(s))"
-            )
-
-    # -----------------------------------------------------
-    # Where competitive
-    # -----------------------------------------------------
-
-    st.markdown(
-        "### Where am I currently competitive?"
-    )
-
-    st.markdown("**Current Batch**")
-
-    if current_role_families:
-        for item in current_role_families[:5]:
-            st.write(
-                f"- {item['label']} "
-                f"({item['count']} signal(s))"
-            )
-    else:
-        st.write(
-            "No clear current role-family signal yet."
-        )
-
-    st.markdown("**Long-term Signal**")
-
-    if historical_role_families:
-        for item in historical_role_families[:5]:
-            st.write(
-                f"- {item['label']} "
-                f"({item['count']} signal(s))"
-            )
-    else:
-        st.write(
-            "Historical role-family signal is still building."
-        )
-
-    # -----------------------------------------------------
-    # Recurring gaps
-    # -----------------------------------------------------
-
-    st.markdown(
-        "### Main recurring gaps"
+    current_raise_fit = current_market.get(
+        "what_would_raise_fit",
+        [],
     )
 
     recurring_gaps = historical_market.get(
@@ -688,43 +881,168 @@ if scan_result:
         [],
     )
 
-    if recurring_gaps:
-        for item in recurring_gaps[:7]:
-            st.write(
-                f"- {item['label']} "
-                f"({item['count']} signal(s))"
+
+    def labels(
+        items,
+        limit=3,
+    ) -> list[str]:
+        return [
+            str(item.get("label", "")).strip()
+            for item in (items or [])[:limit]
+            if str(item.get("label", "")).strip()
+        ]
+
+
+    def natural_join(
+        values: list[str],
+    ) -> str:
+        values = [
+            value
+            for value in values
+            if value
+        ]
+
+        if not values:
+            return ""
+
+        if len(values) == 1:
+            return values[0]
+
+        if len(values) == 2:
+            return (
+                values[0]
+                + " and "
+                + values[1]
             )
-    else:
+
+        return (
+            ", ".join(values[:-1])
+            + ", and "
+            + values[-1]
+        )
+
+
+    st.divider()
+    st.subheader("Market Position")
+
+    st.caption(
+        f"This reading uses {current_sample} jobs from this search "
+        f"and {historical_sample} jobs from your previous market signal."
+    )
+
+    # -----------------------------------------------------
+    # Current reading
+    # -----------------------------------------------------
+
+    st.markdown("### What this search is telling me")
+
+    if current_role_families:
+        strongest_current = (
+            current_role_families[0]["label"]
+        )
+
         st.write(
-            "Not enough historical evidence yet."
+            "The clearest signal from this search is around "
+            f"**{strongest_current}**. "
+            "That does not mean you should change direction toward "
+            "every role in that family; it tells us where your current "
+            "evidence is getting the strongest response."
+        )
+
+    blocker_labels = labels(
+        current_blockers,
+        3,
+    )
+
+    if blocker_labels:
+        st.write(
+            "The main things keeping some roles from becoming stronger "
+            "matches are "
+            f"**{natural_join(blocker_labels)}**."
+        )
+
+        st.write(
+            "I would treat these as market signals, not automatically "
+            "as things you need to learn. Some may simply belong to "
+            "roles that are adjacent to, rather than central to, your "
+            "career direction."
         )
 
     # -----------------------------------------------------
-    # What should change now
+    # Traction
     # -----------------------------------------------------
 
-    st.markdown(
-        "### What should I change now?"
+    st.markdown("### Where you're getting traction")
+
+    current_families = labels(
+        current_role_families,
+        4,
     )
 
-    current_raise_fit = current_market.get(
-        "what_would_raise_fit",
-        [],
+    historical_families = labels(
+        historical_role_families,
+        4,
     )
 
-    if current_raise_fit:
+    if current_families:
         st.write(
-            "The highest-value short-term changes "
-            "suggested by this batch are:"
+            "In this search, your profile is showing the most "
+            "competitiveness around "
+            f"**{natural_join(current_families)}**."
         )
 
-        for item in current_raise_fit[:5]:
-            st.write(
-                f"- {item['label']}"
-            )
-    else:
+    if historical_families:
         st.write(
-            "No strong short-term change signal yet."
+            "Looking across previous searches as well, the recurring "
+            "direction has been "
+            f"**{natural_join(historical_families)}**."
+        )
+
+    # -----------------------------------------------------
+    # What raises fit
+    # -----------------------------------------------------
+
+    st.markdown("### What could improve your chances")
+
+    short_term = labels(
+        current_raise_fit,
+        4,
+    )
+
+    persistent = labels(
+        recurring_gaps,
+        4,
+    )
+
+    if short_term:
+        st.write(
+            "For the roles in this particular search, stronger evidence "
+            "around "
+            f"**{natural_join(short_term)}** "
+            "would have increased your fit."
+        )
+
+    if persistent:
+        st.write(
+            "Across the broader history, the areas that keep appearing "
+            "are "
+            f"**{natural_join(persistent)}**."
+        )
+
+        st.write(
+            "The Career Development section will help decide which of "
+            "those are actually worth investing in, rather than treating "
+            "every recurring requirement as a development priority."
+        )
+
+    if (
+        not current_role_families
+        and not current_blockers
+        and not current_raise_fit
+    ):
+        st.write(
+            "There isn't enough consistent evidence in this batch yet "
+            "to make a useful market reading."
         )
 
 
