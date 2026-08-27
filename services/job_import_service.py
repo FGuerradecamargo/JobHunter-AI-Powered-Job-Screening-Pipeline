@@ -1,4 +1,5 @@
-﻿from services.database import (
+from services.database import (
+    get_connection,
     upsert_raw_job,
 )
 from services.job_source_repository import (
@@ -26,9 +27,9 @@ class JobImportService:
         self,
         source: JobSource,
         source_type: str,
-        user_id: str,
         keywords: str,
         location: str,
+        user_id: str | None = None,
         page: int = 1,
         results_per_page: int = 20,
     ) -> dict[str, int]:
@@ -58,8 +59,21 @@ class JobImportService:
 
             self.source_repository.add_source(
                 job_id=job.id,
-                user_id=user_id,
                 source_type=source_type,
+                user_id=user_id,
             )
+
+            if user_id is None:
+                with get_connection() as connection:
+                    connection.execute(
+                        """
+                        UPDATE jobs
+                        SET archived_at = NULL
+                        WHERE
+                            id = %s
+                            AND archived_at IS NOT NULL
+                        """,
+                        (job.id,),
+                    )
 
         return result

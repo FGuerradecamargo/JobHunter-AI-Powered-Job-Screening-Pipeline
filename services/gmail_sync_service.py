@@ -24,8 +24,14 @@ GMAIL_READONLY_SCOPE = (
 
 DEFAULT_JOB_ALERT_QUERY = (
     "newer_than:30d "
+    "("
     "from:jobalerts-noreply@linkedin.com "
-    'subject:("new job" OR "new jobs")'
+    "OR from:indeed.com "
+    "OR from:irishjobs.ie "
+    "OR from:jobs.ie "
+    "OR from:totaljobs.com "
+    "OR from:reed.co.uk"
+    ")"
 )
 
 

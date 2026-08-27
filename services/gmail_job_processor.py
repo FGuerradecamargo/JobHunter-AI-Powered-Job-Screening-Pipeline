@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from parser.job_parser import (
-    extract_jobs_from_html,
+from parser.email_job_parser import (
+    extract_jobs_from_email,
 )
 from services.database import (
     upsert_raw_job,
@@ -113,19 +113,30 @@ class GmailJobProcessor:
                 continue
 
             try:
-                jobs = extract_jobs_from_html(
-                    raw_html
+                parsed = extract_jobs_from_email(
+                    html=raw_html,
+                    sender=message.get(
+                        "sender",
+                        "",
+                    ),
                 )
+
+                jobs = parsed.jobs
 
                 jobs_found += len(jobs)
 
                 for job in jobs.values():
                     result = upsert_raw_job(job)
 
+                    source_type = (
+                        "gmail_"
+                        + parsed.source
+                    )
+
                     self._job_source_repository.add_source(
                         job_id=job.id,
                         user_id=user_id,
-                        source_type="gmail",
+                        source_type=source_type,
                     )
 
                     if result == "created":

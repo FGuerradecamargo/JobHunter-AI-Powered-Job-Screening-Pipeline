@@ -9,37 +9,80 @@ class JobSourceRepository:
     def add_source(
         self,
         job_id: str,
-        user_id: str,
         source_type: str,
+        user_id: str | None = None,
     ) -> None:
-        discovered_at = (
+        seen_at = (
             datetime.now(timezone.utc).isoformat()
         )
 
         with get_connection() as connection:
-            connection.execute(
-                """
-                INSERT INTO job_sources (
-                    job_id,
-                    user_id,
-                    source_type,
-                    discovered_at
+            if user_id is None:
+                connection.execute(
+                    """
+                    INSERT INTO job_sources (
+                        job_id,
+                        user_id,
+                        source_type,
+                        discovered_at,
+                        last_seen_at
+                    )
+                    VALUES (
+                        %s,
+                        NULL,
+                        %s,
+                        %s,
+                        %s
+                    )
+                    ON CONFLICT (
+                        job_id,
+                        source_type
+                    )
+                    WHERE user_id IS NULL
+                    DO UPDATE SET
+                        last_seen_at = EXCLUDED.last_seen_at
+                    """,
+                    (
+                        job_id,
+                        source_type,
+                        seen_at,
+                        seen_at,
+                    ),
                 )
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (
-                    job_id,
-                    user_id,
-                    source_type
+            else:
+                connection.execute(
+                    """
+                    INSERT INTO job_sources (
+                        job_id,
+                        user_id,
+                        source_type,
+                        discovered_at,
+                        last_seen_at
+                    )
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s
+                    )
+                    ON CONFLICT (
+                        job_id,
+                        user_id,
+                        source_type
+                    )
+                    WHERE user_id IS NOT NULL
+                    DO UPDATE SET
+                        last_seen_at = EXCLUDED.last_seen_at
+                    """,
+                    (
+                        job_id,
+                        user_id,
+                        source_type,
+                        seen_at,
+                        seen_at,
+                    ),
                 )
-                DO NOTHING
-                """,
-                (
-                    job_id,
-                    user_id,
-                    source_type,
-                    discovered_at,
-                ),
-            )
 
     def list_by_user(
         self,
