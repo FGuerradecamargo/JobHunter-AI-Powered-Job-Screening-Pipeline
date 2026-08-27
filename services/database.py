@@ -67,6 +67,8 @@ def _get_postgres_pool(
         kwargs={
             "row_factory": dict_row,
         },
+        check=ConnectionPool.check_connection,
+        max_idle=60,
         open=True,
     )
 

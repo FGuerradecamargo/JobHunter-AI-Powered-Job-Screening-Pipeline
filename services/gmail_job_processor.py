@@ -52,17 +52,11 @@ class GmailJobProcessor:
     def process_pending_messages(
         self,
         user_id: str,
-        candidate_id: str,
         limit: int = 5,
     ) -> GmailJobProcessingResult:
         if not user_id:
             raise ValueError(
                 "User ID is required."
-            )
-
-        if not candidate_id:
-            raise ValueError(
-                "Candidate ID is required."
             )
 
         if limit <= 0:

@@ -171,6 +171,26 @@ class GmailConnectionRepository:
             ],
         )
 
+    def list_connected_user_ids(
+        self,
+    ) -> list[str]:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT user_id
+                FROM gmail_connections
+                WHERE
+                    connection_status = 'connected'
+                    AND encrypted_refresh_token != ''
+                ORDER BY user_id
+                """
+            ).fetchall()
+
+        return [
+            row["user_id"]
+            for row in rows
+        ]
+
     def update_sync_state(
         self,
         user_id: str,
