@@ -1,7 +1,4 @@
 import logging
-import os
-import hashlib
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -9,18 +6,12 @@ import streamlit as st
 
 from components.job_analysis_view import render_job_analysis
 
-from models.job import Job
 
 from services.job_search_repository import JobSearchRepository
-from services.job_source_repository import JobSourceRepository
 from services.session_auth import require_login, render_logout_button
 from services.candidate_repository import CandidateRepository
 from services.career_objective_repository import CareerObjectiveRepository
 from services.career_update_repository import CareerUpdateRepository
-from services.gmail_connection_repository import GmailConnectionRepository
-from services.gmail_message_repository import GmailMessageRepository
-from services.gmail_job_processor import GmailJobProcessor
-from services.gmail_sync_service import GmailSyncService
 from services.candidate_job_analysis_service import (
     CandidateJobAnalysisService,
     ANALYSIS_VERSION,
@@ -41,32 +32,24 @@ from services.database import (
     list_candidate_jobs,
     update_candidate_job_notes,
     update_candidate_job_status,
-    upsert_raw_job,
 )
 
 
 st.set_page_config(
-    page_title="Analyze Jobs",
+    page_title="Opportunities",
     page_icon="ðŸ”Ž",
     layout="wide",
 )
 
-st.title("Analyze Jobs")
+st.title("Opportunities")
 
 current_user = require_login()
 render_logout_button()
 
 repository = JobSearchRepository()
-job_source_repository = JobSourceRepository()
 candidate_repository = CandidateRepository()
 analysis_service = CandidateJobAnalysisService()
 
-gmail_repository = GmailConnectionRepository()
-gmail_message_repository = GmailMessageRepository()
-
-gmail_job_processor = GmailJobProcessor(
-    gmail_message_repository=gmail_message_repository
-)
 
 
 if not current_user.candidate_id:
@@ -94,250 +77,6 @@ st.write(
     "with your professional profile, career direction, "
     "preferences, constraints and current priorities."
 )
-
-
-gmail_connection = gmail_repository.get_by_user_id(
-    current_user.id
-)
-
-if gmail_connection is not None:
-    with st.expander(
-        "Gmail job source",
-        expanded=False,
-    ):
-        st.caption(
-            f"Connected: {gmail_connection.gmail_address}"
-        )
-
-        if gmail_connection.last_sync_at:
-            st.caption(
-                f"Last sync: {gmail_connection.last_sync_at}"
-            )
-
-        if st.button(
-            "Sync Gmail",
-            type="secondary",
-            use_container_width=True,
-            key="analyze_jobs_sync_gmail",
-        ):
-            try:
-                gmail_sync_service = GmailSyncService(
-                    client_id=os.environ[
-                        "GOOGLE_OAUTH_CLIENT_ID"
-                    ],
-                    client_secret=os.environ[
-                        "GOOGLE_OAUTH_CLIENT_SECRET"
-                    ],
-                    gmail_connection_repository=(
-                        gmail_repository
-                    ),
-                    gmail_message_repository=(
-                        gmail_message_repository
-                    ),
-                )
-
-                with st.spinner(
-                    "Syncing Gmail and adding new jobs "
-                    "to the job pool..."
-                ):
-                    sync_result = (
-                        gmail_sync_service
-                        .sync_recent_job_alerts(
-                            user_id=current_user.id
-                        )
-                    )
-
-                    processing_result = (
-                        gmail_job_processor
-                        .process_pending_messages(
-                            user_id=current_user.id,
-                            candidate_id=candidate_id,
-                            limit=100,
-                        )
-                    )
-
-                st.success(
-                    "Gmail sync completed. "
-                    "New jobs are ready for analysis."
-                )
-
-                sync_columns = st.columns(4)
-
-                sync_columns[0].metric(
-                    "Emails found",
-                    sync_result.total_messages_found,
-                )
-
-                sync_columns[1].metric(
-                    "New emails",
-                    sync_result.new_messages_found,
-                )
-
-                sync_columns[2].metric(
-                    "Jobs added",
-                    processing_result.jobs_created,
-                )
-
-                sync_columns[3].metric(
-                    "Already known",
-                    processing_result.jobs_unchanged,
-                )
-
-            except Exception as error:
-                st.error(
-                    "Could not synchronize Gmail."
-                )
-                logger.exception("Could not synchronize Gmail.")
-
-else:
-    st.caption(
-        "Gmail is not connected. "
-        "You can connect it from Connect Gmail."
-    )
-
-
-st.divider()
-
-with st.expander(
-    "Add a job manually",
-):
-    st.caption(
-        "Enter the complete job information. "
-        "All fields are required."
-    )
-
-    with st.form(
-        "manual_job_form",
-        clear_on_submit=True,
-    ):
-        manual_title = st.text_input(
-            "Job title *"
-        )
-
-        manual_company = st.text_input(
-            "Company *"
-        )
-
-        manual_location = st.text_input(
-            "Location *"
-        )
-
-        manual_description = st.text_area(
-            "Job description *",
-            height=250,
-            placeholder=(
-                "Paste the complete job description here."
-            ),
-        )
-
-        manual_url = st.text_input(
-            "Job URL *",
-            placeholder="https://...",
-        )
-
-        manual_submit = st.form_submit_button(
-            "Add job",
-            type="primary",
-            use_container_width=True,
-        )
-
-    if manual_submit:
-        title = manual_title.strip()
-        company = manual_company.strip()
-        location = manual_location.strip()
-        description = manual_description.strip()
-        url = manual_url.strip()
-
-        missing_fields = []
-
-        if not title:
-            missing_fields.append("Job title")
-
-        if not company:
-            missing_fields.append("Company")
-
-        if not location:
-            missing_fields.append("Location")
-
-        if not description:
-            missing_fields.append("Job description")
-
-        if not url:
-            missing_fields.append("Job URL")
-
-        if missing_fields:
-            st.error(
-                "Complete all required fields: "
-                + ", ".join(missing_fields)
-                + "."
-            )
-
-        else:
-            parsed_url = urlparse(url)
-
-            valid_url = (
-                parsed_url.scheme in {
-                    "http",
-                    "https",
-                }
-                and bool(parsed_url.netloc)
-            )
-
-            if not valid_url:
-                st.error(
-                    "Enter a valid job URL starting "
-                    "with http:// or https://."
-                )
-
-            else:
-                normalized_url = url.strip().lower()
-
-                job_id = (
-                    "manual_"
-                    + hashlib.sha256(
-                        normalized_url.encode(
-                            "utf-8"
-                        )
-                    ).hexdigest()[:24]
-                )
-
-                raw_text = (
-                    f"Title: {title}\n"
-                    f"Company: {company}\n"
-                    f"Location: {location}\n"
-                    f"URL: {url}\n\n"
-                    f"{description}"
-                )
-
-                manual_job = Job(
-                    id=job_id,
-                    raw_text=raw_text,
-                    url=url,
-                    title=title,
-                    company=company,
-                    location=location,
-                    description=description,
-                )
-
-                upsert_raw_job(
-                    manual_job
-                )
-
-                job_source_repository.add_source(
-                    job_id=job_id,
-                    user_id=current_user.id,
-                    source_type="manual",
-                )
-
-                st.success(
-                    "Job added to the global pool. "
-                    "It will be considered in your next opportunity scan."
-                )
-
-                st.rerun()
-
-
-st.divider()
 
 career_objective = (
     CareerObjectiveRepository()
@@ -1468,5 +1207,3 @@ elif scan_result:
         "No competitive opportunities were found "
         "in this scan."
     )
-
-
