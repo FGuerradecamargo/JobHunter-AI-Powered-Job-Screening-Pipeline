@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 
 from services.auth_service import AuthService
 from services.session_auth import (
@@ -10,7 +10,7 @@ from services.session_auth import (
 
 st.set_page_config(
     page_title="JobHunter Login",
-    page_icon="🔐",
+    page_icon="ðŸ”",
 )
 
 st.title("JobHunter")
@@ -43,7 +43,7 @@ if current_user is not None:
         type="primary",
     ):
         st.switch_page(
-            "pages/2_Profile.py"
+            "pages/3_Profile.py"
         )
 
     if st.button("Log out"):
@@ -167,3 +167,4 @@ with signup_tab:
 
                 except ValueError as exc:
                     st.error(str(exc))
+

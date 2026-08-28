@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+﻿from datetime import datetime, timedelta, timezone
 import secrets
 
 import streamlit as st
@@ -187,7 +187,5 @@ def render_logout_button() -> None:
             key="global_logout_button",
         ):
             logout_user()
+            st.rerun()
 
-            st.switch_page(
-                "pages/0_Login.py"
-            )
