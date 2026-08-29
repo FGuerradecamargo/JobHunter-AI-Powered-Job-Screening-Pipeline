@@ -37,11 +37,9 @@ from services.database import (
 
 st.set_page_config(
     page_title="Opportunities",
-    page_icon="ðŸ”Ž",
+    page_icon="Ã°Å¸â€Å½",
     layout="wide",
 )
-
-st.title("Opportunities")
 
 current_user = require_login()
 render_logout_button()
@@ -72,10 +70,21 @@ if candidate is None:
     st.stop()
 
 
-st.write(
-    "JobHunter will scan available jobs and compare them "
-    "with your professional profile, career direction, "
-    "preferences, constraints and current priorities."
+st.html(
+    """
+    <div class="wp-opp-eyebrow">
+        DISCOVER
+    </div>
+    <div class="wp-opp-title">
+        Opportunities
+    </div>
+    <div class="wp-opp-copy">
+        Let WorkPilot screen the market against your
+        experience, career direction, preferences and
+        priorities — then bring forward the opportunities
+        worth your attention.
+    </div>
+    """
 )
 
 career_objective = (
@@ -93,6 +102,182 @@ candidate_signature = build_candidate_signature(
     career_objective,
     career_updates,
 )
+
+
+
+OPPORTUNITIES_CSS = """
+<style>
+    .wp-opp-eyebrow {
+        color: #075665;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        margin-bottom: 0.55rem;
+    }
+
+    .wp-opp-title {
+        color: #18363D;
+        font-size: 2.45rem;
+        line-height: 1.08;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        margin-bottom: 0.45rem;
+    }
+
+    .wp-opp-copy {
+        color: #65777C;
+        font-size: 1rem;
+        line-height: 1.55;
+        max-width: 760px;
+        margin-bottom: 1.5rem;
+    }
+
+    .wp-pool-card {
+        background: #EDF5F5;
+        border: 1px solid #D8E6E5;
+        border-radius: 12px;
+        padding: 0.9rem 1rem;
+        margin-bottom: 1.1rem;
+    }
+
+    .wp-pool-number {
+        color: #075665;
+        font-size: 1.25rem;
+        font-weight: 800;
+    }
+
+    .wp-pool-label {
+        color: #60757A;
+        font-size: 0.82rem;
+        margin-top: 0.1rem;
+    }
+
+    .wp-results-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-top: 2rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .wp-results-title {
+        color: #18363D;
+        font-size: 1.35rem;
+        font-weight: 800;
+    }
+
+    .wp-results-copy {
+        color: #718287;
+        font-size: 0.86rem;
+        margin-top: 0.2rem;
+    }
+
+    .wp-category {
+        margin-top: 1.35rem;
+        margin-bottom: 0.65rem;
+    }
+
+    .wp-category-top {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+    }
+
+    .wp-category-title {
+        color: #18363D;
+        font-size: 1rem;
+        font-weight: 800;
+    }
+
+    .wp-category-count {
+        display: inline-block;
+        background: #E2F1EE;
+        color: #075665;
+        border-radius: 99px;
+        padding: 0.16rem 0.48rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+    }
+
+    .wp-category-copy {
+        color: #77888C;
+        font-size: 0.82rem;
+        margin-top: 0.25rem;
+    }
+
+    .wp-empty-category {
+        background: #F8FAF9;
+        border: 1px dashed #CFDCDD;
+        border-radius: 11px;
+        color: #708287;
+        font-size: 0.86rem;
+        padding: 0.85rem 1rem;
+        margin-bottom: 0.7rem;
+    }
+
+    /* Opportunity job expanders */
+    [data-testid="stMain"] [data-testid="stExpander"] {
+        background: #FFFFFF !important;
+        border: 1px solid #DFE7E7 !important;
+        border-radius: 12px !important;
+        overflow: hidden;
+        margin-bottom: 0.55rem;
+    }
+
+    [data-testid="stMain"] [data-testid="stExpander"] details summary {
+        background: #FFFFFF !important;
+        color: #18363D !important;
+    }
+
+    [data-testid="stMain"] [data-testid="stExpander"] details summary * {
+        color: #18363D !important;
+    }
+</style>
+"""
+
+st.markdown(
+    OPPORTUNITIES_CSS,
+    unsafe_allow_html=True,
+)
+
+
+
+def render_opportunity_category_header(
+    title: str,
+    count: int,
+    description: str,
+) -> None:
+    st.html(
+        f"""
+        <div class="wp-category">
+            <div class="wp-category-top">
+                <div class="wp-category-title">
+                    {title}
+                </div>
+                <div class="wp-category-count">
+                    {count}
+                </div>
+            </div>
+            <div class="wp-category-copy">
+                {description}
+            </div>
+        </div>
+        """
+    )
+
+
+def render_empty_category(
+    message: str,
+) -> None:
+    st.html(
+        f"""
+        <div class="wp-empty-category">
+            {message}
+        </div>
+        """
+    )
 
 
 OPPORTUNITY_TARGETS = {
@@ -223,8 +408,17 @@ pool_available = (
     )
 )
 
-st.caption(
-    f"{pool_available} job(s) currently available to screen."
+st.html(
+    f"""
+    <div class="wp-pool-card">
+        <div class="wp-pool-number">
+            {pool_available:,}
+        </div>
+        <div class="wp-pool-label">
+            opportunities currently available for screening
+        </div>
+    </div>
+    """
 )
 
 target_label = st.selectbox(
@@ -1161,49 +1355,87 @@ if (
     or potential_jobs
     or good_opportunities
 ):
-    st.divider()
+    total_visible = (
+        len(best_matches)
+        + len(potential_jobs)
+        + len(good_opportunities)
+    )
 
-    with st.expander(
-        f"Best Matches ({len(best_matches)})",
-        expanded=True,
-    ):
-        if not best_matches:
-            st.info(
-                "No best matches found."
-            )
+    st.html(
+        f"""
+        <div class="wp-results-header">
+            <div>
+                <div class="wp-results-title">
+                    Your opportunities
+                </div>
+                <div class="wp-results-copy">
+                    {total_visible} opportunities are currently
+                    worth reviewing.
+                </div>
+            </div>
+        </div>
+        """
+    )
 
-        for job in best_matches:
-            render_job(job)
-
-    with st.expander(
-        f"Potential ({len(potential_jobs)})",
-        expanded=(
-            not best_matches
-            and bool(potential_jobs)
+    render_opportunity_category_header(
+        "Best Match",
+        len(best_matches),
+        (
+            "Strong alignment with both your current "
+            "evidence and career direction."
         ),
-    ):
-        if not potential_jobs:
-            st.info(
-                "No potential opportunities found."
-            )
+    )
 
-        for job in potential_jobs:
-            render_job(job)
+    if not best_matches:
+        render_empty_category(
+            "No Best Matches in the current results. "
+            "That is okay — WorkPilot only uses this label "
+            "when the evidence is strong enough."
+        )
 
-    with st.expander(
-        "Competitive "
-        f"({len(good_opportunities)})"
-    ):
-        if not good_opportunities:
-            st.info(
-                "No competitive opportunities found."
-            )
+    for job in best_matches:
+        render_job(job)
 
-        for job in good_opportunities:
-            render_job(job)
+    render_opportunity_category_header(
+        "Potential",
+        len(potential_jobs),
+        (
+            "Worth reviewing, with meaningful alignment "
+            "and some gaps or trade-offs to consider."
+        ),
+    )
+
+    if not potential_jobs:
+        render_empty_category(
+            "No Potential opportunities in the current results."
+        )
+
+    for job in potential_jobs:
+        render_job(job)
+
+    render_opportunity_category_header(
+        "Competitive",
+        len(good_opportunities),
+        (
+            "Roles where your evidence may compete, but "
+            "the overall fit is less direct."
+        ),
+    )
+
+    if not good_opportunities:
+        render_empty_category(
+            "No Competitive opportunities in the current results."
+        )
+
+    for job in good_opportunities:
+        render_job(job)
 
 elif scan_result:
-    st.info(
-        "No competitive opportunities were found "
-        "in this scan."
+    st.html(
+        '<div class="wp-empty-category">'
+        'This scan did not identify an opportunity strong '
+        'enough to recommend. Your profile has not failed '
+        'the search - the current jobs simply did not clear '
+        'the WorkPilot recommendation threshold.'
+        '</div>'
     )

@@ -9,11 +9,11 @@ from services.session_auth import (
 
 
 st.set_page_config(
-    page_title="JobHunter Login",
+    page_title="WorkPilot Login",
     page_icon="ðŸ”",
 )
 
-st.title("JobHunter")
+st.title("WorkPilot")
 
 auth_service = AuthService()
 
@@ -167,4 +167,5 @@ with signup_tab:
 
                 except ValueError as exc:
                     st.error(str(exc))
+
 

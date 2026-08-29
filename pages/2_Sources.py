@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 import hashlib
@@ -49,20 +49,20 @@ initialize_database()
 
 st.set_page_config(
     page_title="Sources",
-    page_icon="📧",
+    page_icon="ðŸ“§",
     layout="centered",
 )
 
 st.title("Sources")
 
 st.caption(
-    "Manage where JobHunter gets opportunities from."
+    "Manage where WorkPilot gets opportunities from."
 )
 
 st.subheader("Gmail job alerts")
 
 st.caption(
-    "Connect Gmail so JobHunter can import supported "
+    "Connect Gmail so WorkPilot can import supported "
     "job alert emails automatically."
 )
 
@@ -462,7 +462,7 @@ st.subheader("Add a job manually")
 
 st.caption(
     "Paste a job you found somewhere else and "
-    "JobHunter will include it in your opportunities."
+    "WorkPilot will include it in your opportunities."
 )
 
 with st.form(
@@ -608,4 +608,5 @@ if manual_submit:
             )
 
             st.rerun()
+
 

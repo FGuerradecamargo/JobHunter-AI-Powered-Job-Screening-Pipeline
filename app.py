@@ -15,6 +15,114 @@ from services.database import (
 )
 
 
+
+DASHBOARD_CSS = """
+<style>
+    .wp-dashboard-eyebrow {
+        color: #075665;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        margin-bottom: 0.55rem;
+    }
+
+    .wp-dashboard-title {
+        color: #18363D;
+        font-size: 2.45rem;
+        line-height: 1.08;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        margin-bottom: 0.45rem;
+    }
+
+    .wp-dashboard-copy {
+        color: #65777C;
+        font-size: 1rem;
+        line-height: 1.55;
+        margin-bottom: 1.7rem;
+        max-width: 720px;
+    }
+
+    .wp-dashboard-section {
+        color: #18363D;
+        font-size: 1.15rem;
+        font-weight: 750;
+        margin-top: 1.7rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .wp-dashboard-section-copy {
+        color: #738388;
+        font-size: 0.88rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .wp-stat-card {
+        background: #FFFFFF;
+        border: 1px solid #DFE7E7;
+        border-radius: 14px;
+        padding: 1.05rem 1.15rem;
+        min-height: 105px;
+        box-shadow:
+            0 2px 10px rgba(7, 62, 73, 0.025);
+    }
+
+    .wp-stat-label {
+        color: #6C7D81;
+        font-size: 0.78rem;
+        font-weight: 650;
+        margin-bottom: 0.35rem;
+    }
+
+    .wp-stat-value {
+        color: #18363D;
+        font-size: 2rem;
+        line-height: 1;
+        font-weight: 750;
+    }
+
+    [data-testid="stTabs"] {
+        margin-top: 0.35rem;
+    }
+
+    [data-testid="stExpander"] {
+        border: 1px solid #DFE7E7 !important;
+        border-radius: 12px !important;
+        overflow: hidden;
+        background: #FFFFFF !important;
+    }
+
+    [data-testid="stExpander"] details summary {
+        background: #FFFFFF !important;
+        color: #18363D !important;
+    }
+
+    [data-testid="stExpander"] details summary * {
+        color: #18363D !important;
+    }
+</style>
+"""
+
+
+def render_dashboard_stat(
+    label: str,
+    value: int,
+) -> None:
+    st.html(
+        f"""
+        <div class="wp-stat-card">
+            <div class="wp-stat-label">
+                {label}
+            </div>
+            <div class="wp-stat-value">
+                {value}
+            </div>
+        </div>
+        """
+    )
+
+
 STATUS_LABELS = {
     "system_rejected": "System rejected",
     "in_review": "In review",
@@ -657,8 +765,8 @@ def render_job_section(
 
 def main() -> None:
     st.set_page_config(
-        page_title="JobHunter",
-        page_icon="🎯",
+        page_title="WorkPilot",
+        page_icon="ðŸŽ¯",
         layout="wide",
     )
 
@@ -669,10 +777,24 @@ def main() -> None:
 
     candidate_repository = CandidateRepository()
 
-    st.title("JobHunter")
+    st.markdown(
+        DASHBOARD_CSS,
+        unsafe_allow_html=True,
+    )
 
-    st.caption(
-        "Review opportunities and track your applications."
+    st.html(
+        """
+        <div class="wp-dashboard-eyebrow">
+            YOUR CAREER
+        </div>
+        <div class="wp-dashboard-title">
+            Career Dashboard
+        </div>
+        <div class="wp-dashboard-copy">
+            Track your applications, follow your progress
+            and keep what happens next in one place.
+        </div>
+        """
     )
 
     if current_user.access_level == "admin":
@@ -726,29 +848,46 @@ def main() -> None:
         + counts["rejected_after_interview"]
     )
 
-    metric_columns = st.columns(4)
-
-    metric_columns[0].metric(
-        "Applied",
-        counts["applied"],
+    metric_columns = st.columns(
+        4,
+        gap="medium",
     )
 
-    metric_columns[1].metric(
-        "In process",
-        counts["in_process"],
-    )
+    with metric_columns[0]:
+        render_dashboard_stat(
+            "Applied",
+            counts["applied"],
+        )
 
-    metric_columns[2].metric(
-        "Rejected",
-        rejected_total,
-    )
+    with metric_columns[1]:
+        render_dashboard_stat(
+            "In process",
+            counts["in_process"],
+        )
 
-    metric_columns[3].metric(
-        "Offers",
-        counts["offer"],
-    )
+    with metric_columns[2]:
+        render_dashboard_stat(
+            "Rejected",
+            rejected_total,
+        )
 
-    st.divider()
+    with metric_columns[3]:
+        render_dashboard_stat(
+            "Offers",
+            counts["offer"],
+        )
+
+    st.html(
+        """
+        <div class="wp-dashboard-section">
+            Applications
+        </div>
+        <div class="wp-dashboard-section-copy">
+            Follow each application from submission
+            through interview, rejection or offer.
+        </div>
+        """
+    )
 
     tabs = st.tabs(
         [

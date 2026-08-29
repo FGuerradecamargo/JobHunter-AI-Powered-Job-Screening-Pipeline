@@ -653,7 +653,7 @@ st.divider()
 st.subheader("Current career objective")
 
 st.write(
-    "Tell JobHunter where you want your career to move next. "
+    "Tell WorkPilot where you want your career to move next. "
     "Your professional history remains evidence, while this "
     "objective determines which opportunities and development "
     "paths are relevant now."
@@ -687,7 +687,7 @@ objective_description = st.text_area(
     ),
     placeholder=(
         "Describe the kinds of roles, work and progression "
-        "you want JobHunter to prioritize."
+        "you want WorkPilot to prioritize."
     ),
     height=140,
     key=f"career_objective_description_{candidate_id}",
@@ -788,7 +788,7 @@ st.divider()
 st.subheader("Current priorities")
 
 st.write(
-    "Tell JobHunter what matters particularly to you right now. "
+    "Tell WorkPilot what matters particularly to you right now. "
     "Priorities influence job recommendations without changing "
     "your professional history."
 )
@@ -811,7 +811,7 @@ if priority_candidate is not None:
     )
 
     priority_direction = st.selectbox(
-        "How should JobHunter interpret it?",
+        "How should WorkPilot interpret it?",
         options=[
             "positive",
             "negative",
@@ -994,7 +994,7 @@ if not profile_exists:
 
     st.caption(
         "You normally only need to generate your profile once. "
-        "After that, JobHunter will keep it updated as your "
+        "After that, WorkPilot will keep it updated as your "
         "professional life changes."
     )
 
@@ -1016,7 +1016,7 @@ else:
     )
 
     st.write(
-        "Add only what changed. JobHunter keeps it as "
+        "Add only what changed. WorkPilot keeps it as "
         "new professional evidence and considers it when "
         "evaluating future opportunities."
     )
@@ -1438,6 +1438,7 @@ if generated_candidate is not None:
                 .spoken_languages
             )
         )
+
 
 
 
