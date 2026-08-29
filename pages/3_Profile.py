@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import streamlit as st
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ from models.career_objective import CareerObjective
 from services.career_objective_repository import CareerObjectiveRepository
 from services.access_policy import AccessPolicy
 from services.session_auth import require_login, render_logout_button
+from components.profile_onboarding import render_profile_onboarding
 
 current_user = require_login()
 render_logout_button()
@@ -107,6 +108,22 @@ existing_onboarding = (
 generated_candidate = candidate_repository.get(
     candidate_id
 )
+
+profile_ready = bool(
+    generated_candidate
+    and generated_candidate.professional_summary.strip()
+    and generated_candidate.current_role.strip()
+)
+
+if not profile_ready:
+    render_profile_onboarding(
+        candidate_id=candidate_id,
+        candidate_name=current_user.display_name,
+        onboarding_repository=onboarding_repository,
+        profile_generation_service=profile_generation_service,
+    )
+    st.stop()
+
 
 # Reset session-based fields when changing candidate/user.
 session_candidate_key = "profile_candidate_id"
@@ -1421,3 +1438,6 @@ if generated_candidate is not None:
                 .spoken_languages
             )
         )
+
+
+
