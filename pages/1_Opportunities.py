@@ -602,27 +602,27 @@ if st.session_state.pop(
                     """
                 )
 
-            if (
-                batch_result.get(
-                    "usage_limit_reached",
-                    False,
-                )
-                or batch_result.get(
-                    "provider_quota_exhausted",
-                    False,
-                )
-            ):
-                break
+                if (
+                    batch_result.get(
+                        "usage_limit_reached",
+                        False,
+                    )
+                    or batch_result.get(
+                        "provider_quota_exhausted",
+                        False,
+                    )
+                ):
+                    break
 
-            # Avoid an endless loop if nothing in the
-            # selected batch can be persisted/analyzed.
-            if (
-                batch_result.get(
-                    "analyzed",
-                    0,
-                ) == 0
-            ):
-                break
+                # Avoid an endless loop if nothing in the
+                # selected batch can be persisted/analyzed.
+                if (
+                    batch_result.get(
+                        "analyzed",
+                        0,
+                    ) == 0
+                ):
+                    break
 
         aggregate[
             "opportunities_found"
