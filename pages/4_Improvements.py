@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 
 import streamlit as st
 from openai import RateLimitError
@@ -21,11 +21,12 @@ st.set_page_config(
     layout="wide",
 )
 
+st.caption("CAREER GROWTH")
 st.title("Career Development")
 
-st.caption(
-    "A practical look at where you are and what may be worth "
-    "focusing on next."
+st.write(
+    "A focused view of where you are, what the market is "
+    "showing and what may be worth developing next."
 )
 
 current_user = require_login()
@@ -108,16 +109,24 @@ market_patterns = clean_items(
     )
 )
 
-st.subheader("Where you are now")
-
 if current_position:
     st.write(current_position)
 
-for item in strengths:
-    st.write(item)
+with st.expander(
+    "Where you are now",
+    expanded=False,
+):
+    if strengths:
+        st.markdown("**Strengths to leverage**")
 
-for item in market_patterns:
-    st.write(item)
+        for item in strengths:
+            st.write(item)
+
+    if market_patterns:
+        st.markdown("**Market patterns**")
+
+        for item in market_patterns:
+            st.write(item)
 
 
 # =========================================================
@@ -137,7 +146,7 @@ priorities = [
     )
 ]
 
-st.subheader("What I’d focus on next")
+st.subheader("What to focus on next")
 
 if not priorities:
     st.info(
@@ -167,17 +176,17 @@ for priority in priorities:
         )
     ).strip()
 
-    st.markdown(
-        f"#### {area}"
-    )
+    with st.expander(
+        area or "Development priority",
+        expanded=False,
+    ):
+        if why:
+            st.write(why)
 
-    if why:
-        st.write(why)
-
-    if action:
-        st.markdown(
-            f"**What I’d do:** {action}"
-        )
+        if action:
+            st.markdown(
+                f"**Suggested action:** {action}"
+            )
 
 
 # =========================================================
@@ -192,10 +201,12 @@ application_patterns = clean_items(
 )
 
 if application_patterns:
-    st.markdown("#### One more thing")
-
-    for item in application_patterns:
-        st.write(item)
+    with st.expander(
+        "Application signals",
+        expanded=False,
+    ):
+        for item in application_patterns:
+            st.write(item)
 
 
 # =========================================================
@@ -210,15 +221,17 @@ next_moves = clean_items(
 )
 
 if next_moves:
-    st.subheader("Your next moves")
-
-    for index, move in enumerate(
-        next_moves,
-        start=1,
+    with st.expander(
+        "Your next moves",
+        expanded=False,
     ):
-        st.markdown(
-            f"**{index}.** {move}"
-        )
+        for index, move in enumerate(
+            next_moves,
+            start=1,
+        ):
+            st.markdown(
+                f"**{index}.** {move}"
+            )
 
 
 # =========================================================
@@ -247,10 +260,19 @@ confidence_messages = {
     ),
 }
 
-st.divider()
+confidence_label = {
+    "high": "High confidence",
+    "medium": "Medium confidence",
+    "low": "Early signal",
+}.get(
+    confidence,
+    "Early signal",
+)
 
 st.caption(
-    confidence_messages.get(
+    confidence_label
+    + " · "
+    + confidence_messages.get(
         confidence,
         confidence_messages["low"],
     )

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 import hashlib
@@ -28,24 +28,18 @@ from services.gmail_oauth_service import GmailOAuthService
 from services.oauth_state_repository import (
     OAuthStateRepository,
 )
-from services.user_repository import UserRepository
-
-import os
-import streamlit as st
-
-client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
-
-st.caption(
-    "OAuth Client ID loaded: "
-    + (
-        f"{client_id[:12]}...{client_id[-12:]}"
-        if client_id
-        else "NOT SET"
-    )
+from services.session_auth import (
+    require_login,
+    render_logout_button,
 )
+from services.user_repository import UserRepository
+from services.access_policy import AccessPolicy
 
 load_dotenv()
 initialize_database()
+
+current_user = require_login()
+render_logout_button()
 
 st.set_page_config(
     page_title="Sources",
@@ -53,17 +47,17 @@ st.set_page_config(
     layout="centered",
 )
 
-st.title("Sources")
+st.title("Job sources")
 
 st.caption(
-    "Manage where WorkPilot gets opportunities from."
+    "Choose how WorkPilot finds opportunities for you."
 )
 
-st.subheader("Gmail job alerts")
+st.subheader("Connect your Gmail")
 
 st.caption(
-    "Connect Gmail so WorkPilot can import supported "
-    "job alert emails automatically."
+    "Connect Gmail and WorkPilot can bring in supported "
+    "job alerts automatically."
 )
 
 
@@ -220,33 +214,51 @@ def handle_oauth_callback() -> None:
 handle_oauth_callback()
 
 
-users = user_repository.list_all()
-
-if not users:
-    st.warning(
-        "No application users were found. "
-        "Create a user before connecting Gmail."
-    )
-    st.stop()
-
-
-user_by_id = {
-    user.id: user
-    for user in users
+ADMIN_BYPASS_EMAILS = {
+    "felipehev@gmail.com",
 }
 
-selected_user_id = st.selectbox(
-    "Application user",
-    options=list(user_by_id.keys()),
-    format_func=lambda user_id: (
-        f"{user_by_id[user_id].display_name} "
-        f"({user_by_id[user_id].email})"
-    ),
+is_admin = (
+    AccessPolicy.can_view_all_users(
+        current_user
+    )
+    or (
+        current_user.email
+        and current_user.email.lower()
+        in ADMIN_BYPASS_EMAILS
+    )
 )
 
-selected_user = user_by_id[
-    selected_user_id
-]
+if is_admin:
+    users = user_repository.list_all()
+
+    if not users:
+        st.warning(
+            "No users are available."
+        )
+        st.stop()
+
+    user_by_id = {
+        user.id: user
+        for user in users
+    }
+
+    selected_user_id = st.selectbox(
+        "Manage sources for",
+        options=list(user_by_id.keys()),
+        format_func=lambda user_id: (
+            f"{user_by_id[user_id].display_name} "
+            f"({user_by_id[user_id].email})"
+        ),
+    )
+
+    selected_user = user_by_id[
+        selected_user_id
+    ]
+
+else:
+    selected_user = current_user
+
 
 existing_connection = (
     gmail_repository.get_by_user_id(
@@ -254,41 +266,31 @@ existing_connection = (
     )
 )
 
-if existing_connection is not None:
+gmail_connected = bool(
+    existing_connection
+    and existing_connection.connection_status
+    == "connected"
+)
+
+if gmail_connected:
     st.success(
-        "Connected Gmail: "
+        "Gmail connected"
+    )
+
+    st.caption(
         f"{existing_connection.gmail_address}"
     )
 
-    st.write(
-        "Connection status:",
-        existing_connection.connection_status,
-    )
-
     if existing_connection.last_sync_at:
-        st.write(
-            "Last sync:",
-            existing_connection.last_sync_at,
+        st.caption(
+            "Last checked: "
+            f"{existing_connection.last_sync_at}"
         )
-
-    if st.button(
-        "Disconnect Gmail",
-        use_container_width=True,
-    ):
-        gmail_repository.disconnect(
-            selected_user.id
-        )
-
-        st.success(
-            "Gmail disconnected successfully."
-        )
-
-        st.rerun()
 
 else:
     st.info(
-        "This user does not have a Gmail "
-        "account connected yet."
+        "Connect Gmail to bring your job alerts "
+        "into WorkPilot automatically."
     )
 
 
@@ -298,10 +300,13 @@ if "gmail_authorization_url" not in st.session_state:
     ] = None
 
 
-if st.button(
-    "Connect Gmail",
-    type="primary",
-    use_container_width=True,
+if (
+    not gmail_connected
+    and st.button(
+        "Connect Gmail",
+        type="primary",
+        use_container_width=True,
+    )
 ):
     authorization_request = (
         oauth_service.create_authorization_url()
@@ -330,7 +335,7 @@ authorization_url = st.session_state.get(
     "gmail_authorization_url"
 )
 
-if authorization_url:
+if authorization_url and not gmail_connected:
     st.link_button(
         "Continue with Google",
         authorization_url,
@@ -344,12 +349,34 @@ if authorization_url:
     )
 
 
+
+if gmail_connected:
+    if st.button(
+        "Disconnect Gmail",
+        use_container_width=True,
+        key="sources_disconnect_gmail",
+    ):
+        gmail_repository.disconnect(
+            selected_user.id
+        )
+
+        st.session_state[
+            "gmail_authorization_url"
+        ] = None
+
+        st.success(
+            "Gmail disconnected."
+        )
+
+        st.rerun()
+
+
 # =========================================================
 # GMAIL SYNC
 # =========================================================
 
 st.divider()
-st.subheader("Gmail sync")
+st.subheader("Check for new jobs")
 
 existing_connection = (
     gmail_repository.get_by_user_id(
@@ -363,18 +390,18 @@ if (
     == "connected"
 ):
     st.caption(
-        f"Connected: "
+        f"Connected account: "
         f"{existing_connection.gmail_address}"
     )
 
     if existing_connection.last_sync_at:
         st.caption(
-            f"Last sync: "
+            f"Last checked: "
             f"{existing_connection.last_sync_at}"
         )
 
     if st.button(
-        "Sync Gmail now",
+        "Check Gmail for new jobs",
         type="secondary",
         use_container_width=True,
         key="sources_sync_gmail",
@@ -458,11 +485,11 @@ else:
 # =========================================================
 
 st.divider()
-st.subheader("Add a job manually")
+st.subheader("Add a job you found")
 
 st.caption(
-    "Paste a job you found somewhere else and "
-    "WorkPilot will include it in your opportunities."
+    "Found a role somewhere else? Add it here and "
+    "WorkPilot will consider it with your opportunities."
 )
 
 with st.form(
@@ -603,8 +630,8 @@ if manual_submit:
             )
 
             st.success(
-                "Job added. It will be considered "
-                "in the next opportunity scan."
+                "Job added. WorkPilot will consider it "
+                "the next time you search for opportunities."
             )
 
             st.rerun()

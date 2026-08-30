@@ -1,4 +1,4 @@
-﻿from dataclasses import asdict
+from dataclasses import asdict
 
 from services.ai.career_development_service import (
     CareerDevelopmentService,
@@ -23,7 +23,27 @@ CAREER_DEVELOPMENT_VERSION = (
 
 def get_or_generate_career_development(
     candidate_id: str,
+    force_refresh: bool = False,
 ) -> dict:
+    existing = (
+        get_candidate_career_development(
+            candidate_id
+        )
+    )
+
+    if (
+        existing
+        and not force_refresh
+        and existing.get(
+            "analysis_version"
+        )
+        == CAREER_DEVELOPMENT_VERSION
+    ):
+        return existing.get(
+            "recommendation",
+            {},
+        )
+
     context = (
         build_career_development_context(
             candidate_id
@@ -35,28 +55,6 @@ def get_or_generate_career_development(
             context
         )
     )
-
-    existing = (
-        get_candidate_career_development(
-            candidate_id
-        )
-    )
-
-    if (
-        existing
-        and existing.get(
-            "context_signature"
-        )
-        == context_signature
-        and existing.get(
-            "analysis_version"
-        )
-        == CAREER_DEVELOPMENT_VERSION
-    ):
-        return existing.get(
-            "recommendation",
-            {},
-        )
 
     service = CareerDevelopmentService(
         OpenAIClient()
