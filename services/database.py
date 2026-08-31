@@ -2257,6 +2257,7 @@ def list_pending_candidate_jobs(
     limit: int = 5,
     analysis_version: str | None = None,
     candidate_signature: str | None = None,
+    job_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Return candidate-job relationships that have never
@@ -2279,6 +2280,45 @@ def list_pending_candidate_jobs(
         raise ValueError(
             "Limit must be greater than zero."
         )
+
+    normalized_job_ids = None
+
+    if job_ids is not None:
+        normalized_job_ids = list(
+            dict.fromkeys(
+                str(job_id).strip()
+                for job_id in job_ids
+                if str(job_id).strip()
+            )
+        )
+
+        if not normalized_job_ids:
+            return []
+
+    job_filter = ""
+
+    params: list[Any] = [
+        candidate_id,
+    ]
+
+    if normalized_job_ids is not None:
+        placeholders = ", ".join(
+            "?"
+            for _ in normalized_job_ids
+        )
+
+        job_filter = (
+            " AND candidate_job_analyses.job_id "
+            f"IN ({placeholders})"
+        )
+
+        params.extend(
+            normalized_job_ids
+        )
+
+    params.append(
+        limit
+    )
 
     with get_connection() as connection:
         rows = connection.execute(
@@ -2319,15 +2359,16 @@ def list_pending_candidate_jobs(
 
                 AND jobs.archived_at IS NULL
 
+                {job_filter}
+
             ORDER BY
                 candidate_job_analyses.created_at ASC
 
             LIMIT ?
-            """,
-            (
-                candidate_id,
-                limit,
+            """.format(
+                job_filter=job_filter,
             ),
+            tuple(params),
         ).fetchall()
 
     return [

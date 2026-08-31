@@ -726,6 +726,7 @@ class CandidateJobAnalysisService:
         limit: int = 5,
         target_opportunities: int | None = None,
         ai_budget: AIUsageBudget | None = None,
+        job_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         candidate = self.candidate_repository.get(
             candidate_id
@@ -790,6 +791,7 @@ class CandidateJobAnalysisService:
             limit=limit,
             analysis_version=ANALYSIS_VERSION,
             candidate_signature=candidate_signature,
+            job_ids=job_ids,
         )
 
         result = {

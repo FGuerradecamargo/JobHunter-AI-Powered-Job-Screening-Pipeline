@@ -543,6 +543,11 @@ if st.session_state.pop(
                     """
                 )
 
+                selected_job_ids = [
+                    str(job["id"])
+                    for job in jobs
+                ]
+
                 for job in jobs:
                     created = (
                         ensure_candidate_job_analysis(
@@ -564,11 +569,12 @@ if st.session_state.pop(
                 batch_result = (
                     analysis_service.analyze_pending(
                         candidate_id=candidate_id,
-                        limit=len(jobs),
+                        limit=len(selected_job_ids),
                         target_opportunities=(
                             remaining_target
                         ),
                         ai_budget=ai_budget,
+                        job_ids=selected_job_ids,
                     )
                 )
 
