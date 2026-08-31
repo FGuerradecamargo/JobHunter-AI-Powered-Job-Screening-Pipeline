@@ -764,6 +764,27 @@ class CandidateJobAnalysisService:
             )
         )
 
+        evidence_signature = (
+            build_candidate_evidence_signature(
+                candidate,
+                career_updates,
+            )
+        )
+
+        direction_signature = (
+            build_candidate_direction_signature(
+                candidate,
+                career_objective,
+                career_updates,
+            )
+        )
+
+        constraint_signature = (
+            build_candidate_constraint_signature(
+                candidate
+            )
+        )
+
         pending_rows = list_pending_candidate_jobs(
             candidate_id=candidate_id,
             limit=limit,
@@ -918,6 +939,15 @@ class CandidateJobAnalysisService:
                         ),
                         candidate_signature=(
                             candidate_signature
+                        ),
+                        evidence_signature=(
+                            evidence_signature
+                        ),
+                        direction_signature=(
+                            direction_signature
+                        ),
+                        constraint_signature=(
+                            constraint_signature
                         ),
                         analysis_version=(
                             ANALYSIS_VERSION
@@ -1193,6 +1223,15 @@ class CandidateJobAnalysisService:
                             ),
                             candidate_signature=(
                                 candidate_signature
+                            ),
+                            evidence_signature=(
+                                evidence_signature
+                            ),
+                            direction_signature=(
+                                direction_signature
+                            ),
+                            constraint_signature=(
+                                constraint_signature
                             ),
                             analysis_version=(
                                 ANALYSIS_VERSION

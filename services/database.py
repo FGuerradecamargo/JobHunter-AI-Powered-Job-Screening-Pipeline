@@ -2400,6 +2400,9 @@ def save_candidate_job_analysis(
     candidate_signature: str,
     analysis_version: str,
     status: str = "in_review",
+    evidence_signature: str | None = None,
+    direction_signature: str | None = None,
+    constraint_signature: str | None = None,
 ) -> None:
     if status not in VALID_STATUSES:
         raise ValueError(
@@ -2457,6 +2460,9 @@ def save_candidate_job_analysis(
                 analysis_json = ?,
                 job_signature = ?,
                 candidate_signature = ?,
+                evidence_signature = ?,
+                direction_signature = ?,
+                constraint_signature = ?,
                 analysis_version = ?,
                 analysis_state = ?,
                 opportunity_state = ?,
@@ -2479,6 +2485,9 @@ def save_candidate_job_analysis(
                 ),
                 job_signature,
                 candidate_signature,
+                evidence_signature,
+                direction_signature,
+                constraint_signature,
                 analysis_version,
                 analysis_state,
                 opportunity_state,
