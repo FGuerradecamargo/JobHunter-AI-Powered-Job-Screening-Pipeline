@@ -117,11 +117,300 @@ def build_job_signature(
     return build_shared_job_signature(job)
 
 
+EVIDENCE_UPDATE_TYPES = {
+    "promotion",
+    "new_job",
+    "job_ended",
+    "course_or_certification",
+    "new_skill",
+    "new_responsibility",
+    "project",
+    "other",
+}
+
+DIRECTION_UPDATE_TYPES = {
+    "career_goal_change",
+    # "other" is intentionally included in both signatures
+    # in V1 because its semantic impact is unknown.
+    "other",
+}
+
+
+def _canonicalize_signature_value(
+    value,
+):
+    """
+    Remove formatting/order noise from signature inputs.
+
+    Signatures should react to semantic candidate changes,
+    not capitalization, whitespace or list ordering.
+    """
+    if isinstance(value, str):
+        return " ".join(
+            value.split()
+        ).casefold()
+
+    if isinstance(value, dict):
+        return {
+            key: _canonicalize_signature_value(
+                value[key]
+            )
+            for key in sorted(value)
+        }
+
+    if isinstance(
+        value,
+        (list, tuple, set),
+    ):
+        normalized = [
+            _canonicalize_signature_value(item)
+            for item in value
+        ]
+
+        return sorted(
+            normalized,
+            key=lambda item: json.dumps(
+                item,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            ),
+        )
+
+    return value
+
+
+def _build_canonical_signature(
+    data: dict[str, Any],
+) -> str:
+    return build_signature(
+        _canonicalize_signature_value(
+            data
+        )
+    )
+
+
+def _experience_signature_payload(
+    experience,
+) -> dict[str, Any]:
+    data = asdict(experience)
+
+    # This identifies the source record but does not
+    # describe professional evidence itself.
+    data.pop(
+        "source_experience_id",
+        None,
+    )
+
+    return data
+
+
+def _career_update_signature_payload(
+    career_updates,
+    allowed_types: set[str],
+) -> list[dict[str, str]]:
+    return [
+        {
+            "update_type": update.update_type,
+            "description": update.description,
+        }
+        for update in (
+            career_updates or []
+        )
+        if update.update_type in allowed_types
+    ]
+
+
+def build_candidate_evidence_signature(
+    candidate,
+    career_updates=None,
+) -> str:
+    """
+    Evidence answers:
+    What can this candidate currently demonstrate?
+    """
+    data = {
+        "current_role": candidate.current_role,
+        "current_level": candidate.current_level,
+        "spoken_languages": list(
+            candidate.spoken_languages
+        ),
+        "skills": list(
+            candidate.skills
+        ),
+        "strengths": list(
+            candidate.strengths
+        ),
+        "development_areas": list(
+            candidate.development_areas
+        ),
+        "professional_experiences": [
+            _experience_signature_payload(
+                experience
+            )
+            for experience in (
+                candidate.professional_experiences
+            )
+        ],
+        "proven_capabilities": list(
+            candidate.proven_capabilities
+        ),
+        "transferable_capabilities": list(
+            candidate.transferable_capabilities
+        ),
+        "developing_capabilities": list(
+            candidate.developing_capabilities
+        ),
+        "technical_tools": list(
+            candidate.technical_tools
+        ),
+        "domain_experience": list(
+            candidate.domain_experience
+        ),
+        "competitive_role_families": list(
+            candidate.competitive_role_families
+        ),
+        "career_updates": (
+            _career_update_signature_payload(
+                career_updates,
+                EVIDENCE_UPDATE_TYPES,
+            )
+        ),
+    }
+
+    return _build_canonical_signature(
+        data
+    )
+
+
+def build_candidate_direction_signature(
+    candidate,
+    career_objective=None,
+    career_updates=None,
+) -> str:
+    """
+    Direction answers:
+    Where does the candidate want the career to go?
+    """
+    preferences = candidate.preferences
+
+    active_priorities = [
+        {
+            "text": priority.text,
+            "direction": priority.direction,
+        }
+        for priority in candidate.priorities
+        if priority.active
+    ]
+
+    data = {
+        "target_roles": list(
+            candidate.target_roles
+        ),
+        "bridge_role_families": list(
+            candidate.bridge_role_families
+        ),
+        "target_role_families": list(
+            candidate.target_role_families
+        ),
+        "priorities": active_priorities,
+        "preference_signals": {
+            "customer_facing_preference": (
+                preferences.customer_facing_preference
+            ),
+            "phone_support_preference": (
+                preferences.phone_support_preference
+            ),
+        },
+        "career_updates": (
+            _career_update_signature_payload(
+                career_updates,
+                DIRECTION_UPDATE_TYPES,
+            )
+        ),
+    }
+
+    if career_objective is not None:
+        data["career_objective"] = {
+            "active": career_objective.active,
+            "title": career_objective.title,
+            "description": (
+                career_objective.description
+            ),
+            "desired_role_families": list(
+                career_objective
+                .desired_role_families
+            ),
+        }
+
+    return _build_canonical_signature(
+        data
+    )
+
+
+def build_candidate_constraint_signature(
+    candidate,
+) -> str:
+    """
+    Constraints answer:
+    Which structural conditions may block a job?
+    """
+    preferences = candidate.preferences
+    constraints = candidate.constraints
+
+    data = {
+        # Languages are evidence, but they also affect
+        # language-based hard eligibility.
+        "spoken_languages": list(
+            candidate.spoken_languages
+        ),
+        "constraints": asdict(
+            constraints
+        ),
+        "work_conditions": {
+            "remote_allowed": (
+                preferences.remote_allowed
+            ),
+            "hybrid_allowed": (
+                preferences.hybrid_allowed
+            ),
+            "onsite_allowed": (
+                preferences.onsite_allowed
+            ),
+            "weekend_work_allowed": (
+                preferences.weekend_work_allowed
+            ),
+            "night_shift_allowed": (
+                preferences.night_shift_allowed
+            ),
+            "on_call_allowed": (
+                preferences.on_call_allowed
+            ),
+            "sales_adjacent_allowed": (
+                preferences.sales_adjacent_allowed
+            ),
+            "preferred_work_schedule": (
+                preferences.preferred_work_schedule
+            ),
+        },
+    }
+
+    return _build_canonical_signature(
+        data
+    )
+
+
 def build_candidate_signature(
     candidate,
     career_objective=None,
     career_updates=None,
 ) -> str:
+    """
+    Legacy Sprint <= 8 signature.
+
+    Keep unchanged until Engine V2 no longer uses the
+    monolithic candidate signature for discovery.
+    """
     data = {
         "candidate": asdict(candidate),
         "career_updates": [
