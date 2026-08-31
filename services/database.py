@@ -311,6 +311,11 @@ def initialize_postgres_database() -> None:
                 notes TEXT NOT NULL DEFAULT '',
 
                 job_signature TEXT,
+
+                evidence_signature TEXT,
+                direction_signature TEXT,
+                constraint_signature TEXT,
+
                 candidate_signature TEXT,
                 analysis_version TEXT,
 
@@ -351,6 +356,22 @@ def initialize_postgres_database() -> None:
             column["column_name"]
             for column in candidate_job_analysis_columns
         }
+
+        for signature_column in (
+            "evidence_signature",
+            "direction_signature",
+            "constraint_signature",
+        ):
+            if (
+                signature_column
+                not in candidate_job_analysis_column_names
+            ):
+                connection.execute(
+                    f"""
+                    ALTER TABLE candidate_job_analyses
+                    ADD COLUMN {signature_column} TEXT
+                    """
+                )
 
         if (
             "analysis_state"
@@ -932,6 +953,11 @@ def initialize_sqlite_database() -> None:
                 notes TEXT NOT NULL DEFAULT '',
 
                 job_signature TEXT,
+
+                evidence_signature TEXT,
+                direction_signature TEXT,
+                constraint_signature TEXT,
+
                 candidate_signature TEXT,
                 analysis_version TEXT,
 
@@ -1106,6 +1132,22 @@ def initialize_sqlite_database() -> None:
             column["name"]
             for column in candidate_job_analysis_columns
         }
+
+        for signature_column in (
+            "evidence_signature",
+            "direction_signature",
+            "constraint_signature",
+        ):
+            if (
+                signature_column
+                not in candidate_job_analysis_column_names
+            ):
+                connection.execute(
+                    f"""
+                    ALTER TABLE candidate_job_analyses
+                    ADD COLUMN {signature_column} TEXT
+                    """
+                )
 
         analysis_state_added = (
             "analysis_state"
