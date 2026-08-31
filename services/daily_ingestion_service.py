@@ -81,6 +81,9 @@ class DailyIngestionService:
                         keywords=item["query"],
                         location=location,
                         results_per_page=results_per_page,
+                        discovery_category=item["category"],
+                        discovery_sub_category=item["sub_category"],
+                        discovery_query=item["query"],
                     )
                 )
 

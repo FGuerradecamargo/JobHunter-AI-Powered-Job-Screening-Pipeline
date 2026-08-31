@@ -484,6 +484,44 @@ def initialize_postgres_database() -> None:
 
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS job_discovery_signals (
+                job_id TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                sub_category TEXT NOT NULL,
+                search_query TEXT NOT NULL,
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+
+                PRIMARY KEY (
+                    job_id,
+                    source_type,
+                    category,
+                    sub_category,
+                    search_query
+                ),
+
+                FOREIGN KEY (job_id)
+                    REFERENCES jobs(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_job_discovery_signals_taxonomy
+            ON job_discovery_signals(
+                category,
+                sub_category,
+                job_id
+            )
+            """
+        )
+
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS gmail_connections (
                 user_id TEXT PRIMARY KEY,
                 gmail_address TEXT NOT NULL UNIQUE,
@@ -1029,6 +1067,44 @@ def initialize_sqlite_database() -> None:
                 FOREIGN KEY (user_id)
                     REFERENCES users(id)
                     ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_discovery_signals (
+                job_id TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                sub_category TEXT NOT NULL,
+                search_query TEXT NOT NULL,
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+
+                PRIMARY KEY (
+                    job_id,
+                    source_type,
+                    category,
+                    sub_category,
+                    search_query
+                ),
+
+                FOREIGN KEY (job_id)
+                    REFERENCES jobs(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_job_discovery_signals_taxonomy
+            ON job_discovery_signals(
+                category,
+                sub_category,
+                job_id
             )
             """
         )
