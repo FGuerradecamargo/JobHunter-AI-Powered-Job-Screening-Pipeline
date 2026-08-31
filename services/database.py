@@ -786,6 +786,91 @@ def initialize_postgres_database() -> None:
         )
 
 
+        # ==================================================
+        # Sprint 8.5 ? Career Memory Foundation
+        # ==================================================
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS
+            candidate_career_memory (
+                candidate_id TEXT PRIMARY KEY,
+                memory_version INTEGER NOT NULL,
+                memory_schema_version TEXT NOT NULL,
+                source_signature TEXT NOT NULL,
+                memory_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS
+            candidate_career_memory_events (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+
+                authority TEXT NOT NULL
+                    CHECK (
+                        authority IN (
+                            'fact',
+                            'market_evidence',
+                            'outcome',
+                            'inference',
+                            'hypothesis',
+                            'continuity'
+                        )
+                    ),
+
+                source_type TEXT NOT NULL,
+                source_ref TEXT NOT NULL DEFAULT '',
+                event_signature TEXT NOT NULL,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+
+                UNIQUE (
+                    candidate_id,
+                    event_signature
+                ),
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_career_memory_events_candidate_time
+            ON candidate_career_memory_events(
+                candidate_id,
+                created_at
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_career_memory_events_authority
+            ON candidate_career_memory_events(
+                candidate_id,
+                authority,
+                created_at
+            )
+            """
+        )
+
+
 class PostgresConnectionAdapter:
     def __init__(self, connection):
         self._connection = connection
@@ -1585,6 +1670,91 @@ def initialize_sqlite_database() -> None:
             CREATE INDEX IF NOT EXISTS
                 idx_oauth_states_user_id
             ON oauth_authorization_states(user_id)
+            """
+        )
+
+
+        # ==================================================
+        # Sprint 8.5 ? Career Memory Foundation
+        # ==================================================
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS
+            candidate_career_memory (
+                candidate_id TEXT PRIMARY KEY,
+                memory_version INTEGER NOT NULL,
+                memory_schema_version TEXT NOT NULL,
+                source_signature TEXT NOT NULL,
+                memory_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS
+            candidate_career_memory_events (
+                id TEXT PRIMARY KEY,
+                candidate_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+
+                authority TEXT NOT NULL
+                    CHECK (
+                        authority IN (
+                            'fact',
+                            'market_evidence',
+                            'outcome',
+                            'inference',
+                            'hypothesis',
+                            'continuity'
+                        )
+                    ),
+
+                source_type TEXT NOT NULL,
+                source_ref TEXT NOT NULL DEFAULT '',
+                event_signature TEXT NOT NULL,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+
+                UNIQUE (
+                    candidate_id,
+                    event_signature
+                ),
+
+                FOREIGN KEY (candidate_id)
+                    REFERENCES candidates(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_career_memory_events_candidate_time
+            ON candidate_career_memory_events(
+                candidate_id,
+                created_at
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_career_memory_events_authority
+            ON candidate_career_memory_events(
+                candidate_id,
+                authority,
+                created_at
+            )
             """
         )
 
