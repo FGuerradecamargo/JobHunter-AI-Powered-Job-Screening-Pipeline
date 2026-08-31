@@ -393,3 +393,142 @@ def parse_response(
         ),
     )
 
+
+def parse_batch_response(
+    response: str,
+    requested_job_ids: list[str],
+) -> list[AIRecommendation]:
+    """
+    Parse a batch response while guaranteeing that the
+    returned jobs exactly match the requested jobs.
+
+    Individual analyses are validated by parse_response(),
+    so single-job and batch validation cannot drift.
+    """
+    normalized_requested_ids = [
+        str(job_id)
+        for job_id in requested_job_ids
+    ]
+
+    if not normalized_requested_ids:
+        raise ValueError(
+            "requested_job_ids cannot be empty"
+        )
+
+    if (
+        len(normalized_requested_ids)
+        != len(set(normalized_requested_ids))
+    ):
+        raise ValueError(
+            "requested_job_ids contains duplicates"
+        )
+
+    data = json.loads(response)
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            "Batch response must be an object"
+        )
+
+    raw_results = data.get("results")
+
+    if not isinstance(raw_results, list):
+        raise ValueError(
+            "Batch response results must be a list"
+        )
+
+    analyses_by_job_id: dict[
+        str,
+        AIRecommendation,
+    ] = {}
+
+    for item in raw_results:
+        if not isinstance(item, dict):
+            raise ValueError(
+                "Each batch result must be an object"
+            )
+
+        raw_job_id = item.get("job_id")
+
+        if raw_job_id is None:
+            raise ValueError(
+                "Batch result is missing job_id"
+            )
+
+        job_id = str(raw_job_id)
+
+        if not job_id:
+            raise ValueError(
+                "Batch result contains empty job_id"
+            )
+
+        if job_id in analyses_by_job_id:
+            raise ValueError(
+                f"Duplicate batch job_id: {job_id}"
+            )
+
+        analysis = item.get("analysis")
+
+        if not isinstance(analysis, dict):
+            raise ValueError(
+                f"Batch analysis for {job_id} "
+                f"must be an object"
+            )
+
+        analyses_by_job_id[job_id] = (
+            parse_response(
+                response=json.dumps(
+                    analysis,
+                    ensure_ascii=False,
+                ),
+                job_id=job_id,
+            )
+        )
+
+    requested_set = set(
+        normalized_requested_ids
+    )
+
+    returned_set = set(
+        analyses_by_job_id
+    )
+
+    missing = (
+        requested_set
+        - returned_set
+    )
+
+    unexpected = (
+        returned_set
+        - requested_set
+    )
+
+    if missing or unexpected:
+        details = []
+
+        if missing:
+            details.append(
+                "missing="
+                + ", ".join(
+                    sorted(missing)
+                )
+            )
+
+        if unexpected:
+            details.append(
+                "unexpected="
+                + ", ".join(
+                    sorted(unexpected)
+                )
+            )
+
+        raise ValueError(
+            "Batch job ID mismatch: "
+            + "; ".join(details)
+        )
+
+    return [
+        analyses_by_job_id[job_id]
+        for job_id in normalized_requested_ids
+    ]
+
