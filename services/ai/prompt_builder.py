@@ -545,7 +545,6 @@ def build_batch_prompt(
                     "location": job.location,
                     "remote": job.remote,
                     "salary": job.salary,
-                    "description": job.description,
                 },
                 "job_profile": asdict(
                     job_profile

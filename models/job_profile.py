@@ -14,10 +14,17 @@ class JobProfile:
     must_have_experience: list[str] = field(default_factory=list)
     nice_to_have: list[str] = field(default_factory=list)
 
+    key_responsibilities: list[str] = field(default_factory=list)
+    tools_and_technologies: list[str] = field(default_factory=list)
+    required_qualifications: list[str] = field(default_factory=list)
+    stakeholders_and_collaboration: list[str] = field(default_factory=list)
+
     domain: str = ""
     expected_autonomy: str = ""
 
     structural_requirements: list[str] = field(default_factory=list)
     work_conditions: list[str] = field(default_factory=list)
+    important_details: list[str] = field(default_factory=list)
 
+    role_context: str = ""
     summary: str = ""

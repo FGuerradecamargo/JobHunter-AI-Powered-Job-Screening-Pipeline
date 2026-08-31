@@ -8,7 +8,7 @@ from services.ai.job_profile_service import JobProfileService
 from services.database import get_connection, utc_now
 
 
-JOB_PROFILE_VERSION = "job-profile-v1"
+JOB_PROFILE_VERSION = "job-profile-v2"
 
 
 def build_job_profile_signature(job: Job) -> str:

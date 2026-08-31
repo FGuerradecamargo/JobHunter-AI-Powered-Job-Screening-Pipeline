@@ -97,6 +97,24 @@ def parse_job_profile(
             data.get("nice_to_have"),
             "nice_to_have",
         ),
+        key_responsibilities=_string_list(
+            data.get("key_responsibilities"),
+            "key_responsibilities",
+        ),
+        tools_and_technologies=_string_list(
+            data.get("tools_and_technologies"),
+            "tools_and_technologies",
+        ),
+        required_qualifications=_string_list(
+            data.get("required_qualifications"),
+            "required_qualifications",
+        ),
+        stakeholders_and_collaboration=_string_list(
+            data.get(
+                "stakeholders_and_collaboration"
+            ),
+            "stakeholders_and_collaboration",
+        ),
         domain=str(
             data.get("domain", "")
         ),
@@ -108,6 +126,13 @@ def parse_job_profile(
         work_conditions=_string_list(
             data.get("work_conditions"),
             "work_conditions",
+        ),
+        important_details=_string_list(
+            data.get("important_details"),
+            "important_details",
+        ),
+        role_context=str(
+            data.get("role_context", "")
         ),
         summary=str(
             data.get("summary", "")
