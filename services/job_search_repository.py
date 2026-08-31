@@ -118,14 +118,19 @@ class JobSearchRepository:
         limit: int = 100,
     ):
         """
-        Returns global jobs that still need analysis for this candidate.
+        Return jobs eligible for initial candidate discovery.
 
-        A job is eligible when:
-        - the candidate has never received an analysis for it; or
-        - the existing system analysis is stale because the analysis
-          version or candidate profile signature changed.
+        Sprint 8.5:
+        Discovery contains only:
+        - jobs never linked to this candidate; or
+        - relationships whose initial analysis is pending.
 
-        User decisions such as applied or user_rejected are preserved.
+        Previously analyzed jobs never return to discovery
+        because a model version, candidate signature or job
+        signature changed. Those belong to reanalysis.
+
+        analysis_version and candidate_signature remain as
+        temporary compatibility parameters.
         """
 
         query = """
@@ -152,24 +157,8 @@ class JobSearchRepository:
                     candidate_job_analyses.job_id IS NULL
 
                     OR (
-                        candidate_job_analyses.status IN (
-                            'in_review',
-                            'system_rejected'
-                        )
-
-                        AND (
-                            candidate_job_analyses.recommendation IS NULL
-
-                            OR COALESCE(
-                                candidate_job_analyses.analysis_version,
-                                ''
-                            ) != %s
-
-                            OR COALESCE(
-                                candidate_job_analyses.candidate_signature,
-                                ''
-                            ) != %s
-                        )
+                        candidate_job_analyses.analysis_state = 'pending'
+                        AND candidate_job_analyses.opportunity_state = 'none'
                     )
                 )
 
@@ -183,8 +172,6 @@ class JobSearchRepository:
                 query,
                 (
                     candidate_id,
-                    analysis_version,
-                    candidate_signature,
                     limit,
                 ),
             ).fetchall()
@@ -196,6 +183,13 @@ class JobSearchRepository:
         analysis_version: str,
         candidate_signature: str,
     ) -> int:
+        """
+        Count jobs eligible for initial discovery only.
+
+        Stale/version/signature changes are intentionally
+        excluded and will be handled by reanalysis.
+        """
+
         query = """
             SELECT COUNT(*) AS total
 
@@ -212,24 +206,8 @@ class JobSearchRepository:
                     candidate_job_analyses.job_id IS NULL
 
                     OR (
-                        candidate_job_analyses.status IN (
-                            'in_review',
-                            'system_rejected'
-                        )
-
-                        AND (
-                            candidate_job_analyses.recommendation IS NULL
-
-                            OR COALESCE(
-                                candidate_job_analyses.analysis_version,
-                                ''
-                            ) != %s
-
-                            OR COALESCE(
-                                candidate_job_analyses.candidate_signature,
-                                ''
-                            ) != %s
-                        )
+                        candidate_job_analyses.analysis_state = 'pending'
+                        AND candidate_job_analyses.opportunity_state = 'none'
                     )
                 )
         """
@@ -239,8 +217,6 @@ class JobSearchRepository:
                 query,
                 (
                     candidate_id,
-                    analysis_version,
-                    candidate_signature,
                 ),
             ).fetchone()
 

@@ -2258,6 +2258,18 @@ def list_pending_candidate_jobs(
     analysis_version: str | None = None,
     candidate_signature: str | None = None,
 ) -> list[dict[str, Any]]:
+    """
+    Return candidate-job relationships that have never
+    completed their initial analysis.
+
+    Sprint 8.5:
+    Analysis/version/signature changes no longer make an
+    analyzed job pending again. Reanalysis is a separate
+    pipeline.
+
+    analysis_version and candidate_signature remain as
+    temporary compatibility parameters for legacy callers.
+    """
     if not candidate_id:
         raise ValueError(
             "Candidate ID is required."
@@ -2287,6 +2299,8 @@ def list_pending_candidate_jobs(
                 candidate_job_analyses.candidate_signature,
                 candidate_job_analyses.job_signature,
                 candidate_job_analyses.recommendation,
+                candidate_job_analyses.analysis_state,
+                candidate_job_analyses.opportunity_state,
                 candidate_job_analyses.status,
                 candidate_job_analyses.created_at
 
@@ -2299,77 +2313,27 @@ def list_pending_candidate_jobs(
             WHERE
                 candidate_job_analyses.candidate_id = ?
 
-                AND candidate_job_analyses.status IN (
-                    'in_review',
-                    'system_rejected'
-                )
+                AND candidate_job_analyses.analysis_state = 'pending'
+
+                AND candidate_job_analyses.opportunity_state = 'none'
+
+                AND jobs.archived_at IS NULL
 
             ORDER BY
                 candidate_job_analyses.created_at ASC
+
+            LIMIT ?
             """,
             (
                 candidate_id,
+                limit,
             ),
         ).fetchall()
 
-    pending_rows: list[dict[str, Any]] = []
-
-    for row in rows:
-        row_dict = dict(row)
-
-        stored_analysis_version = (
-            row_dict.get("analysis_version")
-        )
-
-        stored_candidate_signature = (
-            row_dict.get("candidate_signature")
-        )
-
-        stored_job_signature = (
-            row_dict.get("job_signature")
-        )
-
-        current_job_signature = (
-            build_job_signature_from_values(
-                job_id=row_dict.get("id"),
-                title=row_dict.get("title"),
-                company=row_dict.get("company"),
-                location=row_dict.get("location"),
-                remote=row_dict.get("remote"),
-                salary=row_dict.get("salary"),
-                description=row_dict.get(
-                    "description"
-                ),
-                url=row_dict.get("url"),
-            )
-        )
-
-        needs_analysis = (
-            row_dict.get("recommendation") is None
-            or (
-                stored_analysis_version or ""
-            ) != (
-                analysis_version or ""
-            )
-            or (
-                stored_candidate_signature or ""
-            ) != (
-                candidate_signature or ""
-            )
-            or (
-                stored_job_signature or ""
-            ) != current_job_signature
-        )
-
-        if not needs_analysis:
-            continue
-
-        pending_rows.append(row_dict)
-
-        if len(pending_rows) >= limit:
-            break
-
-    return pending_rows
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def update_shared_job_analysis_data(
