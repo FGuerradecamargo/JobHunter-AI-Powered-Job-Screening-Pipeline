@@ -96,6 +96,189 @@ def _safe_string(
     return value
 
 
+def _section_default(
+    section: str,
+) -> Any:
+    if section in {
+        "career_updates",
+        "application_outcomes",
+    }:
+        return []
+
+    return {}
+
+
+def _previous_section_state(
+    *,
+    memory: dict[str, Any],
+    section: str,
+) -> Any:
+    if not isinstance(
+        memory,
+        dict,
+    ):
+        return _section_default(
+            section
+        )
+
+    if section == "candidate":
+        facts = memory.get(
+            "facts",
+            {},
+        )
+
+        if not isinstance(
+            facts,
+            dict,
+        ):
+            return {}
+
+        return facts.get(
+            "candidate",
+            {},
+        )
+
+    if section == "career_objective":
+        facts = memory.get(
+            "facts",
+            {},
+        )
+
+        if not isinstance(
+            facts,
+            dict,
+        ):
+            return {}
+
+        return facts.get(
+            "career_objective",
+            {},
+        )
+
+    if section == "career_updates":
+        facts = memory.get(
+            "facts",
+            {},
+        )
+
+        if not isinstance(
+            facts,
+            dict,
+        ):
+            return []
+
+        value = facts.get(
+            "career_updates",
+            [],
+        )
+
+        return (
+            value
+            if isinstance(value, list)
+            else []
+        )
+
+    if section == "market_evidence":
+        value = memory.get(
+            "market_evidence",
+            {},
+        )
+
+        return (
+            value
+            if isinstance(value, dict)
+            else {}
+        )
+
+    if section == "application_outcomes":
+        value = memory.get(
+            "outcomes",
+            [],
+        )
+
+        return (
+            value
+            if isinstance(value, list)
+            else []
+        )
+
+    raise ValueError(
+        "Unknown Career Memory section: "
+        f"{section}"
+    )
+
+
+def _build_recent_delta(
+    *,
+    source_payload: dict[str, Any],
+    previous_memory: dict[str, Any],
+    force_full_delta: bool,
+) -> list[dict[str, Any]]:
+    delta: list[
+        dict[str, Any]
+    ] = []
+
+    for (
+        section,
+        config,
+    ) in _SECTION_EVENT_CONFIG.items():
+        current_state = (
+            source_payload.get(
+                section,
+                _section_default(
+                    section
+                ),
+            )
+        )
+
+        previous_state = (
+            _previous_section_state(
+                memory=previous_memory,
+                section=section,
+            )
+        )
+
+        if (
+            not force_full_delta
+            and current_state
+            == previous_state
+        ):
+            continue
+
+        authority = str(
+            config["authority"]
+        )
+
+        source_type = str(
+            config["source_type"]
+        )
+
+        source_ref = str(
+            config["source_ref"]
+        )
+
+        delta.append(
+            {
+                "evidence_ref": (
+                    f"{authority}:"
+                    f"{source_type}:"
+                    f"{source_ref}"
+                ),
+                "event_type": str(
+                    config[
+                        "event_type"
+                    ]
+                ),
+                "authority": authority,
+                "source_type": source_type,
+                "source_ref": source_ref,
+                "state": current_state,
+            }
+        )
+
+    return delta
+
+
 def _build_memory(
     *,
     source_payload: dict[str, Any],
@@ -230,60 +413,12 @@ class CareerMemoryManager:
             return {
                 "changed": False,
                 "new_events": 0,
+                "recent_delta": [],
                 "snapshot": existing,
                 "source_signature": (
                     source.source_signature
                 ),
             }
-
-        new_events = 0
-
-        for (
-            section,
-            config,
-        ) in _SECTION_EVENT_CONFIG.items():
-
-            section_state = (
-                source.payload.get(
-                    section
-                )
-            )
-
-            inserted = (
-                self.repository.append_event(
-                    candidate_id=(
-                        normalized_candidate_id
-                    ),
-                    event_type=(
-                        config[
-                            "event_type"
-                        ]
-                    ),
-                    authority=(
-                        config[
-                            "authority"
-                        ]
-                    ),
-                    source_type=(
-                        config[
-                            "source_type"
-                        ]
-                    ),
-                    source_ref=(
-                        config[
-                            "source_ref"
-                        ]
-                    ),
-                    payload={
-                        "state": (
-                            section_state
-                        ),
-                    },
-                )
-            )
-
-            if inserted:
-                new_events += 1
 
         previous_memory = (
             existing.get(
@@ -293,6 +428,71 @@ class CareerMemoryManager:
             if existing
             else {}
         )
+
+        previous_schema_version = (
+            existing.get(
+                "memory_schema_version"
+            )
+            if existing
+            else None
+        )
+
+        recent_delta = (
+            _build_recent_delta(
+                source_payload=(
+                    source.payload
+                ),
+                previous_memory=(
+                    previous_memory
+                ),
+                force_full_delta=(
+                    existing is None
+                    or previous_schema_version
+                    != CAREER_MEMORY_SCHEMA_VERSION
+                ),
+            )
+        )
+
+        new_events = 0
+
+        for item in recent_delta:
+            inserted = (
+                self.repository.append_event(
+                    candidate_id=(
+                        normalized_candidate_id
+                    ),
+                    event_type=(
+                        item[
+                            "event_type"
+                        ]
+                    ),
+                    authority=(
+                        item[
+                            "authority"
+                        ]
+                    ),
+                    source_type=(
+                        item[
+                            "source_type"
+                        ]
+                    ),
+                    source_ref=(
+                        item[
+                            "source_ref"
+                        ]
+                    ),
+                    payload={
+                        "state": (
+                            item[
+                                "state"
+                            ]
+                        ),
+                    },
+                )
+            )
+
+            if inserted:
+                new_events += 1
 
         memory = _build_memory(
             source_payload=(
@@ -321,6 +521,7 @@ class CareerMemoryManager:
         return {
             "changed": True,
             "new_events": new_events,
+            "recent_delta": recent_delta,
             "snapshot": snapshot,
             "source_signature": (
                 source.source_signature

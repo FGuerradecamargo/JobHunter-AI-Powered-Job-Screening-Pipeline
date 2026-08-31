@@ -532,3 +532,233 @@ def parse_batch_response(
         for job_id in normalized_requested_ids
     ]
 
+
+
+
+def _parse_memory_interpretation_items(
+    value: Any,
+    *,
+    field_name: str,
+    allowed_evidence_refs: set[str],
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise ValueError(
+            f"{field_name} must be a list"
+        )
+
+    results: list[
+        dict[str, Any]
+    ] = []
+
+    seen_statements: set[str] = set()
+
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"{field_name}[{index}] "
+                "must be an object"
+            )
+
+        if set(item.keys()) != {
+            "statement",
+            "confidence",
+            "evidence_refs",
+        }:
+            raise ValueError(
+                f"{field_name}[{index}] "
+                "has invalid fields"
+            )
+
+        statement = item[
+            "statement"
+        ]
+
+        if not isinstance(
+            statement,
+            str,
+        ):
+            raise ValueError(
+                f"{field_name}[{index}]."
+                "statement must be a string"
+            )
+
+        statement = statement.strip()
+
+        if not statement:
+            raise ValueError(
+                f"{field_name}[{index}]."
+                "statement must be non-empty"
+            )
+
+        normalized_statement = (
+            statement.casefold()
+        )
+
+        if (
+            normalized_statement
+            in seen_statements
+        ):
+            raise ValueError(
+                f"{field_name} contains "
+                "duplicate statements"
+            )
+
+        seen_statements.add(
+            normalized_statement
+        )
+
+        confidence = item[
+            "confidence"
+        ]
+
+        if not isinstance(
+            confidence,
+            int,
+        ):
+            raise ValueError(
+                f"{field_name}[{index}]."
+                "confidence must be an integer"
+            )
+
+        if not 0 <= confidence <= 100:
+            raise ValueError(
+                f"{field_name}[{index}]."
+                "confidence must be between "
+                "0 and 100"
+            )
+
+        evidence_refs = item[
+            "evidence_refs"
+        ]
+
+        if not isinstance(
+            evidence_refs,
+            list,
+        ):
+            raise ValueError(
+                f"{field_name}[{index}]."
+                "evidence_refs must be a list"
+            )
+
+        if not all(
+            isinstance(ref, str)
+            for ref in evidence_refs
+        ):
+            raise ValueError(
+                f"{field_name}[{index}]."
+                "evidence_refs must contain "
+                "only strings"
+            )
+
+        normalized_refs = []
+
+        for ref in evidence_refs:
+            normalized_ref = (
+                ref.strip()
+            )
+
+            if (
+                normalized_ref
+                not in allowed_evidence_refs
+            ):
+                raise ValueError(
+                    "Career Memory response "
+                    "contains unknown "
+                    "evidence_ref: "
+                    f"{normalized_ref!r}"
+                )
+
+            if (
+                normalized_ref
+                not in normalized_refs
+            ):
+                normalized_refs.append(
+                    normalized_ref
+                )
+
+        results.append(
+            {
+                "statement": statement,
+                "confidence": confidence,
+                "evidence_refs": (
+                    normalized_refs
+                ),
+            }
+        )
+
+    return results
+
+
+def parse_career_memory_response(
+    *,
+    response: str,
+    allowed_evidence_refs: set[str],
+) -> dict[str, Any]:
+    data = json.loads(
+        response
+    )
+
+    if not isinstance(
+        data,
+        dict,
+    ):
+        raise ValueError(
+            "Career Memory response "
+            "must be an object"
+        )
+
+    if set(data.keys()) != {
+        "inferences",
+        "hypotheses",
+        "continuity_note",
+    }:
+        raise ValueError(
+            "Career Memory response "
+            "has invalid top-level fields"
+        )
+
+    continuity_note = data[
+        "continuity_note"
+    ]
+
+    if not isinstance(
+        continuity_note,
+        str,
+    ):
+        raise ValueError(
+            "continuity_note must "
+            "be a string"
+        )
+
+    continuity_note = (
+        continuity_note.strip()
+    )
+
+    if len(continuity_note) > 1000:
+        raise ValueError(
+            "continuity_note is too long"
+        )
+
+    return {
+        "inferences": (
+            _parse_memory_interpretation_items(
+                data["inferences"],
+                field_name="inferences",
+                allowed_evidence_refs=(
+                    allowed_evidence_refs
+                ),
+            )
+        ),
+        "hypotheses": (
+            _parse_memory_interpretation_items(
+                data["hypotheses"],
+                field_name="hypotheses",
+                allowed_evidence_refs=(
+                    allowed_evidence_refs
+                ),
+            )
+        ),
+        "continuity_note": (
+            continuity_note
+        ),
+    }

@@ -661,3 +661,168 @@ Requirements for the response:
 - Do not include markdown or commentary outside JSON.
 """.strip()
 
+
+
+
+def build_career_memory_prompt(
+    *,
+    current_memory: dict,
+    recent_delta: list[dict],
+) -> str:
+    """
+    Build a constrained prompt for low-authority
+    Career Memory interpretation.
+
+    The model may interpret evidence, but it may
+    never rewrite authoritative state.
+    """
+
+    memory_json = json.dumps(
+        current_memory,
+        ensure_ascii=False,
+        sort_keys=True,
+        indent=2,
+    )
+
+    delta_json = json.dumps(
+        recent_delta,
+        ensure_ascii=False,
+        sort_keys=True,
+        indent=2,
+    )
+
+    allowed_refs = sorted(
+        {
+            str(
+                item.get(
+                    "evidence_ref",
+                    "",
+                )
+            ).strip()
+            for item in recent_delta
+            if isinstance(
+                item,
+                dict,
+            )
+            and str(
+                item.get(
+                    "evidence_ref",
+                    "",
+                )
+            ).strip()
+        }
+    )
+
+    refs_json = json.dumps(
+        allowed_refs,
+        ensure_ascii=False,
+        indent=2,
+    )
+
+    return f"""
+You are the Career Memory interpretation layer
+of a career decision-support system.
+
+Your job is NOT to rewrite facts.
+
+Authoritative information already exists in
+separate system layers.
+
+You may only produce:
+
+1. inferences
+2. hypotheses
+3. continuity_note
+
+AUTHORITY RULES
+
+Facts remain facts.
+Market evidence remains market evidence.
+Application outcomes remain outcomes.
+
+Never:
+- create a new fact;
+- rewrite an existing fact;
+- promote an inference to a fact;
+- promote a hypothesis to an inference merely
+  because it appeared previously;
+- treat repetition as proof;
+- infer a preference from employer rejection;
+- infer lack of ability merely because a job
+  rejected the candidate;
+- invent evidence;
+- invent provenance.
+
+INFERENCES
+
+Use an inference only when the supplied evidence
+supports a meaningful pattern.
+
+Each inference must include:
+- statement
+- confidence from 0 to 100
+- evidence_refs
+
+Confidence expresses how strongly the supplied
+evidence supports the interpretation.
+
+HYPOTHESES
+
+Use a hypothesis when an interpretation is
+plausible but requires more evidence.
+
+Each hypothesis must include:
+- statement
+- confidence from 0 to 100
+- evidence_refs
+
+A hypothesis must remain explicitly uncertain.
+
+CONTINUITY NOTE
+
+Write one concise note describing what may be
+worth observing next.
+
+It is a low-authority continuity aid.
+It is never evidence and never a source of truth.
+
+PROVENANCE
+
+You may use ONLY these evidence references:
+
+{refs_json}
+
+Every evidence_refs item in your response must
+exactly match one of those references.
+
+If the evidence does not support a useful
+inference or hypothesis, return an empty list.
+
+CURRENT CAREER MEMORY
+
+{memory_json}
+
+RECENT AUTHORITATIVE DELTA
+
+{delta_json}
+
+Return ONLY valid JSON using exactly this shape:
+
+{{
+  "inferences": [
+    {{
+      "statement": "",
+      "confidence": 0,
+      "evidence_refs": []
+    }}
+  ],
+  "hypotheses": [
+    {{
+      "statement": "",
+      "confidence": 0,
+      "evidence_refs": []
+    }}
+  ],
+  "continuity_note": ""
+}}
+"""

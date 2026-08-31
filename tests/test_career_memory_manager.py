@@ -198,6 +198,42 @@ def test_first_refresh_creates_memory_v1_and_events():
 
     assert result["changed"] is True
     assert result["new_events"] == 5
+    assert len(
+        result["recent_delta"]
+    ) == 5
+
+    assert {
+        item["evidence_ref"]
+        for item in result[
+            "recent_delta"
+        ]
+    } == {
+        (
+            "fact:"
+            "candidate_profile:"
+            "current"
+        ),
+        (
+            "fact:"
+            "career_objective:"
+            "active"
+        ),
+        (
+            "fact:"
+            "career_updates:"
+            "collection"
+        ),
+        (
+            "market_evidence:"
+            "market_position:"
+            "historical"
+        ),
+        (
+            "outcome:"
+            "application_outcomes:"
+            "collection"
+        ),
+    }
 
     snapshot = result[
         "snapshot"
@@ -258,6 +294,7 @@ def test_same_signature_is_true_noop():
 
     assert first["changed"] is True
     assert second["changed"] is False
+    assert second["recent_delta"] == []
 
     assert (
         second["snapshot"][
@@ -315,6 +352,28 @@ def test_only_changed_section_creates_new_event():
 
     assert result["changed"] is True
     assert result["new_events"] == 1
+
+    assert len(
+        result["recent_delta"]
+    ) == 1
+
+    assert (
+        result["recent_delta"][0][
+            "evidence_ref"
+        ]
+        == (
+            "market_evidence:"
+            "market_position:"
+            "historical"
+        )
+    )
+
+    assert (
+        result["recent_delta"][0][
+            "state"
+        ]["sample_size"]
+        == 11
+    )
 
     assert (
         len(repository.events)
@@ -456,6 +515,28 @@ def test_change_to_empty_section_is_recorded_as_delta():
     )
 
     assert result["new_events"] == 1
+
+    assert len(
+        result["recent_delta"]
+    ) == 1
+
+    assert (
+        result["recent_delta"][0][
+            "evidence_ref"
+        ]
+        == (
+            "fact:"
+            "career_updates:"
+            "collection"
+        )
+    )
+
+    assert (
+        result["recent_delta"][0][
+            "state"
+        ]
+        == []
+    )
 
     assert (
         len(repository.events)
