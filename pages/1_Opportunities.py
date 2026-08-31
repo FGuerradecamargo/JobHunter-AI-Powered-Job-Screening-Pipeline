@@ -28,8 +28,10 @@ from services.market_position_service import (
 from services.ai_usage_budget import AIUsageBudget
 
 from services.database import (
+    activate_candidate_opportunities,
     ensure_candidate_job_analysis,
     list_candidate_jobs,
+    list_inactive_approved_candidate_jobs,
     update_candidate_job_notes,
     update_candidate_job_status,
 )
@@ -286,7 +288,7 @@ OPPORTUNITY_TARGETS = {
     "Deep - 15 opportunities": 15,
 }
 
-INTERNAL_SCREENING_BATCH = 20
+INTERNAL_SCREENING_BATCH = 10
 
 
 def empty_scan_result() -> dict:
@@ -301,6 +303,13 @@ def empty_scan_result() -> dict:
         "best_match": 0,
         "potential": 0,
         "good_opportunity": 0,
+
+        # Candidate-visible opportunities activated
+        # during this scan.
+        "activated_best_match": 0,
+        "activated_potential": 0,
+        "activated_good_opportunity": 0,
+
         "opportunities_found": 0,
         "target_reached": False,
         "usage_limit_reached": False,
@@ -384,6 +393,121 @@ def merge_scan_result(
             "provider_quota_exhausted",
             False,
         )
+    )
+
+
+def activate_ready_opportunities(
+    candidate_id: str,
+    limit: int,
+) -> dict:
+    """
+    Activate up to `limit` worthwhile analyses that are
+    already complete but not yet visible to the candidate.
+    """
+    empty_result = {
+        "job_ids": [],
+        "best_match": 0,
+        "potential": 0,
+        "good_opportunity": 0,
+    }
+
+    if limit <= 0:
+        return empty_result
+
+    ready_jobs = (
+        list_inactive_approved_candidate_jobs(
+            candidate_id=candidate_id,
+            limit=limit,
+        )
+    )
+
+    ready_job_ids = [
+        str(job["id"])
+        for job in ready_jobs
+    ]
+
+    activated_ids = (
+        activate_candidate_opportunities(
+            candidate_id=candidate_id,
+            job_ids=ready_job_ids,
+        )
+    )
+
+    if not activated_ids:
+        return empty_result
+
+    activated_set = set(
+        activated_ids
+    )
+
+    result = {
+        "job_ids": activated_ids,
+        "best_match": 0,
+        "potential": 0,
+        "good_opportunity": 0,
+    }
+
+    for job in ready_jobs:
+        if str(job["id"]) not in activated_set:
+            continue
+
+        recommendation = job.get(
+            "recommendation"
+        )
+
+        if recommendation in {
+            "best_match",
+            "apply",
+            "recommended_apply",
+        }:
+            result["best_match"] += 1
+
+        elif recommendation == "potential":
+            result["potential"] += 1
+
+        elif recommendation in {
+            "good_opportunity",
+            "worth_second_look",
+        }:
+            result[
+                "good_opportunity"
+            ] += 1
+
+    return result
+
+
+def merge_activation_result(
+    aggregate: dict,
+    activation: dict,
+) -> None:
+    aggregate[
+        "opportunities_found"
+    ] += len(
+        activation.get(
+            "job_ids",
+            [],
+        )
+    )
+
+    aggregate[
+        "activated_best_match"
+    ] += activation.get(
+        "best_match",
+        0,
+    )
+
+    aggregate[
+        "activated_potential"
+    ] += activation.get(
+        "potential",
+        0,
+    )
+
+    aggregate[
+        "activated_good_opportunity"
+    ] += activation.get(
+        "good_opportunity",
+        0,
     )
 
 
@@ -496,6 +620,26 @@ if st.session_state.pop(
                 """
             )
 
+            # First use worthwhile analyses that were already
+            # paid for in an earlier scan but not yet activated.
+            initially_needed = max(
+                0,
+                target_opportunities
+                - aggregate["opportunities_found"],
+            )
+
+            initial_activation = (
+                activate_ready_opportunities(
+                    candidate_id=candidate_id,
+                    limit=initially_needed,
+                )
+            )
+
+            merge_activation_result(
+                aggregate,
+                initial_activation,
+            )
+
             while (
                 aggregate["opportunities_found"]
                 < target_opportunities
@@ -519,7 +663,7 @@ if st.session_state.pop(
                 )
 
                 opportunities_so_far = aggregate.get(
-                    "ai_approved",
+                    "opportunities_found",
                     0,
                 )
 
@@ -559,20 +703,10 @@ if st.session_state.pop(
                     if created:
                         links_created += 1
 
-                remaining_target = (
-                    target_opportunities
-                    - aggregate[
-                        "opportunities_found"
-                    ]
-                )
-
                 batch_result = (
                     analysis_service.analyze_pending(
                         candidate_id=candidate_id,
                         limit=len(selected_job_ids),
-                        target_opportunities=(
-                            remaining_target
-                        ),
                         ai_budget=ai_budget,
                         job_ids=selected_job_ids,
                     )
@@ -581,6 +715,26 @@ if st.session_state.pop(
                 merge_scan_result(
                     aggregate,
                     batch_result,
+                )
+
+                remaining_to_activate = max(
+                    0,
+                    target_opportunities
+                    - aggregate[
+                        "opportunities_found"
+                    ],
+                )
+
+                new_activation = (
+                    activate_ready_opportunities(
+                        candidate_id=candidate_id,
+                        limit=remaining_to_activate,
+                    )
+                )
+
+                merge_activation_result(
+                    aggregate,
+                    new_activation,
                 )
 
                 reviewed_so_far = aggregate.get(
@@ -594,7 +748,7 @@ if st.session_state.pop(
                 )
 
                 opportunities_so_far = aggregate.get(
-                    "ai_approved",
+                    "opportunities_found",
                     0,
                 )
 
@@ -631,12 +785,6 @@ if st.session_state.pop(
                     break
 
         aggregate[
-            "opportunities_found"
-        ] = aggregate[
-            "ai_approved"
-        ]
-
-        aggregate[
             "target_reached"
         ] = (
             aggregate[
@@ -648,7 +796,7 @@ if st.session_state.pop(
         search_status.update(
             label=(
                 f"Search complete — "
-                f"{aggregate['ai_approved']} "
+                f"{aggregate['opportunities_found']} "
                 f"opportunities found"
             ),
             state="complete",
@@ -723,7 +871,7 @@ if scan_result:
     )
 
     opportunities_found = scan_result.get(
-        "ai_approved",
+        "opportunities_found",
         0,
     )
 
@@ -764,7 +912,7 @@ if scan_result:
     col1.metric(
         "Best Match",
         scan_result.get(
-            "best_match",
+            "activated_best_match",
             0,
         ),
     )
@@ -772,7 +920,7 @@ if scan_result:
     col2.metric(
         "Competitive",
         scan_result.get(
-            "good_opportunity",
+            "activated_good_opportunity",
             0,
         ),
     )
@@ -780,7 +928,7 @@ if scan_result:
     col3.metric(
         "Potential",
         scan_result.get(
-            "potential",
+            "activated_potential",
             0,
         ),
     )

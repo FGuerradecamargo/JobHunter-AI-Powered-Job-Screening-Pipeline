@@ -1001,16 +1001,8 @@ class CandidateJobAnalysisService:
         # =============================================
 
         queue_index = 0
-        opportunities_found = 0
 
         while queue_index < len(ai_queue):
-            if (
-                target_opportunities is not None
-                and opportunities_found
-                >= target_opportunities
-            ):
-                break
-
             if (
                 ai_budget is not None
                 and ai_budget.exhausted
@@ -1030,22 +1022,6 @@ class CandidateJobAnalysisService:
                 BATCH_MAX_SIZE,
                 remaining_jobs,
             )
-
-            # During the current Quick/Standard/Deep
-            # flow, do not analyze more candidate-specific
-            # jobs than are still needed for the requested
-            # opportunity target.
-            if target_opportunities is not None:
-                remaining_target = max(
-                    1,
-                    target_opportunities
-                    - opportunities_found,
-                )
-
-                batch_size = min(
-                    batch_size,
-                    remaining_target,
-                )
 
             if (
                 ai_budget is not None
@@ -1231,8 +1207,6 @@ class CandidateJobAnalysisService:
                             "ai_approved"
                         ] += 1
 
-                        opportunities_found += 1
-
                     elif bucket == "potential":
                         analysis_status = (
                             "in_review"
@@ -1246,8 +1220,6 @@ class CandidateJobAnalysisService:
                             "ai_approved"
                         ] += 1
 
-                        opportunities_found += 1
-
                     elif bucket == "good_opportunity":
                         analysis_status = (
                             "in_review"
@@ -1260,8 +1232,6 @@ class CandidateJobAnalysisService:
                         result[
                             "ai_approved"
                         ] += 1
-
-                        opportunities_found += 1
 
                     else:
                         analysis_status = (
@@ -1303,6 +1273,7 @@ class CandidateJobAnalysisService:
                             ANALYSIS_VERSION
                         ),
                         status=analysis_status,
+                        opportunity_state="none",
                     )
 
                     result[
@@ -1323,22 +1294,16 @@ class CandidateJobAnalysisService:
                         }
                     )
 
-        result[
-            "opportunities_found"
-        ] = result["ai_approved"]
-
-        if target_opportunities is not None:
-            result[
-                "target_reached"
-            ] = (
-                result["opportunities_found"]
-                >= target_opportunities
-            )
+        # Analysis and opportunity activation are separate.
+        # This service reports AI results only. The opportunity
+        # workflow decides which approved analyses become active.
+        result["opportunities_found"] = 0
+        result["target_reached"] = False
 
         if (
             ai_budget is not None
             and ai_budget.exhausted
-            and not result["target_reached"]
+            and queue_index < len(ai_queue)
         ):
             result[
                 "usage_limit_reached"
