@@ -50,6 +50,31 @@ COMPANY_REJECTION_STATUSES = {
 }
 
 
+VALID_OPPORTUNITY_STATES = {
+    "none",
+    "active",
+    "user_rejected",
+    "applied",
+    "rejected_before_interview",
+    "in_process",
+    "rejected_after_interview",
+    "offer",
+    "expired",
+}
+
+
+APPROVED_OPPORTUNITY_RECOMMENDATIONS = {
+    "best_match",
+    "potential",
+    "good_opportunity",
+
+    # Legacy compatibility.
+    "apply",
+    "recommended_apply",
+    "worth_second_look",
+}
+
+
 def utc_now() -> str:
     return datetime.now(
         timezone.utc
@@ -1776,6 +1801,7 @@ def list_candidate_jobs(
                 jobs.company,
                 jobs.location,
                 jobs.url,
+
                 candidate_job_analyses.status,
                 candidate_job_analyses.notes,
                 candidate_job_analyses.recommendation,
@@ -1783,6 +1809,7 @@ def list_candidate_jobs(
                 candidate_job_analyses.current_fit,
                 candidate_job_analyses.growth_value,
                 candidate_job_analyses.analysis_json,
+                candidate_job_analyses.opportunity_state,
                 candidate_job_analyses.created_at,
                 candidate_job_analyses.updated_at,
                 candidate_job_analyses.applied_at,
@@ -1791,15 +1818,23 @@ def list_candidate_jobs(
             FROM candidate_job_analyses
 
             INNER JOIN jobs
-                ON jobs.id = candidate_job_analyses.job_id
+                ON jobs.id =
+                    candidate_job_analyses.job_id
 
             WHERE
                 candidate_job_analyses.candidate_id = ?
                 AND candidate_job_analyses.status = ?
+
                 AND (
                     ? != 'in_review'
-                    OR candidate_job_analyses.recommendation
-                        IS NOT NULL
+
+                    OR (
+                        candidate_job_analyses.recommendation
+                            IS NOT NULL
+
+                        AND candidate_job_analyses.opportunity_state
+                            = 'active'
+                    )
                 )
 
             ORDER BY
@@ -1847,21 +1882,236 @@ def count_candidate_jobs_by_status(
             """
             SELECT
                 status,
+                opportunity_state,
                 COUNT(*) AS total
 
             FROM candidate_job_analyses
 
             WHERE candidate_id = ?
 
-            GROUP BY status
+            GROUP BY
+                status,
+                opportunity_state
             """,
-            (candidate_id,),
+            (
+                candidate_id,
+            ),
         ).fetchall()
 
     for row in rows:
-        counts[row["status"]] = row["total"]
+        status = row["status"]
+
+        if status not in counts:
+            continue
+
+        # in_review is now the public/active
+        # opportunity count.
+        if (
+            status == "in_review"
+            and row["opportunity_state"]
+            != "active"
+        ):
+            continue
+
+        counts[status] += int(
+            row["total"]
+        )
 
     return counts
+
+
+def list_inactive_approved_candidate_jobs(
+    candidate_id: str,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """
+    Return worthwhile analyses that are ready to become
+    opportunities but have not yet been activated.
+    """
+    if not candidate_id:
+        raise ValueError(
+            "Candidate ID is required."
+        )
+
+    if limit <= 0:
+        raise ValueError(
+            "Limit must be greater than zero."
+        )
+
+    approved = sorted(
+        APPROVED_OPPORTUNITY_RECOMMENDATIONS
+    )
+
+    placeholders = ", ".join(
+        "?"
+        for _ in approved
+    )
+
+    query = f"""
+        SELECT
+            jobs.id,
+            jobs.title,
+            jobs.company,
+            jobs.location,
+            jobs.url,
+
+            candidate_job_analyses.recommendation,
+            candidate_job_analyses.current_fit,
+            candidate_job_analyses.growth_value,
+            candidate_job_analyses.analysis_json,
+            candidate_job_analyses.updated_at
+
+        FROM candidate_job_analyses
+
+        INNER JOIN jobs
+            ON jobs.id =
+                candidate_job_analyses.job_id
+
+        WHERE
+            candidate_job_analyses.candidate_id = ?
+
+            AND candidate_job_analyses.analysis_state
+                = 'analyzed'
+
+            AND candidate_job_analyses.opportunity_state
+                = 'none'
+
+            AND candidate_job_analyses.status
+                = 'in_review'
+
+            AND candidate_job_analyses.recommendation
+                IN ({placeholders})
+
+            AND jobs.archived_at IS NULL
+
+        ORDER BY
+            CASE candidate_job_analyses.recommendation
+                WHEN 'best_match' THEN 0
+                WHEN 'apply' THEN 0
+                WHEN 'recommended_apply' THEN 0
+                WHEN 'potential' THEN 1
+                WHEN 'good_opportunity' THEN 2
+                WHEN 'worth_second_look' THEN 2
+                ELSE 3
+            END,
+            candidate_job_analyses.current_fit DESC,
+            candidate_job_analyses.growth_value DESC,
+            candidate_job_analyses.updated_at ASC
+
+        LIMIT ?
+    """
+
+    params = [
+        candidate_id,
+        *approved,
+        limit,
+    ]
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            query,
+            tuple(params),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def activate_candidate_opportunities(
+    candidate_id: str,
+    job_ids: list[str],
+) -> list[str]:
+    """
+    Activate already-analyzed worthwhile jobs.
+
+    Returns IDs actually activated in requested order.
+    """
+    if not candidate_id:
+        raise ValueError(
+            "Candidate ID is required."
+        )
+
+    normalized_job_ids = list(
+        dict.fromkeys(
+            str(job_id).strip()
+            for job_id in job_ids
+            if str(job_id).strip()
+        )
+    )
+
+    if not normalized_job_ids:
+        return []
+
+    activated: list[str] = []
+
+    with get_connection() as connection:
+        for job_id in normalized_job_ids:
+            row = connection.execute(
+                """
+                SELECT
+                    recommendation,
+                    analysis_state,
+                    opportunity_state,
+                    status
+
+                FROM candidate_job_analyses
+
+                WHERE
+                    candidate_id = ?
+                    AND job_id = ?
+                """,
+                (
+                    candidate_id,
+                    job_id,
+                ),
+            ).fetchone()
+
+            if row is None:
+                continue
+
+            if row["analysis_state"] != "analyzed":
+                continue
+
+            if row["opportunity_state"] != "none":
+                continue
+
+            if row["status"] != "in_review":
+                continue
+
+            if (
+                row["recommendation"]
+                not in APPROVED_OPPORTUNITY_RECOMMENDATIONS
+            ):
+                continue
+
+            cursor = connection.execute(
+                """
+                UPDATE candidate_job_analyses
+
+                SET
+                    opportunity_state = 'active',
+                    updated_at = ?
+
+                WHERE
+                    candidate_id = ?
+                    AND job_id = ?
+                    AND opportunity_state = 'none'
+                """,
+                (
+                    utc_now(),
+                    candidate_id,
+                    job_id,
+                ),
+            )
+
+            if cursor.rowcount:
+                activated.append(
+                    job_id
+                )
+
+    return activated
 
 
 def update_candidate_job_status(
@@ -2408,6 +2658,7 @@ def save_candidate_job_analysis(
     evidence_signature: str | None = None,
     direction_signature: str | None = None,
     constraint_signature: str | None = None,
+    opportunity_state: str | None = None,
 ) -> None:
     if status not in VALID_STATUSES:
         raise ValueError(
@@ -2432,19 +2683,42 @@ def save_candidate_job_analysis(
 
     now = utc_now()
 
-    # Sprint 8.5:
     # Analysis completion and opportunity lifecycle
     # are independent dimensions.
     analysis_state = "analyzed"
 
-    if status == "in_review" and recommendation is not None:
-        opportunity_state = "active"
+    if opportunity_state is not None:
+        if (
+            opportunity_state
+            not in VALID_OPPORTUNITY_STATES
+        ):
+            raise ValueError(
+                "Invalid opportunity_state: "
+                f"{opportunity_state}"
+            )
+
+        resolved_opportunity_state = (
+            opportunity_state
+        )
+
+    elif (
+        status == "in_review"
+        and recommendation is not None
+    ):
+        # Legacy compatibility for callers that have
+        # not yet migrated to explicit activation.
+        resolved_opportunity_state = "active"
+
     elif status in APPLICATION_STATUSES:
-        opportunity_state = status
+        resolved_opportunity_state = status
+
     elif status == "user_rejected":
-        opportunity_state = "user_rejected"
+        resolved_opportunity_state = (
+            "user_rejected"
+        )
+
     else:
-        opportunity_state = "none"
+        resolved_opportunity_state = "none"
 
     rejected_at = (
         now
@@ -2495,7 +2769,7 @@ def save_candidate_job_analysis(
                 constraint_signature,
                 analysis_version,
                 analysis_state,
-                opportunity_state,
+                resolved_opportunity_state,
                 status,
                 rejected_at,
                 now,
@@ -2509,6 +2783,7 @@ def save_candidate_job_analysis(
                 "Candidate-job relationship was not found: "
                 f"{candidate_id} / {job_id}"
             )
+
 
 def save_candidate_application_outcome(
     candidate_id: str,
