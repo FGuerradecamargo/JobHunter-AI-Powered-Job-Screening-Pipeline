@@ -303,6 +303,10 @@ def initialize_postgres_database() -> None:
                 growth_value INTEGER,
 
                 analysis_json TEXT NOT NULL DEFAULT '{}',
+
+                analysis_state TEXT NOT NULL DEFAULT 'pending',
+                opportunity_state TEXT NOT NULL DEFAULT 'none',
+
                 status TEXT NOT NULL DEFAULT 'in_review',
                 notes TEXT NOT NULL DEFAULT '',
 
@@ -330,6 +334,82 @@ def initialize_postgres_database() -> None:
             )
             """
         )
+
+        # Sprint 8.5:
+        # Add analysis/opportunity lifecycle columns only once.
+        candidate_job_analysis_columns = connection.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE
+                table_schema = current_schema()
+                AND table_name = 'candidate_job_analyses'
+            """
+        ).fetchall()
+
+        candidate_job_analysis_column_names = {
+            column["column_name"]
+            for column in candidate_job_analysis_columns
+        }
+
+        if (
+            "analysis_state"
+            not in candidate_job_analysis_column_names
+        ):
+            connection.execute(
+                """
+                ALTER TABLE candidate_job_analyses
+                ADD COLUMN analysis_state TEXT
+                NOT NULL DEFAULT 'pending'
+                """
+            )
+
+            connection.execute(
+                """
+                UPDATE candidate_job_analyses
+                SET analysis_state = CASE
+                    WHEN status = 'in_review'
+                         AND recommendation IS NULL
+                        THEN 'pending'
+                    ELSE 'analyzed'
+                END
+                """
+            )
+
+        if (
+            "opportunity_state"
+            not in candidate_job_analysis_column_names
+        ):
+            connection.execute(
+                """
+                ALTER TABLE candidate_job_analyses
+                ADD COLUMN opportunity_state TEXT
+                NOT NULL DEFAULT 'none'
+                """
+            )
+
+            connection.execute(
+                """
+                UPDATE candidate_job_analyses
+                SET opportunity_state = CASE
+                    WHEN status = 'in_review'
+                         AND recommendation IS NOT NULL
+                        THEN 'active'
+
+                    WHEN status IN (
+                        'user_rejected',
+                        'applied',
+                        'in_process',
+                        'rejected_before_interview',
+                        'rejected_after_interview',
+                        'offer'
+                    )
+                        THEN status
+
+                    ELSE 'none'
+                END
+                """
+            )
 
         connection.execute(
             """
@@ -1016,6 +1096,79 @@ def initialize_sqlite_database() -> None:
                     """
                 )
 
+        candidate_job_analysis_columns = connection.execute(
+            """
+            PRAGMA table_info(candidate_job_analyses)
+            """
+        ).fetchall()
+
+        candidate_job_analysis_column_names = {
+            column["name"]
+            for column in candidate_job_analysis_columns
+        }
+
+        analysis_state_added = (
+            "analysis_state"
+            not in candidate_job_analysis_column_names
+        )
+        opportunity_state_added = (
+            "opportunity_state"
+            not in candidate_job_analysis_column_names
+        )
+
+        if analysis_state_added:
+            connection.execute(
+                """
+                ALTER TABLE candidate_job_analyses
+                ADD COLUMN analysis_state TEXT
+                NOT NULL DEFAULT 'pending'
+                """
+            )
+
+            connection.execute(
+                """
+                UPDATE candidate_job_analyses
+                SET analysis_state = CASE
+                    WHEN status = 'in_review'
+                         AND recommendation IS NULL
+                        THEN 'pending'
+                    ELSE 'analyzed'
+                END
+                """
+            )
+
+        if opportunity_state_added:
+            connection.execute(
+                """
+                ALTER TABLE candidate_job_analyses
+                ADD COLUMN opportunity_state TEXT
+                NOT NULL DEFAULT 'none'
+                """
+            )
+
+            connection.execute(
+                """
+                UPDATE candidate_job_analyses
+                SET opportunity_state = CASE
+                    WHEN status = 'in_review'
+                         AND recommendation IS NOT NULL
+                        THEN 'active'
+
+                    WHEN status IN (
+                        'user_rejected',
+                        'applied',
+                        'in_process',
+                        'rejected_before_interview',
+                        'rejected_after_interview',
+                        'offer'
+                    )
+                        THEN status
+
+                    ELSE 'none'
+                END
+                """
+            )
+
         gmail_message_columns = connection.execute(
             """
             PRAGMA table_info(gmail_messages)
@@ -1694,11 +1847,46 @@ def update_candidate_job_status(
     )
 
     with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT recommendation
+            FROM candidate_job_analyses
+            WHERE
+                candidate_id = ?
+                AND job_id = ?
+            """,
+            (
+                candidate_id,
+                job_id,
+            ),
+        ).fetchone()
+
+        if row is None:
+            raise ValueError(
+                "Candidate-job relationship was not found: "
+                f"{candidate_id} / {job_id}"
+            )
+
+        recommendation = row["recommendation"]
+
+        if (
+            status == "in_review"
+            and recommendation is not None
+        ):
+            opportunity_state = "active"
+        elif status in APPLICATION_STATUSES:
+            opportunity_state = status
+        elif status == "user_rejected":
+            opportunity_state = "user_rejected"
+        else:
+            opportunity_state = "none"
+
         connection.execute(
             """
             UPDATE candidate_job_analyses
             SET
                 status = ?,
+                opportunity_state = ?,
                 updated_at = ?,
                 applied_at = COALESCE(?, applied_at),
                 rejected_at = COALESCE(?, rejected_at)
@@ -1708,6 +1896,7 @@ def update_candidate_job_status(
             """,
             (
                 status,
+                opportunity_state,
                 now,
                 applied_at,
                 rejected_at,
@@ -2193,6 +2382,20 @@ def save_candidate_job_analysis(
 
     now = utc_now()
 
+    # Sprint 8.5:
+    # Analysis completion and opportunity lifecycle
+    # are independent dimensions.
+    analysis_state = "analyzed"
+
+    if status == "in_review" and recommendation is not None:
+        opportunity_state = "active"
+    elif status in APPLICATION_STATUSES:
+        opportunity_state = status
+    elif status == "user_rejected":
+        opportunity_state = "user_rejected"
+    else:
+        opportunity_state = "none"
+
     rejected_at = (
         now
         if status == "rejected"
@@ -2213,6 +2416,8 @@ def save_candidate_job_analysis(
                 job_signature = ?,
                 candidate_signature = ?,
                 analysis_version = ?,
+                analysis_state = ?,
+                opportunity_state = ?,
                 status = ?,
                 rejected_at = ?,
                 updated_at = ?
@@ -2233,6 +2438,8 @@ def save_candidate_job_analysis(
                 job_signature,
                 candidate_signature,
                 analysis_version,
+                analysis_state,
+                opportunity_state,
                 status,
                 rejected_at,
                 now,
