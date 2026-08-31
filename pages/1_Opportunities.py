@@ -651,6 +651,15 @@ if st.session_state.pop(
                         analysis_version=ANALYSIS_VERSION,
                         candidate_signature=candidate_signature,
                         limit=INTERNAL_SCREENING_BATCH,
+                        target_families=(
+                            candidate.target_role_families
+                        ),
+                        bridge_families=(
+                            candidate.bridge_role_families
+                        ),
+                        competitive_families=(
+                            candidate.competitive_role_families
+                        ),
                     )
                 )
 
