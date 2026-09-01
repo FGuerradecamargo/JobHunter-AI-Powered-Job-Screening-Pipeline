@@ -233,6 +233,140 @@ class CareerMemoryRepository:
 
         return snapshot
 
+    def _append_event_on_connection(
+        self,
+        connection: Any,
+        *,
+        candidate_id: str,
+        event_type: str,
+        authority: str,
+        source_type: str,
+        payload: dict[str, Any],
+        source_ref: str = "",
+    ) -> bool:
+        """
+        Append one immutable Career Memory event using an
+        existing database transaction.
+
+        Public append_event() uses this helper inside its own
+        transaction. apply_interpretation() uses the same
+        helper inside the snapshot interpretation transaction.
+        """
+
+        normalized_candidate_id = str(
+            candidate_id or ""
+        ).strip()
+
+        normalized_event_type = str(
+            event_type or ""
+        ).strip()
+
+        normalized_authority = str(
+            authority or ""
+        ).strip()
+
+        normalized_source_type = str(
+            source_type or ""
+        ).strip()
+
+        normalized_source_ref = str(
+            source_ref or ""
+        ).strip()
+
+        if not normalized_candidate_id:
+            raise ValueError(
+                "candidate_id must be non-empty."
+            )
+
+        if not normalized_event_type:
+            raise ValueError(
+                "event_type must be non-empty."
+            )
+
+        if (
+            normalized_authority
+            not in VALID_MEMORY_AUTHORITIES
+        ):
+            raise ValueError(
+                "Invalid Career Memory authority: "
+                f"{normalized_authority!r}"
+            )
+
+        if not normalized_source_type:
+            raise ValueError(
+                "source_type must be non-empty."
+            )
+
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            raise ValueError(
+                "payload must be a dictionary."
+            )
+
+        event_signature = (
+            build_memory_event_signature(
+                event_type=(
+                    normalized_event_type
+                ),
+                authority=(
+                    normalized_authority
+                ),
+                source_type=(
+                    normalized_source_type
+                ),
+                source_ref=(
+                    normalized_source_ref
+                ),
+                payload=payload,
+            )
+        )
+
+        cursor = connection.execute(
+            """
+            INSERT INTO candidate_career_memory_events (
+                id,
+                candidate_id,
+                event_type,
+                authority,
+                source_type,
+                source_ref,
+                event_signature,
+                payload_json,
+                created_at
+            )
+            VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s
+            )
+
+            ON CONFLICT(
+                candidate_id,
+                event_signature
+            )
+            DO NOTHING
+            """,
+            (
+                "career_memory_event_"
+                + uuid4().hex,
+                normalized_candidate_id,
+                normalized_event_type,
+                normalized_authority,
+                normalized_source_type,
+                normalized_source_ref,
+                event_signature,
+                _canonical_json(
+                    payload
+                ),
+                utc_now(),
+            ),
+        )
+
+        return bool(
+            cursor.rowcount
+        )
+
     def apply_interpretation(
         self,
         *,
@@ -241,13 +375,20 @@ class CareerMemoryRepository:
         interpretation: dict[str, Any],
     ) -> dict[str, Any]:
         """
-        Apply only low-authority interpretation fields.
+        Apply low-authority interpretation fields and their
+        immutable provenance events atomically.
 
         memory_version is deliberately NOT incremented.
 
-        The update is optimistic: if source_signature
-        changed while interpretation was being generated,
-        the stale interpretation is rejected.
+        Snapshot, interpreted-source pointer, and interpretation
+        events either all commit or all roll back.
+
+        The write remains optimistic: an interpretation built
+        from an older Career Memory source is rejected.
+
+        The first successfully persisted interpretation for one
+        exact source wins. A later nondeterministic result for
+        the same source cannot rewrite it.
         """
 
         normalized_candidate_id = str(
@@ -327,6 +468,67 @@ class CareerMemoryRepository:
                 "continuity_note must be a string."
             )
 
+        normalized_continuity_note = (
+            continuity_note.strip()
+        )
+
+        interpretation_events: list[
+            tuple[str, str, dict[str, Any]]
+        ] = []
+
+        for inference in inferences:
+            payload = (
+                dict(inference)
+                if isinstance(
+                    inference,
+                    dict,
+                )
+                else {
+                    "value": inference,
+                }
+            )
+
+            interpretation_events.append(
+                (
+                    "career_memory_inference",
+                    "inference",
+                    payload,
+                )
+            )
+
+        for hypothesis in hypotheses:
+            payload = (
+                dict(hypothesis)
+                if isinstance(
+                    hypothesis,
+                    dict,
+                )
+                else {
+                    "value": hypothesis,
+                }
+            )
+
+            interpretation_events.append(
+                (
+                    "career_memory_hypothesis",
+                    "hypothesis",
+                    payload,
+                )
+            )
+
+        if normalized_continuity_note:
+            interpretation_events.append(
+                (
+                    "career_memory_continuity",
+                    "continuity",
+                    {
+                        "statement": (
+                            normalized_continuity_note
+                        ),
+                    },
+                )
+            )
+
         with get_connection() as connection:
             row = connection.execute(
                 """
@@ -342,102 +544,167 @@ class CareerMemoryRepository:
                 ),
             ).fetchone()
 
-        if row is None:
-            raise ValueError(
-                "Career Memory snapshot "
-                "does not exist."
-            )
-
-        current_source_signature = str(
-            row["source_signature"]
-            or ""
-        )
-
-        interpreted_source_signature = str(
-            row[
-                "interpreted_source_signature"
-            ]
-            or ""
-        )
-
-        if (
-            current_source_signature
-            != normalized_source_signature
-        ):
-            raise (
-                StaleCareerMemoryInterpretationError(
-                    "Career Memory source changed "
-                    "before interpretation could "
-                    "be applied."
-                )
-            )
-
-        # Successful interpretation for this exact
-        # source was already persisted.
-        #
-        # Do not allow a later nondeterministic LLM
-        # response to rewrite the same memory version.
-        if (
-            interpreted_source_signature
-            == normalized_source_signature
-        ):
-            snapshot = self.get_snapshot(
-                normalized_candidate_id
-            )
-
-            if snapshot is None:
-                raise RuntimeError(
+            if row is None:
+                raise ValueError(
                     "Career Memory snapshot "
-                    "disappeared unexpectedly."
+                    "does not exist."
                 )
 
-            return snapshot
+            current_source_signature = str(
+                row["source_signature"]
+                or ""
+            )
 
-        memory = _safe_json_object(
-            row["memory_json"]
-        )
+            interpreted_source_signature = str(
+                row[
+                    "interpreted_source_signature"
+                ]
+                or ""
+            )
 
-        # Only these three low-authority fields
-        # are writable by interpretation.
-        memory["inferences"] = inferences
-        memory["hypotheses"] = hypotheses
-        memory["continuity_note"] = (
-            continuity_note.strip()
-        )
+            if (
+                current_source_signature
+                != normalized_source_signature
+            ):
+                raise (
+                    StaleCareerMemoryInterpretationError(
+                        "Career Memory source changed "
+                        "before interpretation could "
+                        "be applied."
+                    )
+                )
 
-        now = utc_now()
+            # Successful interpretation for this exact
+            # source was already persisted.
+            #
+            # Do not allow a later nondeterministic LLM
+            # response to rewrite the same memory version.
+            if (
+                interpreted_source_signature
+                != normalized_source_signature
+            ):
+                memory = _safe_json_object(
+                    row["memory_json"]
+                )
 
-        with get_connection() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE candidate_career_memory
-                SET
-                    memory_json = %s,
-                    interpreted_source_signature = %s,
-                    updated_at = %s
-                WHERE
-                    candidate_id = %s
-                    AND source_signature = %s
-                """,
-                (
-                    _canonical_json(
-                        memory
+                # Only these three low-authority fields
+                # are writable by interpretation.
+                memory["inferences"] = inferences
+                memory["hypotheses"] = hypotheses
+                memory["continuity_note"] = (
+                    normalized_continuity_note
+                )
+
+                now = utc_now()
+
+                # Claim this source interpretation first.
+                #
+                # Events are inserted after the UPDATE but
+                # inside this same transaction. If an event
+                # insert fails, this UPDATE is rolled back too.
+                cursor = connection.execute(
+                    """
+                    UPDATE candidate_career_memory
+                    SET
+                        memory_json = %s,
+                        interpreted_source_signature = %s,
+                        updated_at = %s
+                    WHERE
+                        candidate_id = %s
+                        AND source_signature = %s
+                        AND COALESCE(
+                            interpreted_source_signature,
+                            ''
+                        ) <> %s
+                    """,
+                    (
+                        _canonical_json(
+                            memory
+                        ),
+                        normalized_source_signature,
+                        now,
+                        normalized_candidate_id,
+                        normalized_source_signature,
+                        normalized_source_signature,
                     ),
-                    normalized_source_signature,
-                    now,
-                    normalized_candidate_id,
-                    normalized_source_signature,
-                ),
-            )
-
-        if not cursor.rowcount:
-            raise (
-                StaleCareerMemoryInterpretationError(
-                    "Career Memory source changed "
-                    "while interpretation was "
-                    "being persisted."
                 )
-            )
+
+                if not cursor.rowcount:
+                    # Another writer may have completed this
+                    # exact interpretation while this call was
+                    # waiting to persist.
+                    current = connection.execute(
+                        """
+                        SELECT
+                            source_signature,
+                            interpreted_source_signature
+                        FROM candidate_career_memory
+                        WHERE candidate_id = %s
+                        """,
+                        (
+                            normalized_candidate_id,
+                        ),
+                    ).fetchone()
+
+                    if (
+                        current is None
+                        or str(
+                            current[
+                                "source_signature"
+                            ]
+                            or ""
+                        )
+                        != normalized_source_signature
+                    ):
+                        raise (
+                            StaleCareerMemoryInterpretationError(
+                                "Career Memory source changed "
+                                "while interpretation was "
+                                "being persisted."
+                            )
+                        )
+
+                    if (
+                        str(
+                            current[
+                                "interpreted_source_signature"
+                            ]
+                            or ""
+                        )
+                        != normalized_source_signature
+                    ):
+                        raise (
+                            StaleCareerMemoryInterpretationError(
+                                "Career Memory interpretation "
+                                "could not be claimed."
+                            )
+                        )
+
+                    # Same source was already successfully
+                    # interpreted by another writer.
+                    # Do not insert this later result's events.
+                else:
+                    for (
+                        event_type,
+                        authority,
+                        payload,
+                    ) in interpretation_events:
+                        self._append_event_on_connection(
+                            connection,
+                            candidate_id=(
+                                normalized_candidate_id
+                            ),
+                            event_type=event_type,
+                            authority=authority,
+                            source_type=(
+                                "career_memory_"
+                                "ai_interpretation"
+                            ),
+                            source_ref=(
+                                normalized_source_signature
+                            ),
+                            payload=payload,
+                        )
 
         snapshot = self.get_snapshot(
             normalized_candidate_id
@@ -461,109 +728,24 @@ class CareerMemoryRepository:
         payload: dict[str, Any],
         source_ref: str = "",
     ) -> bool:
-        normalized_candidate_id = str(
-            candidate_id or ""
-        ).strip()
+        """
+        Append one immutable Career Memory event.
 
-        normalized_event_type = str(
-            event_type or ""
-        ).strip()
-
-        normalized_authority = str(
-            authority or ""
-        ).strip()
-
-        normalized_source_type = str(
-            source_type or ""
-        ).strip()
-
-        normalized_source_ref = str(
-            source_ref or ""
-        ).strip()
-
-        if not normalized_candidate_id:
-            raise ValueError(
-                "candidate_id must be non-empty."
-            )
-
-        if not normalized_event_type:
-            raise ValueError(
-                "event_type must be non-empty."
-            )
-
-        if (
-            normalized_authority
-            not in VALID_MEMORY_AUTHORITIES
-        ):
-            raise ValueError(
-                "Invalid Career Memory authority: "
-                f"{normalized_authority!r}"
-            )
-
-        if not normalized_source_type:
-            raise ValueError(
-                "source_type must be non-empty."
-            )
-
-        if not isinstance(payload, dict):
-            raise ValueError(
-                "payload must be a dictionary."
-            )
-
-        event_signature = (
-            build_memory_event_signature(
-                event_type=normalized_event_type,
-                authority=normalized_authority,
-                source_type=normalized_source_type,
-                source_ref=normalized_source_ref,
-                payload=payload,
-            )
-        )
+        This public method preserves the existing API while the
+        connection-aware helper also allows atomic multi-write
+        transactions.
+        """
 
         with get_connection() as connection:
-            cursor = connection.execute(
-                """
-                INSERT INTO candidate_career_memory_events (
-                    id,
-                    candidate_id,
-                    event_type,
-                    authority,
-                    source_type,
-                    source_ref,
-                    event_signature,
-                    payload_json,
-                    created_at
-                )
-                VALUES (
-                    %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s
-                )
-
-                ON CONFLICT(
-                    candidate_id,
-                    event_signature
-                )
-                DO NOTHING
-                """,
-                (
-                    "career_memory_event_"
-                    + uuid4().hex,
-                    normalized_candidate_id,
-                    normalized_event_type,
-                    normalized_authority,
-                    normalized_source_type,
-                    normalized_source_ref,
-                    event_signature,
-                    _canonical_json(
-                        payload
-                    ),
-                    utc_now(),
-                ),
+            return self._append_event_on_connection(
+                connection,
+                candidate_id=candidate_id,
+                event_type=event_type,
+                authority=authority,
+                source_type=source_type,
+                source_ref=source_ref,
+                payload=payload,
             )
-
-        return bool(
-            cursor.rowcount
-        )
 
     def list_events(
         self,
