@@ -13,6 +13,9 @@ from services.candidate_repository import CandidateRepository
 from services.compromised_password_service import (
     CompromisedPasswordService,
 )
+from services.session_store import (
+    revoke_user_sessions_with_connection,
+)
 from services.database import get_connection, utc_now
 from services.user_repository import UserRepository
 
@@ -176,9 +179,9 @@ class AuthService:
                 """
                 UPDATE users
                 SET
-                    password_hash = %s,
-                    updated_at = %s
-                WHERE id = %s
+                    password_hash = ?,
+                    updated_at = ?
+                WHERE id = ?
                 """,
                 (
                     password_hash,
@@ -187,9 +190,14 @@ class AuthService:
                 ),
             )
 
-        if cursor.rowcount == 0:
-            raise ValueError(
-                f"User not found: {user_id}"
+            if cursor.rowcount == 0:
+                raise ValueError(
+                    f"User not found: {user_id}"
+                )
+
+            revoke_user_sessions_with_connection(
+                connection,
+                user_id,
             )
 
     def authenticate(
@@ -217,7 +225,7 @@ class AuthService:
                     id,
                     password_hash
                 FROM users
-                WHERE email = %s
+                WHERE email = ?
                 """,
                 (normalized_email,),
             ).fetchone()
@@ -294,11 +302,11 @@ class AuthService:
                     """
                     UPDATE users
                     SET
-                        password_hash = %s,
-                        updated_at = %s
+                        password_hash = ?,
+                        updated_at = ?
                     WHERE
-                        id = %s
-                        AND password_hash = %s
+                        id = ?
+                        AND password_hash = ?
                     """,
                     (
                         upgraded_hash,
@@ -360,9 +368,9 @@ class AuthService:
                 """
                 UPDATE users
                 SET
-                    password_hash = %s,
-                    updated_at = %s
-                WHERE id = %s
+                    password_hash = ?,
+                    updated_at = ?
+                WHERE id = ?
                 """,
                 (
                     password_hash,

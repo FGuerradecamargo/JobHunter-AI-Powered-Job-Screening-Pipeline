@@ -8,6 +8,10 @@ from streamlit_cookies_manager import EncryptedCookieManager
 
 from models.app_user import AppUser
 from services.database import get_connection, utc_now
+from services.session_store import (
+    ensure_session_table_with_connection,
+    revoke_user_sessions_with_connection,
+)
 from services.user_repository import UserRepository
 
 
@@ -53,30 +57,12 @@ def _hash_session_token(
 
 def ensure_session_table() -> None:
     with get_connection() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                token TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                expires_at TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-
-                FOREIGN KEY (user_id)
-                    REFERENCES users(id)
-                    ON DELETE CASCADE
-            )
-            """
+        ensure_session_table_with_connection(
+            connection
         )
 
 
 def get_current_user() -> AppUser | None:
-    user = st.session_state.get(
-        "current_user"
-    )
-
-    if user is not None:
-        return user
-
     ensure_session_table()
 
     token = cookies.get(
@@ -84,6 +70,10 @@ def get_current_user() -> AppUser | None:
     )
 
     if not token:
+        st.session_state.pop(
+            "current_user",
+            None,
+        )
         return None
 
     token_hash = _hash_session_token(
@@ -97,12 +87,13 @@ def get_current_user() -> AppUser | None:
                 user_id,
                 expires_at
             FROM user_sessions
-            WHERE token = %s
+            WHERE token = ?
             """,
             (token_hash,),
         ).fetchone()
 
     if row is None:
+        logout_user()
         return None
 
     expires_at = datetime.fromisoformat(
@@ -151,7 +142,7 @@ def login_user(
                 expires_at,
                 created_at
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (?, ?, ?, ?)
             """,
             (
                 token_hash,
@@ -165,6 +156,25 @@ def login_user(
     cookies.save()
 
     st.session_state.current_user = user
+
+
+def revoke_user_sessions(
+    user_id: str,
+) -> int:
+    normalized_user_id = str(
+        user_id or ""
+    ).strip()
+
+    if not normalized_user_id:
+        raise ValueError(
+            "User ID is required."
+        )
+
+    with get_connection() as connection:
+        return revoke_user_sessions_with_connection(
+            connection,
+            normalized_user_id,
+        )
 
 
 def logout_user() -> None:
@@ -181,7 +191,7 @@ def logout_user() -> None:
             connection.execute(
                 """
                 DELETE FROM user_sessions
-                WHERE token = %s
+                WHERE token = ?
                 """,
                 (token_hash,),
             )

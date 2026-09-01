@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 from contextlib import contextmanager
@@ -90,6 +90,33 @@ class FakeConnection:
         if normalized.startswith(
             "DELETE FROM user_sessions"
         ):
+            if "WHERE user_id = ?" in normalized:
+                user_id = params[0]
+
+                matching_tokens = [
+                    token_hash
+                    for (
+                        token_hash,
+                        stored,
+                    ) in self.sessions.items()
+                    if (
+                        stored["user_id"]
+                        == user_id
+                    )
+                ]
+
+                for token_hash in matching_tokens:
+                    self.sessions.pop(
+                        token_hash,
+                        None,
+                    )
+
+                return FakeCursor(
+                    rowcount=len(
+                        matching_tokens
+                    )
+                )
+
             token_hash = params[0]
 
             existed = (
@@ -114,7 +141,7 @@ class FakeConnection:
             normalized.startswith("SELECT")
             and "FROM user_sessions"
             in normalized
-            and "WHERE token = %s"
+            and "WHERE token = ?"
             in normalized
         ):
             token_hash = params[0]
@@ -313,3 +340,145 @@ def test_hardcoded_beta_cookie_key_is_absent():
         '"SESSION_COOKIE_KEY"'
         in source
     )
+
+
+def test_revoked_database_session_invalidates_cached_user(
+    session_runtime,
+):
+    runtime = session_runtime
+
+    session_auth.login_user(
+        runtime.user
+    )
+
+    raw_token = runtime.cookies[
+        session_auth.SESSION_COOKIE
+    ]
+
+    token_hash = (
+        session_auth._hash_session_token(
+            raw_token
+        )
+    )
+
+    assert (
+        runtime.streamlit
+        .session_state
+        .current_user
+        is runtime.user
+    )
+
+    # Simulate server-side revocation while the
+    # Streamlit tab still has current_user cached.
+    runtime.connection.sessions.pop(
+        token_hash
+    )
+
+    resolved_user = (
+        session_auth.get_current_user()
+    )
+
+    assert resolved_user is None
+
+    assert (
+        runtime.cookies[
+            session_auth.SESSION_COOKIE
+        ]
+        == ""
+    )
+
+    assert (
+        "current_user"
+        not in runtime.streamlit.session_state
+    )
+
+
+
+def test_revoke_user_sessions_removes_all_sessions(
+    session_runtime,
+):
+    runtime = session_runtime
+
+    session_auth.login_user(
+        runtime.user
+    )
+
+    first_raw_token = runtime.cookies[
+        session_auth.SESSION_COOKIE
+    ]
+
+    first_hash = (
+        session_auth._hash_session_token(
+            first_raw_token
+        )
+    )
+
+    session_auth.login_user(
+        runtime.user
+    )
+
+    second_raw_token = runtime.cookies[
+        session_auth.SESSION_COOKIE
+    ]
+
+    second_hash = (
+        session_auth._hash_session_token(
+            second_raw_token
+        )
+    )
+
+    assert first_hash != second_hash
+
+    assert first_hash in (
+        runtime.connection.sessions
+    )
+
+    assert second_hash in (
+        runtime.connection.sessions
+    )
+
+    revoked = (
+        session_auth.revoke_user_sessions(
+            runtime.user.id
+        )
+    )
+
+    assert revoked == 2
+
+    assert first_hash not in (
+        runtime.connection.sessions
+    )
+
+    assert second_hash not in (
+        runtime.connection.sessions
+    )
+
+    # Cached UI state alone must not keep
+    # the revoked session authenticated.
+    resolved_user = (
+        session_auth.get_current_user()
+    )
+
+    assert resolved_user is None
+
+    assert (
+        runtime.cookies[
+            session_auth.SESSION_COOKIE
+        ]
+        == ""
+    )
+
+    assert (
+        "current_user"
+        not in runtime.streamlit.session_state
+    )
+
+
+def test_revoke_user_sessions_requires_user_id():
+    with pytest.raises(
+        ValueError,
+        match="User ID is required",
+    ):
+        session_auth.revoke_user_sessions(
+            ""
+        )

@@ -234,6 +234,25 @@ class _AuthConnection:
         if normalized.startswith(
             "UPDATE users SET password_hash"
         ):
+            if len(params) == 3:
+                (
+                    new_hash,
+                    _updated_at,
+                    user_id,
+                ) = params
+
+                if user_id == self.user_id:
+                    self.password_hash = new_hash
+                    self.update_count += 1
+
+                    return _AuthCursor(
+                        rowcount=1
+                    )
+
+                return _AuthCursor(
+                    rowcount=0
+                )
+
             (
                 new_hash,
                 _updated_at,
@@ -1111,3 +1130,311 @@ def test_unknown_account_records_failure_after_dummy_check(
             "missing@example.com",
         )
     ]
+
+
+
+def test_set_password_revokes_sessions_on_same_connection(
+    monkeypatch,
+):
+    old_password = (
+        "old sufficiently long password"
+    )
+
+    new_password = (
+        "new sufficiently long password"
+    )
+
+    user = SimpleNamespace(
+        id="user_password_change",
+        email="change@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=(
+            AuthService.hash_password(
+                old_password
+            )
+        ),
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    revocations = []
+
+    def revoke_sessions(
+        locked_connection,
+        user_id,
+    ):
+        revocations.append(
+            (
+                locked_connection,
+                user_id,
+            )
+        )
+        return 3
+
+    monkeypatch.setattr(
+        auth_module,
+        "revoke_user_sessions_with_connection",
+        revoke_sessions,
+    )
+
+    service.set_password(
+        user.id,
+        new_password,
+    )
+
+    assert connection.update_count == 1
+
+    assert AuthService.verify_password(
+        new_password,
+        connection.password_hash,
+    )
+
+    assert revocations == [
+        (
+            connection,
+            user.id,
+        )
+    ]
+
+
+def test_set_password_does_not_revoke_if_user_missing(
+    monkeypatch,
+):
+    user = SimpleNamespace(
+        id="existing_user",
+        email="existing@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=(
+            AuthService.hash_password(
+                "existing sufficiently long password"
+            )
+        ),
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    def must_not_revoke(
+        locked_connection,
+        user_id,
+    ):
+        raise AssertionError(
+            "Sessions must not be revoked "
+            "when the user update failed."
+        )
+
+    monkeypatch.setattr(
+        auth_module,
+        "revoke_user_sessions_with_connection",
+        must_not_revoke,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="User not found",
+    ):
+        service.set_password(
+            "missing_user",
+            "another sufficiently long password",
+        )
+
+    assert connection.update_count == 0
+
+
+def test_set_password_rolls_back_if_session_revocation_fails(
+    monkeypatch,
+):
+    import sqlite3
+
+    connection = sqlite3.connect(
+        ":memory:"
+    )
+
+    connection.execute(
+        """
+        CREATE TABLE users (
+            id TEXT PRIMARY KEY,
+            password_hash TEXT,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE TABLE user_sessions (
+            token TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+    user_id = "rollback_user"
+
+    old_password = (
+        "old rollback password value"
+    )
+
+    new_password = (
+        "new rollback password value"
+    )
+
+    old_hash = (
+        AuthService.hash_password(
+            old_password
+        )
+    )
+
+    connection.execute(
+        """
+        INSERT INTO users (
+            id,
+            password_hash,
+            updated_at
+        )
+        VALUES (?, ?, ?)
+        """,
+        (
+            user_id,
+            old_hash,
+            "before-change",
+        ),
+    )
+
+    connection.execute(
+        """
+        INSERT INTO user_sessions (
+            token,
+            user_id,
+            expires_at,
+            created_at
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            "existing-session",
+            user_id,
+            "2099-01-01T00:00:00+00:00",
+            "2026-09-01T00:00:00+00:00",
+        ),
+    )
+
+    connection.commit()
+
+    @contextmanager
+    def real_sqlite_connection():
+        with connection:
+            yield connection
+
+    monkeypatch.setattr(
+        auth_module,
+        "get_connection",
+        real_sqlite_connection,
+    )
+
+    def failing_revocation(
+        locked_connection,
+        target_user_id,
+    ):
+        locked_connection.execute(
+            """
+            DELETE FROM user_sessions
+            WHERE user_id = ?
+            """,
+            (
+                target_user_id,
+            ),
+        )
+
+        raise RuntimeError(
+            "simulated revocation failure"
+        )
+
+    monkeypatch.setattr(
+        auth_module,
+        "revoke_user_sessions_with_connection",
+        failing_revocation,
+    )
+
+    service = AuthService.__new__(
+        AuthService
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="simulated revocation failure",
+    ):
+        service.set_password(
+            user_id,
+            new_password,
+        )
+
+    stored_user = connection.execute(
+        """
+        SELECT password_hash
+        FROM users
+        WHERE id = ?
+        """,
+        (
+            user_id,
+        ),
+    ).fetchone()
+
+    assert stored_user is not None
+
+    assert (
+        stored_user[0]
+        == old_hash
+    )
+
+    assert AuthService.verify_password(
+        old_password,
+        stored_user[0],
+    )
+
+    assert not AuthService.verify_password(
+        new_password,
+        stored_user[0],
+    )
+
+    session_count = connection.execute(
+        """
+        SELECT COUNT(*)
+        FROM user_sessions
+        WHERE user_id = ?
+        """,
+        (
+            user_id,
+        ),
+    ).fetchone()[0]
+
+    assert session_count == 1
+
+    connection.close()
