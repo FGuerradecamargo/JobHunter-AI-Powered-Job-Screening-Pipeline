@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from models.app_user import AppUser
 from models.candidate import Candidate
+from services.auth_rate_limiter import AuthRateLimiter
 from services.candidate_repository import CandidateRepository
 from services.compromised_password_service import (
     CompromisedPasswordService,
@@ -198,7 +199,18 @@ class AuthService:
     ) -> Optional[AppUser]:
         normalized_email = email.strip().lower()
 
-        with get_connection() as connection:
+        with AuthRateLimiter.serialized_attempt(
+            normalized_email
+        ) as connection:
+            if (
+                AuthRateLimiter
+                .is_limited_with_connection(
+                    connection,
+                    normalized_email,
+                )
+            ):
+                return None
+
             row = connection.execute(
                 """
                 SELECT
@@ -210,41 +222,74 @@ class AuthService:
                 (normalized_email,),
             ).fetchone()
 
-        if row is None:
-            self.verify_password(
-                password,
-                self.DUMMY_PASSWORD_HASH,
-            )
-            return None
-
-        stored_hash = row[
-            "password_hash"
-        ]
-
-        if not stored_hash:
-            self.verify_password(
-                password,
-                self.DUMMY_PASSWORD_HASH,
-            )
-            return None
-
-        if not self.verify_password(
-            password,
-            stored_hash,
-        ):
-            return None
-
-        if self.needs_password_rehash(
-            stored_hash
-        ):
-            upgraded_hash = (
-                self._build_password_hash(
+            if row is None:
+                self.verify_password(
                     password,
-                    iterations=self.ITERATIONS,
+                    self.DUMMY_PASSWORD_HASH,
+                )
+
+                (
+                    AuthRateLimiter
+                    .record_failure_with_connection(
+                        connection,
+                        normalized_email,
+                    )
+                )
+
+                return None
+
+            stored_hash = row[
+                "password_hash"
+            ]
+
+            if not stored_hash:
+                self.verify_password(
+                    password,
+                    self.DUMMY_PASSWORD_HASH,
+                )
+
+                (
+                    AuthRateLimiter
+                    .record_failure_with_connection(
+                        connection,
+                        normalized_email,
+                    )
+                )
+
+                return None
+
+            if not self.verify_password(
+                password,
+                stored_hash,
+            ):
+                (
+                    AuthRateLimiter
+                    .record_failure_with_connection(
+                        connection,
+                        normalized_email,
+                    )
+                )
+
+                return None
+
+            (
+                AuthRateLimiter
+                .clear_with_connection(
+                    connection,
+                    normalized_email,
                 )
             )
 
-            with get_connection() as connection:
+            if self.needs_password_rehash(
+                stored_hash
+            ):
+                upgraded_hash = (
+                    self._build_password_hash(
+                        password,
+                        iterations=self.ITERATIONS,
+                    )
+                )
+
                 connection.execute(
                     """
                     UPDATE users

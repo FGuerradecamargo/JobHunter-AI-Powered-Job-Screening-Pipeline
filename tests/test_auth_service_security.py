@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from services.auth_rate_limiter import AuthRateLimiter
 from services.auth_service import AuthService
 from services.compromised_password_service import (
     CompromisedPasswordService,
@@ -293,10 +294,72 @@ def _patch_auth_connection(
     def fake_get_connection():
         yield connection
 
+    @contextmanager
+    def fake_serialized_attempt(
+        cls,
+        identifier,
+    ):
+        yield connection
+
+    def never_limited(
+        cls,
+        locked_connection,
+        identifier,
+        now=None,
+    ):
+        return False
+
+    def ignore_failure(
+        cls,
+        locked_connection,
+        identifier,
+        now=None,
+    ):
+        return None
+
+    def ignore_clear(
+        cls,
+        locked_connection,
+        identifier,
+    ):
+        return None
+
     monkeypatch.setattr(
         auth_module,
         "get_connection",
         fake_get_connection,
+    )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "serialized_attempt",
+        classmethod(
+            fake_serialized_attempt
+        ),
+    )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "is_limited_with_connection",
+        classmethod(
+            never_limited
+        ),
+    )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "record_failure_with_connection",
+        classmethod(
+            ignore_failure
+        ),
+    )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "clear_with_connection",
+        classmethod(
+            ignore_clear
+        ),
     )
 
 
@@ -746,3 +809,305 @@ def test_existing_wrong_password_does_not_use_dummy_hash(
         AuthService.DUMMY_PASSWORD_HASH
         not in calls
     )
+
+
+
+def test_rate_limited_login_stops_before_password_check(
+    monkeypatch,
+):
+    user = SimpleNamespace(
+        id="user_limited",
+        email="limited@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=(
+            AuthService._build_password_hash(
+                "correct password",
+                iterations=(
+                    AuthService.ITERATIONS
+                ),
+            )
+        ),
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    def limited(
+        cls,
+        locked_connection,
+        identifier,
+        now=None,
+    ):
+        assert (
+            locked_connection
+            is connection
+        )
+        return True
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "is_limited_with_connection",
+        classmethod(limited),
+    )
+
+    def must_not_verify(
+        cls,
+        password,
+        stored_hash,
+    ):
+        raise AssertionError(
+            "PBKDF2 must not run while "
+            "the identifier is rate limited."
+        )
+
+    monkeypatch.setattr(
+        AuthService,
+        "verify_password",
+        classmethod(
+            must_not_verify
+        ),
+    )
+
+    authenticated = service.authenticate(
+        user.email,
+        "attempted password",
+    )
+
+    assert authenticated is None
+
+
+def test_failed_login_records_failure_on_locked_connection(
+    monkeypatch,
+):
+    password = "correct password"
+
+    user = SimpleNamespace(
+        id="user_failed_rate",
+        email="failed@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=(
+            AuthService._build_password_hash(
+                password,
+                iterations=(
+                    AuthService.ITERATIONS
+                ),
+            )
+        ),
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    recorded = []
+
+    def record_failure(
+        cls,
+        locked_connection,
+        identifier,
+        now=None,
+    ):
+        recorded.append(
+            (
+                locked_connection,
+                identifier,
+            )
+        )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "record_failure_with_connection",
+        classmethod(
+            record_failure
+        ),
+    )
+
+    authenticated = service.authenticate(
+        user.email,
+        "wrong password",
+    )
+
+    assert authenticated is None
+
+    assert recorded == [
+        (
+            connection,
+            user.email,
+        )
+    ]
+
+
+def test_successful_login_clears_failures_on_locked_connection(
+    monkeypatch,
+):
+    password = "correct password"
+
+    user = SimpleNamespace(
+        id="user_success_rate",
+        email="success@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=(
+            AuthService._build_password_hash(
+                password,
+                iterations=(
+                    AuthService.ITERATIONS
+                ),
+            )
+        ),
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    cleared = []
+
+    def clear_failures(
+        cls,
+        locked_connection,
+        identifier,
+    ):
+        cleared.append(
+            (
+                locked_connection,
+                identifier,
+            )
+        )
+
+    def must_not_record(
+        cls,
+        locked_connection,
+        identifier,
+        now=None,
+    ):
+        raise AssertionError(
+            "Successful login must not "
+            "record a failure."
+        )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "clear_with_connection",
+        classmethod(
+            clear_failures
+        ),
+    )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "record_failure_with_connection",
+        classmethod(
+            must_not_record
+        ),
+    )
+
+    authenticated = service.authenticate(
+        user.email,
+        password,
+    )
+
+    assert authenticated is user
+
+    assert cleared == [
+        (
+            connection,
+            user.email,
+        )
+    ]
+
+
+def test_unknown_account_records_failure_after_dummy_check(
+    monkeypatch,
+):
+    user = SimpleNamespace(
+        id="unused_user_rate",
+        email="existing@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=None,
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    recorded = []
+
+    def record_failure(
+        cls,
+        locked_connection,
+        identifier,
+        now=None,
+    ):
+        recorded.append(
+            (
+                locked_connection,
+                identifier,
+            )
+        )
+
+    monkeypatch.setattr(
+        AuthRateLimiter,
+        "record_failure_with_connection",
+        classmethod(
+            record_failure
+        ),
+    )
+
+    authenticated = service.authenticate(
+        "missing@example.com",
+        "attempted password",
+    )
+
+    assert authenticated is None
+
+    assert recorded == [
+        (
+            connection,
+            "missing@example.com",
+        )
+    ]

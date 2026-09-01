@@ -352,6 +352,42 @@ def _create_candidate_job_analysis_run_schema(
     )
 
 
+def create_auth_login_failure_schema(
+    connection,
+) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS
+        auth_login_failures (
+            id TEXT PRIMARY KEY,
+            identifier_hash TEXT NOT NULL,
+            attempted_at TEXT NOT NULL
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+        idx_auth_login_failures_identifier_time
+        ON auth_login_failures(
+            identifier_hash,
+            attempted_at
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+        idx_auth_login_failures_attempted_at
+        ON auth_login_failures(
+            attempted_at
+        )
+        """
+    )
+
+
 def initialize_postgres_database() -> None:
     with get_connection() as connection:
         connection.execute(
@@ -520,6 +556,10 @@ def initialize_postgres_database() -> None:
                     ON DELETE SET NULL
             )
             """
+        )
+
+        create_auth_login_failure_schema(
+            connection
         )
 
         connection.execute(
@@ -1309,6 +1349,10 @@ def initialize_sqlite_database() -> None:
                     ON DELETE SET NULL
             )
             """
+        )
+
+        create_auth_login_failure_schema(
+            connection
         )
 
         connection.execute(
