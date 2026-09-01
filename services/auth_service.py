@@ -21,6 +21,16 @@ class AuthService:
     MIN_PASSWORD_LENGTH = 15
     MAX_PASSWORD_LENGTH = 128
 
+    # Used only to equalize authentication cost when
+    # an account does not exist. It is not a real
+    # credential and never authenticates successfully.
+    DUMMY_PASSWORD_HASH = (
+        f"{ITERATIONS}$"
+        "00000000000000000000000000000000$"
+        "00000000000000000000000000000000"
+        "00000000000000000000000000000000"
+    )
+
     def __init__(self) -> None:
         self.user_repository = UserRepository()
         self.candidate_repository = CandidateRepository()
@@ -201,11 +211,22 @@ class AuthService:
             ).fetchone()
 
         if row is None:
+            self.verify_password(
+                password,
+                self.DUMMY_PASSWORD_HASH,
+            )
             return None
 
         stored_hash = row[
             "password_hash"
         ]
+
+        if not stored_hash:
+            self.verify_password(
+                password,
+                self.DUMMY_PASSWORD_HASH,
+            )
+            return None
 
         if not self.verify_password(
             password,

@@ -554,3 +554,195 @@ def test_login_and_legacy_rehash_do_not_call_hibp(
     assert connection.password_hash.startswith(
         "600000$"
     )
+
+
+def test_unknown_email_uses_dummy_password_hash(
+    monkeypatch,
+):
+    user = SimpleNamespace(
+        id="unused_user",
+        email="existing@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=(
+            AuthService._build_password_hash(
+                "existing password",
+                iterations=(
+                    AuthService.ITERATIONS
+                ),
+            )
+        ),
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    calls = []
+
+    def fake_verify(
+        cls,
+        password,
+        stored_hash,
+    ):
+        calls.append(
+            (
+                password,
+                stored_hash,
+            )
+        )
+        return False
+
+    monkeypatch.setattr(
+        AuthService,
+        "verify_password",
+        classmethod(fake_verify),
+    )
+
+    authenticated = service.authenticate(
+        "missing@example.com",
+        "attempted password",
+    )
+
+    assert authenticated is None
+
+    assert calls == [
+        (
+            "attempted password",
+            AuthService.DUMMY_PASSWORD_HASH,
+        )
+    ]
+
+
+def test_account_without_local_password_uses_dummy_hash(
+    monkeypatch,
+):
+    user = SimpleNamespace(
+        id="user_google_only",
+        email="googleonly@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=None,
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    calls = []
+
+    def fake_verify(
+        cls,
+        password,
+        stored_hash,
+    ):
+        calls.append(
+            stored_hash
+        )
+        return False
+
+    monkeypatch.setattr(
+        AuthService,
+        "verify_password",
+        classmethod(fake_verify),
+    )
+
+    authenticated = service.authenticate(
+        user.email,
+        "attempted password",
+    )
+
+    assert authenticated is None
+
+    assert calls == [
+        AuthService.DUMMY_PASSWORD_HASH
+    ]
+
+
+def test_existing_wrong_password_does_not_use_dummy_hash(
+    monkeypatch,
+):
+    stored_hash = (
+        AuthService._build_password_hash(
+            "correct password",
+            iterations=(
+                AuthService.ITERATIONS
+            ),
+        )
+    )
+
+    user = SimpleNamespace(
+        id="user_existing_wrong",
+        email="existingwrong@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=stored_hash,
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    calls = []
+
+    def fake_verify(
+        cls,
+        password,
+        supplied_hash,
+    ):
+        calls.append(
+            supplied_hash
+        )
+        return False
+
+    monkeypatch.setattr(
+        AuthService,
+        "verify_password",
+        classmethod(fake_verify),
+    )
+
+    authenticated = service.authenticate(
+        user.email,
+        "wrong password",
+    )
+
+    assert authenticated is None
+
+    assert calls == [
+        stored_hash
+    ]
+
+    assert (
+        AuthService.DUMMY_PASSWORD_HASH
+        not in calls
+    )
