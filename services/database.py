@@ -388,6 +388,96 @@ def create_auth_login_failure_schema(
     )
 
 
+def create_account_security_schema(
+    connection,
+) -> None:
+    """
+    Create account recovery / verification
+    persistence without storing raw action tokens.
+    """
+
+    if is_postgres():
+        connection.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS
+                email_verified_at TEXT
+            """
+        )
+
+    else:
+        user_columns = {
+            row[1]
+            for row in connection.execute(
+                """
+                PRAGMA table_info(users)
+                """
+            ).fetchall()
+        }
+
+        if (
+            "email_verified_at"
+            not in user_columns
+        ):
+            connection.execute(
+                """
+                ALTER TABLE users
+                ADD COLUMN email_verified_at TEXT
+                """
+            )
+
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS
+        account_action_tokens (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+
+            purpose TEXT NOT NULL
+                CHECK (
+                    purpose IN (
+                        'password_reset',
+                        'email_verification'
+                    )
+                ),
+
+            token_hash TEXT NOT NULL UNIQUE,
+
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            invalidated_at TEXT,
+            created_at TEXT NOT NULL,
+
+            FOREIGN KEY (user_id)
+                REFERENCES users(id)
+                ON DELETE CASCADE
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_account_action_tokens_user_purpose
+        ON account_action_tokens(
+            user_id,
+            purpose,
+            created_at
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_account_action_tokens_expiry
+        ON account_action_tokens(
+            expires_at
+        )
+        """
+    )
+
+
 def initialize_postgres_database() -> None:
     with get_connection() as connection:
         connection.execute(
@@ -559,6 +649,10 @@ def initialize_postgres_database() -> None:
         )
 
         create_auth_login_failure_schema(
+            connection
+        )
+
+        create_account_security_schema(
             connection
         )
 
@@ -1361,6 +1455,10 @@ def initialize_sqlite_database() -> None:
         )
 
         create_auth_login_failure_schema(
+            connection
+        )
+
+        create_account_security_schema(
             connection
         )
 
