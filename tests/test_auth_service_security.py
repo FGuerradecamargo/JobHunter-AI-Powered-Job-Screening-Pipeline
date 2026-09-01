@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import hashlib
 import os
@@ -6,6 +6,25 @@ import os
 import pytest
 
 from services.auth_service import AuthService
+from services.compromised_password_service import (
+    CompromisedPasswordService,
+    PasswordSecurityUnavailableError,
+)
+
+
+
+
+@pytest.fixture(autouse=True)
+def _disable_external_breach_lookup(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        CompromisedPasswordService,
+        "is_compromised",
+        classmethod(
+            lambda cls, password: False
+        ),
+    )
 
 
 def _build_legacy_hash(
@@ -424,4 +443,114 @@ def test_wrong_legacy_password_does_not_rehash(
     assert (
         connection.password_hash
         == legacy_hash
+    )
+
+
+
+def test_compromised_password_is_rejected(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        CompromisedPasswordService,
+        "is_compromised",
+        classmethod(
+            lambda cls, password: True
+        ),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="known data breach",
+    ):
+        AuthService.hash_password(
+            "correct horse battery staple"
+        )
+
+
+def test_breach_service_unavailable_blocks_new_password(
+    monkeypatch,
+):
+    def unavailable(
+        cls,
+        password,
+    ):
+        raise PasswordSecurityUnavailableError(
+            "Password security check "
+            "is temporarily unavailable. "
+            "Please try again."
+        )
+
+    monkeypatch.setattr(
+        CompromisedPasswordService,
+        "is_compromised",
+        classmethod(unavailable),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="temporarily unavailable",
+    ):
+        AuthService.hash_password(
+            "another sufficiently long password"
+        )
+
+
+def test_login_and_legacy_rehash_do_not_call_hibp(
+    monkeypatch,
+):
+    password = "old-pass-1"
+
+    legacy_hash = _build_legacy_hash(
+        password,
+        iterations=310_000,
+    )
+
+    user = SimpleNamespace(
+        id="user_no_hibp_login",
+        email="nohibp@example.com",
+    )
+
+    connection = _AuthConnection(
+        user_id=user.id,
+        email=user.email,
+        password_hash=legacy_hash,
+    )
+
+    _patch_auth_connection(
+        monkeypatch,
+        connection,
+    )
+
+    service = (
+        _build_auth_service_for_test(
+            user
+        )
+    )
+
+    def must_not_be_called(
+        cls,
+        supplied_password,
+    ):
+        raise AssertionError(
+            "HIBP must not be called during login."
+        )
+
+    monkeypatch.setattr(
+        CompromisedPasswordService,
+        "is_compromised",
+        classmethod(
+            must_not_be_called
+        ),
+    )
+
+    authenticated = service.authenticate(
+        user.email,
+        password,
+    )
+
+    assert authenticated is user
+    assert connection.update_count == 1
+
+    assert connection.password_hash.startswith(
+        "600000$"
     )

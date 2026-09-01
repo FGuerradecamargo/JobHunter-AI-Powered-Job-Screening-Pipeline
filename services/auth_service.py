@@ -9,6 +9,9 @@ from uuid import uuid4
 from models.app_user import AppUser
 from models.candidate import Candidate
 from services.candidate_repository import CandidateRepository
+from services.compromised_password_service import (
+    CompromisedPasswordService,
+)
 from services.database import get_connection, utc_now
 from services.user_repository import UserRepository
 
@@ -42,6 +45,16 @@ class AuthService:
             raise ValueError(
                 "Password must contain at most "
                 f"{cls.MAX_PASSWORD_LENGTH} characters."
+            )
+
+        if (
+            CompromisedPasswordService
+            .is_compromised(password)
+        ):
+            raise ValueError(
+                "This password has appeared in "
+                "a known data breach. "
+                "Please choose another password."
             )
 
     @classmethod
