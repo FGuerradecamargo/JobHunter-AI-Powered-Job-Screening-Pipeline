@@ -146,6 +146,153 @@ def is_postgres() -> bool:
     )
 
 
+def _create_candidate_job_analysis_run_schema(
+    connection,
+) -> None:
+    """
+    Create immutable candidate-job analysis history.
+
+    candidate_job_analyses remains the current-state
+    projection.
+
+    candidate_job_analysis_runs records how each analysis
+    attempt was produced so reanalysis never destroys its
+    previous provenance.
+    """
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS
+        candidate_job_analysis_runs (
+            id TEXT PRIMARY KEY,
+
+            scan_id TEXT NOT NULL,
+            batch_id TEXT NOT NULL,
+
+            candidate_id TEXT NOT NULL,
+            job_id TEXT NOT NULL,
+
+            run_mode TEXT NOT NULL
+                CHECK (
+                    run_mode IN (
+                        'discovery',
+                        'reanalysis'
+                    )
+                ),
+
+            trigger_reasons_json TEXT
+                NOT NULL DEFAULT '[]',
+
+            analysis_version TEXT
+                NOT NULL DEFAULT '',
+
+            job_profile_version TEXT
+                NOT NULL DEFAULT '',
+
+            job_signature TEXT
+                NOT NULL DEFAULT '',
+
+            candidate_signature TEXT
+                NOT NULL DEFAULT '',
+
+            evidence_signature TEXT
+                NOT NULL DEFAULT '',
+
+            direction_signature TEXT
+                NOT NULL DEFAULT '',
+
+            constraint_signature TEXT
+                NOT NULL DEFAULT '',
+
+            career_memory_version INTEGER,
+
+            career_memory_schema_version TEXT
+                NOT NULL DEFAULT '',
+
+            career_memory_source_signature TEXT
+                NOT NULL DEFAULT '',
+
+            career_memory_interpreted_source_signature TEXT
+                NOT NULL DEFAULT '',
+
+            result_state TEXT NOT NULL
+                CHECK (
+                    result_state IN (
+                        'completed',
+                        'failed'
+                    )
+                ),
+
+            result_stage TEXT NOT NULL
+                CHECK (
+                    result_stage IN (
+                        'preparation',
+                        'hard_filter',
+                        'batch_ai',
+                        'persistence'
+                    )
+                ),
+
+            analysis_json TEXT
+                NOT NULL DEFAULT '{}',
+
+            error_text TEXT
+                NOT NULL DEFAULT '',
+
+            created_at TEXT NOT NULL,
+
+            UNIQUE (
+                scan_id,
+                batch_id,
+                candidate_id,
+                job_id
+            ),
+
+            FOREIGN KEY (candidate_id)
+                REFERENCES candidates(id)
+                ON DELETE CASCADE,
+
+            FOREIGN KEY (job_id)
+                REFERENCES jobs(id)
+                ON DELETE CASCADE
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+        idx_candidate_job_analysis_runs_candidate_created
+        ON candidate_job_analysis_runs(
+            candidate_id,
+            created_at
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+        idx_candidate_job_analysis_runs_job_created
+        ON candidate_job_analysis_runs(
+            candidate_id,
+            job_id,
+            created_at
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+        idx_candidate_job_analysis_runs_scan_batch
+        ON candidate_job_analysis_runs(
+            scan_id,
+            batch_id
+        )
+        """
+    )
+
+
 def initialize_postgres_database() -> None:
     with get_connection() as connection:
         connection.execute(
@@ -456,6 +603,10 @@ def initialize_postgres_database() -> None:
                 END
                 """
             )
+
+        _create_candidate_job_analysis_run_schema(
+            connection
+        )
 
         connection.execute(
             """
@@ -1141,6 +1292,10 @@ def initialize_sqlite_database() -> None:
                     ON DELETE CASCADE
             )
             """
+        )
+
+        _create_candidate_job_analysis_run_schema(
+            connection
         )
 
         connection.execute(
