@@ -8,6 +8,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from dotenv import load_dotenv
 
@@ -3352,7 +3353,9 @@ def update_shared_job_analysis_data(
         )
 
 
-def save_candidate_job_analysis(
+def _save_candidate_job_analysis_on_connection(
+    connection,
+    *,
     candidate_id: str,
     job_id: str,
     analysis: dict[str, Any],
@@ -3365,6 +3368,14 @@ def save_candidate_job_analysis(
     constraint_signature: str | None = None,
     opportunity_state: str | None = None,
 ) -> None:
+    """
+    Persist the current candidate-job analysis using an
+    existing transaction.
+
+    Keeping this operation connection-scoped allows the
+    current-state projection and immutable history record
+    to commit or roll back together.
+    """
     if status not in VALID_STATUSES:
         raise ValueError(
             f"Invalid status: {status}"
@@ -3431,63 +3442,395 @@ def save_candidate_job_analysis(
         else None
     )
 
-    with get_connection() as connection:
-        cursor = connection.execute(
-            """
-            UPDATE candidate_job_analyses
+    cursor = connection.execute(
+        """
+        UPDATE candidate_job_analyses
 
-            SET
-                recommendation = ?,
-                competitive_status = ?,
-                current_fit = ?,
-                growth_value = ?,
-                analysis_json = ?,
-                job_signature = ?,
-                candidate_signature = ?,
-                evidence_signature = ?,
-                direction_signature = ?,
-                constraint_signature = ?,
-                analysis_version = ?,
-                analysis_state = ?,
-                opportunity_state = ?,
-                status = ?,
-                rejected_at = ?,
-                updated_at = ?
+        SET
+            recommendation = ?,
+            competitive_status = ?,
+            current_fit = ?,
+            growth_value = ?,
+            analysis_json = ?,
+            job_signature = ?,
+            candidate_signature = ?,
+            evidence_signature = ?,
+            direction_signature = ?,
+            constraint_signature = ?,
+            analysis_version = ?,
+            analysis_state = ?,
+            opportunity_state = ?,
+            status = ?,
+            rejected_at = ?,
+            updated_at = ?
 
-            WHERE
-                candidate_id = ?
-                AND job_id = ?
-            """,
-            (
-                recommendation,
-                competitive_status,
-                current_fit,
-                growth_value,
-                json.dumps(
-                    analysis,
-                    ensure_ascii=False,
-                ),
-                job_signature,
-                candidate_signature,
-                evidence_signature,
-                direction_signature,
-                constraint_signature,
-                analysis_version,
-                analysis_state,
-                resolved_opportunity_state,
-                status,
-                rejected_at,
-                now,
-                candidate_id,
-                job_id,
+        WHERE
+            candidate_id = ?
+            AND job_id = ?
+        """,
+        (
+            recommendation,
+            competitive_status,
+            current_fit,
+            growth_value,
+            json.dumps(
+                analysis,
+                ensure_ascii=False,
             ),
+            job_signature,
+            candidate_signature,
+            evidence_signature,
+            direction_signature,
+            constraint_signature,
+            analysis_version,
+            analysis_state,
+            resolved_opportunity_state,
+            status,
+            rejected_at,
+            now,
+            candidate_id,
+            job_id,
+        ),
+    )
+
+    if cursor.rowcount == 0:
+        raise ValueError(
+            "Candidate-job relationship was not found: "
+            f"{candidate_id} / {job_id}"
         )
 
-        if cursor.rowcount == 0:
-            raise ValueError(
-                "Candidate-job relationship was not found: "
-                f"{candidate_id} / {job_id}"
+
+def _append_candidate_job_analysis_run_on_connection(
+    connection,
+    *,
+    scan_id: str,
+    batch_id: str,
+    candidate_id: str,
+    job_id: str,
+    run_mode: str,
+    trigger_reasons: list[str],
+    analysis_version: str,
+    job_profile_version: str,
+    job_signature: str,
+    candidate_signature: str,
+    evidence_signature: str,
+    direction_signature: str,
+    constraint_signature: str,
+    career_memory_version: int | None,
+    career_memory_schema_version: str,
+    career_memory_source_signature: str,
+    career_memory_interpreted_source_signature: str,
+    result_state: str,
+    result_stage: str,
+    analysis: dict[str, Any] | None = None,
+    error_text: str = "",
+) -> None:
+    """
+    Append one immutable analysis execution record.
+
+    No ON CONFLICT update is allowed here. A duplicate
+    scan/batch/candidate/job tuple is a traceability
+    violation and must fail rather than rewrite history.
+    """
+    normalized_reasons = []
+
+    for reason in trigger_reasons:
+        normalized = str(
+            reason or ""
+        ).strip()
+
+        if (
+            normalized
+            and normalized
+            not in normalized_reasons
+        ):
+            normalized_reasons.append(
+                normalized
             )
+
+    connection.execute(
+        """
+        INSERT INTO candidate_job_analysis_runs (
+            id,
+            scan_id,
+            batch_id,
+            candidate_id,
+            job_id,
+            run_mode,
+            trigger_reasons_json,
+            analysis_version,
+            job_profile_version,
+            job_signature,
+            candidate_signature,
+            evidence_signature,
+            direction_signature,
+            constraint_signature,
+            career_memory_version,
+            career_memory_schema_version,
+            career_memory_source_signature,
+            career_memory_interpreted_source_signature,
+            result_state,
+            result_stage,
+            analysis_json,
+            error_text,
+            created_at
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        """,
+        (
+            (
+                "candidate_job_analysis_run_"
+                + uuid4().hex
+            ),
+            str(scan_id or "").strip(),
+            str(batch_id or "").strip(),
+            str(candidate_id or "").strip(),
+            str(job_id or "").strip(),
+            str(run_mode or "").strip(),
+            json.dumps(
+                normalized_reasons,
+                ensure_ascii=False,
+            ),
+            str(
+                analysis_version or ""
+            ).strip(),
+            str(
+                job_profile_version or ""
+            ).strip(),
+            str(
+                job_signature or ""
+            ).strip(),
+            str(
+                candidate_signature or ""
+            ).strip(),
+            str(
+                evidence_signature or ""
+            ).strip(),
+            str(
+                direction_signature or ""
+            ).strip(),
+            str(
+                constraint_signature or ""
+            ).strip(),
+            career_memory_version,
+            str(
+                career_memory_schema_version
+                or ""
+            ).strip(),
+            str(
+                career_memory_source_signature
+                or ""
+            ).strip(),
+            str(
+                career_memory_interpreted_source_signature
+                or ""
+            ).strip(),
+            str(
+                result_state or ""
+            ).strip(),
+            str(
+                result_stage or ""
+            ).strip(),
+            json.dumps(
+                analysis or {},
+                ensure_ascii=False,
+            ),
+            str(
+                error_text or ""
+            ),
+            utc_now(),
+        ),
+    )
+
+
+def save_candidate_job_analysis(
+    candidate_id: str,
+    job_id: str,
+    analysis: dict[str, Any],
+    job_signature: str,
+    candidate_signature: str,
+    analysis_version: str,
+    status: str = "in_review",
+    evidence_signature: str | None = None,
+    direction_signature: str | None = None,
+    constraint_signature: str | None = None,
+    opportunity_state: str | None = None,
+) -> None:
+    """
+    Legacy/current-state persistence API.
+
+    Existing callers keep exactly the same behavior.
+    """
+    with get_connection() as connection:
+        _save_candidate_job_analysis_on_connection(
+            connection,
+            candidate_id=candidate_id,
+            job_id=job_id,
+            analysis=analysis,
+            job_signature=job_signature,
+            candidate_signature=(
+                candidate_signature
+            ),
+            analysis_version=analysis_version,
+            status=status,
+            evidence_signature=evidence_signature,
+            direction_signature=direction_signature,
+            constraint_signature=constraint_signature,
+            opportunity_state=opportunity_state,
+        )
+
+
+def save_candidate_job_analysis_with_run(
+    *,
+    candidate_id: str,
+    job_id: str,
+    analysis: dict[str, Any],
+    job_signature: str,
+    candidate_signature: str,
+    analysis_version: str,
+    status: str,
+    opportunity_state: str,
+    evidence_signature: str,
+    direction_signature: str,
+    constraint_signature: str,
+    scan_id: str,
+    batch_id: str,
+    run_mode: str,
+    trigger_reasons: list[str],
+    job_profile_version: str,
+    career_memory_version: int | None,
+    career_memory_schema_version: str,
+    career_memory_source_signature: str,
+    career_memory_interpreted_source_signature: str,
+    result_stage: str,
+) -> None:
+    """
+    Atomically update current state and append its
+    immutable provenance record.
+
+    Either both persist or neither persists.
+    """
+    with get_connection() as connection:
+        _save_candidate_job_analysis_on_connection(
+            connection,
+            candidate_id=candidate_id,
+            job_id=job_id,
+            analysis=analysis,
+            job_signature=job_signature,
+            candidate_signature=(
+                candidate_signature
+            ),
+            analysis_version=analysis_version,
+            status=status,
+            evidence_signature=evidence_signature,
+            direction_signature=direction_signature,
+            constraint_signature=constraint_signature,
+            opportunity_state=opportunity_state,
+        )
+
+        _append_candidate_job_analysis_run_on_connection(
+            connection,
+            scan_id=scan_id,
+            batch_id=batch_id,
+            candidate_id=candidate_id,
+            job_id=job_id,
+            run_mode=run_mode,
+            trigger_reasons=trigger_reasons,
+            analysis_version=analysis_version,
+            job_profile_version=job_profile_version,
+            job_signature=job_signature,
+            candidate_signature=(
+                candidate_signature
+            ),
+            evidence_signature=evidence_signature,
+            direction_signature=direction_signature,
+            constraint_signature=constraint_signature,
+            career_memory_version=(
+                career_memory_version
+            ),
+            career_memory_schema_version=(
+                career_memory_schema_version
+            ),
+            career_memory_source_signature=(
+                career_memory_source_signature
+            ),
+            career_memory_interpreted_source_signature=(
+                career_memory_interpreted_source_signature
+            ),
+            result_state="completed",
+            result_stage=result_stage,
+            analysis=analysis,
+            error_text="",
+        )
+
+
+def append_candidate_job_analysis_run(
+    *,
+    scan_id: str,
+    batch_id: str,
+    candidate_id: str,
+    job_id: str,
+    run_mode: str,
+    trigger_reasons: list[str],
+    analysis_version: str,
+    job_profile_version: str,
+    job_signature: str,
+    candidate_signature: str,
+    evidence_signature: str,
+    direction_signature: str,
+    constraint_signature: str,
+    career_memory_version: int | None,
+    career_memory_schema_version: str,
+    career_memory_source_signature: str,
+    career_memory_interpreted_source_signature: str,
+    result_state: str,
+    result_stage: str,
+    analysis: dict[str, Any] | None = None,
+    error_text: str = "",
+) -> None:
+    """
+    Append traceability when no current-state write
+    belongs in the same transaction, such as preparation
+    or batch-AI failure.
+    """
+    with get_connection() as connection:
+        _append_candidate_job_analysis_run_on_connection(
+            connection,
+            scan_id=scan_id,
+            batch_id=batch_id,
+            candidate_id=candidate_id,
+            job_id=job_id,
+            run_mode=run_mode,
+            trigger_reasons=trigger_reasons,
+            analysis_version=analysis_version,
+            job_profile_version=job_profile_version,
+            job_signature=job_signature,
+            candidate_signature=(
+                candidate_signature
+            ),
+            evidence_signature=evidence_signature,
+            direction_signature=direction_signature,
+            constraint_signature=constraint_signature,
+            career_memory_version=(
+                career_memory_version
+            ),
+            career_memory_schema_version=(
+                career_memory_schema_version
+            ),
+            career_memory_source_signature=(
+                career_memory_source_signature
+            ),
+            career_memory_interpreted_source_signature=(
+                career_memory_interpreted_source_signature
+            ),
+            result_state=result_state,
+            result_stage=result_stage,
+            analysis=analysis,
+            error_text=error_text,
+        )
 
 
 def save_candidate_application_outcome(
