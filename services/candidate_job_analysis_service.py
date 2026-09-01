@@ -32,6 +32,9 @@ from services.candidate_repository import (
 from services.career_objective_repository import (
     CareerObjectiveRepository,
 )
+from services.career_memory_repository import (
+    CareerMemoryRepository,
+)
 from services.career_update_repository import (
     CareerUpdateRepository,
 )
@@ -704,6 +707,10 @@ class CandidateJobAnalysisService:
             CareerUpdateRepository()
         )
 
+        self.career_memory_repository = (
+            CareerMemoryRepository()
+        )
+
         self.enricher = JobEnricher()
         self.matcher = JobMatcher()
         self.fit_analyzer = CandidateFitAnalyzer()
@@ -721,6 +728,31 @@ class CandidateJobAnalysisService:
                 OpenAIClient()
             )
         )
+
+    def _load_candidate_career_memory(
+        self,
+        candidate_id: str,
+    ) -> dict[str, Any]:
+        snapshot = (
+            self.career_memory_repository
+            .get_snapshot(candidate_id)
+        )
+
+        if not snapshot:
+            return {}
+
+        memory = snapshot.get(
+            "memory",
+            {},
+        )
+
+        if not isinstance(
+            memory,
+            dict,
+        ):
+            return {}
+
+        return memory
 
     def analyze_pending(
         self,
@@ -753,6 +785,18 @@ class CandidateJobAnalysisService:
             candidate,
             career_objective,
             career_updates,
+        )
+
+        # Career Memory is candidate-specific historical
+        # context. Read it once per scan and keep it fixed
+        # across every batch in this analyze_pending call.
+        #
+        # Do NOT refresh or interpret it here: opportunity
+        # analysis must not trigger hidden additional AI work.
+        career_memory = (
+            self._load_candidate_career_memory(
+                candidate_id
+            )
         )
 
         hard_filter = HardFilterAnalyzer(
@@ -1059,6 +1103,7 @@ class CandidateJobAnalysisService:
                     self.ai_service.analyze_batch(
                         items=batch_items,
                         candidate_profile=profile,
+                        career_memory=career_memory,
                     )
                 )
 

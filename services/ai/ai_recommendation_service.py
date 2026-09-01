@@ -46,6 +46,7 @@ class AIRecommendationService:
         self,
         items: list[tuple[Job, JobProfile]],
         candidate_profile: CandidateProfile,
+        career_memory: dict | None = None,
     ) -> list[AIRecommendation]:
         """
         Analyze up to BATCH_MAX_SIZE jobs in one LLM
@@ -78,6 +79,7 @@ class AIRecommendationService:
         prompt = build_batch_prompt(
             items=items,
             candidate_profile=candidate_profile,
+            career_memory=career_memory,
         )
 
         raw_response = self.llm_client.generate(
