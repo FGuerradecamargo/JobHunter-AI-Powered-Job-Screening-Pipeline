@@ -964,6 +964,7 @@ class CandidateJobAnalysisService:
         target_opportunities: int | None = None,
         ai_budget: AIUsageBudget | None = None,
         job_ids: list[str] | None = None,
+        scan_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Analyze jobs that have never completed their
@@ -986,10 +987,7 @@ class CandidateJobAnalysisService:
             ),
             ai_budget=ai_budget,
             preserve_existing_lifecycle=False,
-            scan_id=(
-                "candidate_job_scan_"
-                + uuid4().hex
-            ),
+            scan_id=scan_id,
             run_mode="discovery",
         )
 

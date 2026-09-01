@@ -662,3 +662,142 @@ def test_reanalysis_ai_reject_preserves_active_lifecycle(
     assert result["analyzed"] == 1
     assert result["ai_rejected"] == 1
     assert result["failed"] == 0
+
+
+def test_analyze_pending_reuses_caller_scan_id_across_waves(
+    monkeypatch,
+):
+    import services.candidate_job_analysis_service as module
+
+    service = object.__new__(
+        CandidateJobAnalysisService
+    )
+
+    engine_scan_ids = []
+
+    def fake_selector(
+        **kwargs,
+    ):
+        return [
+            {
+                "id": kwargs["job_ids"][0],
+            },
+        ]
+
+    def fake_engine(
+        **kwargs,
+    ):
+        engine_scan_ids.append(
+            kwargs["scan_id"]
+        )
+
+        return {
+            "scan_id": kwargs["scan_id"],
+        }
+
+    monkeypatch.setattr(
+        module,
+        "list_pending_candidate_jobs",
+        fake_selector,
+    )
+
+    monkeypatch.setattr(
+        service,
+        "_run_candidate_job_analysis",
+        fake_engine,
+    )
+
+    scan_id = (
+        "candidate_job_scan_same_action"
+    )
+
+    first = service.analyze_pending(
+        candidate_id="candidate-a",
+        limit=1,
+        job_ids=["job-wave-1"],
+        scan_id=scan_id,
+    )
+
+    second = service.analyze_pending(
+        candidate_id="candidate-a",
+        limit=1,
+        job_ids=["job-wave-2"],
+        scan_id=scan_id,
+    )
+
+    assert engine_scan_ids == [
+        scan_id,
+        scan_id,
+    ]
+
+    assert first["scan_id"] == scan_id
+    assert second["scan_id"] == scan_id
+
+
+def test_analyze_pending_without_scan_id_keeps_engine_fallback(
+    monkeypatch,
+):
+    import services.candidate_job_analysis_service as module
+
+    service = object.__new__(
+        CandidateJobAnalysisService
+    )
+
+    engine_scan_ids = []
+
+    def fake_selector(
+        **kwargs,
+    ):
+        return [
+            {
+                "id": "job-1",
+            },
+        ]
+
+    original_engine = (
+        service._run_candidate_job_analysis
+    )
+
+    def fake_engine(
+        **kwargs,
+    ):
+        # Prove the public method does not invent a
+        # competing caller-level ID when none was supplied.
+        engine_scan_ids.append(
+            kwargs["scan_id"]
+        )
+
+        return {
+            "scan_id": kwargs["scan_id"],
+        }
+
+    monkeypatch.setattr(
+        module,
+        "list_pending_candidate_jobs",
+        fake_selector,
+    )
+
+    monkeypatch.setattr(
+        service,
+        "_run_candidate_job_analysis",
+        fake_engine,
+    )
+
+    result = service.analyze_pending(
+        candidate_id="candidate-a",
+        limit=1,
+        job_ids=["job-1"],
+    )
+
+    assert engine_scan_ids == [
+        None,
+    ]
+
+    assert result["scan_id"] is None
+
+    # The actual shared engine still owns UUID fallback.
+    #
+    # Existing trace wiring tests exercise that production
+    # boundary directly, so this routing test only verifies
+    # backward-compatible delegation.
+    assert original_engine is not None

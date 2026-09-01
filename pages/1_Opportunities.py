@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -595,6 +596,16 @@ if st.session_state.pop(
 ):
     aggregate = empty_scan_result()
 
+    # One user-requested search owns one immutable scan ID.
+    #
+    # The search may screen several internal waves before
+    # reaching its Quick / Standard / Deep opportunity target,
+    # but all trace rows belong to this same logical scan.
+    scan_id = (
+        "candidate_job_scan_"
+        + uuid4().hex
+    )
+
     # Unlimited for now.
     #
     # Later this comes from the user's subscription
@@ -718,6 +729,7 @@ if st.session_state.pop(
                         limit=len(selected_job_ids),
                         ai_budget=ai_budget,
                         job_ids=selected_job_ids,
+                        scan_id=scan_id,
                     )
                 )
 
