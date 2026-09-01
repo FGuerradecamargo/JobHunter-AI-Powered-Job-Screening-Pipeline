@@ -7,8 +7,38 @@ from services.candidate_job_analysis_service import (
 )
 
 
+@pytest.fixture(autouse=True)
+def fake_claim_release(
+    monkeypatch,
+):
+    calls = []
+
+    def fake_release(
+        **kwargs,
+    ):
+        calls.append(
+            kwargs
+        )
+
+        return len(
+            kwargs.get(
+                "job_ids",
+                [],
+            )
+        )
+
+    monkeypatch.setattr(
+        module,
+        "release_candidate_job_analysis_claims",
+        fake_release,
+    )
+
+    return calls
+
+
 def test_analyze_pending_uses_discovery_selector_and_shared_engine(
     monkeypatch,
+    fake_claim_release,
 ):
     service = object.__new__(
         CandidateJobAnalysisService
@@ -65,13 +95,31 @@ def test_analyze_pending_uses_discovery_selector_and_shared_engine(
         ],
     )
 
-    assert selector_call == {
-        "candidate_id": "candidate-a",
-        "limit": 7,
-        "job_ids": [
-            "new-job-1",
-        ],
-    }
+    assert selector_call[
+        "candidate_id"
+    ] == "candidate-a"
+
+    assert selector_call[
+        "limit"
+    ] == 7
+
+    assert selector_call[
+        "job_ids"
+    ] == [
+        "new-job-1",
+    ]
+
+    assert selector_call[
+        "claim_ttl_seconds"
+    ] == module.ANALYSIS_CLAIM_TTL_SECONDS
+
+    discovery_claim_token = selector_call[
+        "claim_token"
+    ]
+
+    assert discovery_claim_token.startswith(
+        "candidate_job_claim_"
+    )
 
     assert engine_call[
         "candidate_id"
@@ -96,6 +144,27 @@ def test_analyze_pending_uses_discovery_selector_and_shared_engine(
         is False
     )
 
+    assert (
+        engine_call[
+            "analysis_claim_token"
+        ]
+        == discovery_claim_token
+    )
+
+    assert len(
+        fake_claim_release
+    ) == 1
+
+    assert fake_claim_release[0] == {
+        "candidate_id": "candidate-a",
+        "job_ids": [
+            "new-job-1",
+        ],
+        "claim_token": (
+            discovery_claim_token
+        ),
+    }
+
     assert result == {
         "mode": "discovery",
     }
@@ -103,6 +172,7 @@ def test_analyze_pending_uses_discovery_selector_and_shared_engine(
 
 def test_reanalyze_stale_uses_granular_signatures_and_shared_engine(
     monkeypatch,
+    fake_claim_release,
 ):
     service = object.__new__(
         CandidateJobAnalysisService
@@ -243,16 +313,43 @@ def test_reanalyze_stale_uses_granular_signatures_and_shared_engine(
         ],
     )
 
-    assert selector_call == {
-        "candidate_id": "candidate-a",
-        "evidence_signature": "current-e",
-        "direction_signature": "current-d",
-        "constraint_signature": "current-c",
-        "limit": 12,
-        "job_ids": [
-            "stale-job-1",
-        ],
-    }
+    assert selector_call[
+        "candidate_id"
+    ] == "candidate-a"
+
+    assert selector_call[
+        "evidence_signature"
+    ] == "current-e"
+
+    assert selector_call[
+        "direction_signature"
+    ] == "current-d"
+
+    assert selector_call[
+        "constraint_signature"
+    ] == "current-c"
+
+    assert selector_call[
+        "limit"
+    ] == 12
+
+    assert selector_call[
+        "job_ids"
+    ] == [
+        "stale-job-1",
+    ]
+
+    assert selector_call[
+        "claim_ttl_seconds"
+    ] == module.ANALYSIS_CLAIM_TTL_SECONDS
+
+    reanalysis_claim_token = selector_call[
+        "claim_token"
+    ]
+
+    assert reanalysis_claim_token.startswith(
+        "candidate_job_claim_"
+    )
 
     assert engine_call[
         "candidate_id"
@@ -279,6 +376,27 @@ def test_reanalyze_stale_uses_granular_signatures_and_shared_engine(
         ]
         is True
     )
+
+    assert (
+        engine_call[
+            "analysis_claim_token"
+        ]
+        == reanalysis_claim_token
+    )
+
+    assert len(
+        fake_claim_release
+    ) == 1
+
+    assert fake_claim_release[0] == {
+        "candidate_id": "candidate-a",
+        "job_ids": [
+            "stale-job-1",
+        ],
+        "claim_token": (
+            reanalysis_claim_token
+        ),
+    }
 
     assert result == {
         "mode": "reanalysis",

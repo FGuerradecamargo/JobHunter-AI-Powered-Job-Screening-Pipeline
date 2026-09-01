@@ -1,3 +1,4 @@
+import logging
 import hashlib
 import json
 import time
@@ -43,6 +44,7 @@ from services.database import (
     append_candidate_job_analysis_run,
     list_candidate_jobs_for_reanalysis,
     list_pending_candidate_jobs,
+    release_candidate_job_analysis_claims,
     save_candidate_job_analysis_with_run,
     update_shared_job_analysis_data,
 )
@@ -68,6 +70,7 @@ from services.ai_usage_budget import AIUsageBudget
 
 ANALYSIS_VERSION = "candidate-job-analysis-v15"
 REQUEST_DELAY_SECONDS = 2
+ANALYSIS_CLAIM_TTL_SECONDS = 1800
 
 
 class _CareerMemoryContext(dict):
@@ -973,23 +976,65 @@ class CandidateJobAnalysisService:
         Discovery and reanalysis intentionally use
         different selectors.
         """
+        claim_token = (
+            "candidate_job_claim_"
+            + uuid4().hex
+        )
+
         source_rows = list_pending_candidate_jobs(
             candidate_id=candidate_id,
             limit=limit,
             job_ids=job_ids,
+            claim_token=claim_token,
+            claim_ttl_seconds=(
+                ANALYSIS_CLAIM_TTL_SECONDS
+            ),
         )
 
-        return self._run_candidate_job_analysis(
-            candidate_id=candidate_id,
-            source_rows=source_rows,
-            target_opportunities=(
-                target_opportunities
-            ),
-            ai_budget=ai_budget,
-            preserve_existing_lifecycle=False,
-            scan_id=scan_id,
-            run_mode="discovery",
-        )
+        claimed_job_ids = [
+            str(
+                row.get(
+                    "id",
+                    ""
+                )
+            ).strip()
+            for row in source_rows
+            if str(
+                row.get(
+                    "id",
+                    ""
+                )
+            ).strip()
+        ]
+
+        try:
+            return self._run_candidate_job_analysis(
+                candidate_id=candidate_id,
+                source_rows=source_rows,
+                target_opportunities=(
+                    target_opportunities
+                ),
+                ai_budget=ai_budget,
+                preserve_existing_lifecycle=False,
+                scan_id=scan_id,
+                run_mode="discovery",
+                analysis_claim_token=(
+                    claim_token
+                ),
+            )
+
+        finally:
+            try:
+                release_candidate_job_analysis_claims(
+                    candidate_id=candidate_id,
+                    job_ids=claimed_job_ids,
+                    claim_token=claim_token,
+                )
+            except Exception:
+                logging.exception(
+                    "Failed to release candidate-job "
+                    "analysis claims after discovery."
+                )
 
     def reanalyze_stale(
         self,
@@ -1045,6 +1090,11 @@ class CandidateJobAnalysisService:
             )
         )
 
+        claim_token = (
+            "candidate_job_claim_"
+            + uuid4().hex
+        )
+
         source_rows = (
             list_candidate_jobs_for_reanalysis(
                 candidate_id=candidate_id,
@@ -1059,21 +1109,58 @@ class CandidateJobAnalysisService:
                 ),
                 limit=limit,
                 job_ids=job_ids,
+                claim_token=claim_token,
+                claim_ttl_seconds=(
+                    ANALYSIS_CLAIM_TTL_SECONDS
+                ),
             )
         )
 
-        return self._run_candidate_job_analysis(
-            candidate_id=candidate_id,
-            source_rows=source_rows,
-            target_opportunities=None,
-            ai_budget=ai_budget,
-            preserve_existing_lifecycle=True,
-            scan_id=(
-                "candidate_job_scan_"
-                + uuid4().hex
-            ),
-            run_mode="reanalysis",
-        )
+        claimed_job_ids = [
+            str(
+                row.get(
+                    "id",
+                    ""
+                )
+            ).strip()
+            for row in source_rows
+            if str(
+                row.get(
+                    "id",
+                    ""
+                )
+            ).strip()
+        ]
+
+        try:
+            return self._run_candidate_job_analysis(
+                candidate_id=candidate_id,
+                source_rows=source_rows,
+                target_opportunities=None,
+                ai_budget=ai_budget,
+                preserve_existing_lifecycle=True,
+                scan_id=(
+                    "candidate_job_scan_"
+                    + uuid4().hex
+                ),
+                run_mode="reanalysis",
+                analysis_claim_token=(
+                    claim_token
+                ),
+            )
+
+        finally:
+            try:
+                release_candidate_job_analysis_claims(
+                    candidate_id=candidate_id,
+                    job_ids=claimed_job_ids,
+                    claim_token=claim_token,
+                )
+            except Exception:
+                logging.exception(
+                    "Failed to release candidate-job "
+                    "analysis claims after reanalysis."
+                )
 
     def _run_candidate_job_analysis(
         self,
@@ -1084,6 +1171,7 @@ class CandidateJobAnalysisService:
         preserve_existing_lifecycle: bool = False,
         scan_id: str | None = None,
         run_mode: str | None = None,
+        analysis_claim_token: str | None = None,
     ) -> dict[str, Any]:
         resolved_scan_id = str(
             scan_id
@@ -1442,6 +1530,9 @@ class CandidateJobAnalysisService:
                             career_memory_interpreted_source_signature
                         ),
                         result_stage="hard_filter",
+                        analysis_claim_token=(
+                            analysis_claim_token
+                        ),
                     )
 
                     result["hard_rejected"] += 1
@@ -1967,6 +2058,9 @@ class CandidateJobAnalysisService:
                             career_memory_interpreted_source_signature
                         ),
                         result_stage="batch_ai",
+                        analysis_claim_token=(
+                            analysis_claim_token
+                        ),
                     )
 
                     result[
@@ -2056,4 +2150,3 @@ class CandidateJobAnalysisService:
             ] = True
 
         return result
-

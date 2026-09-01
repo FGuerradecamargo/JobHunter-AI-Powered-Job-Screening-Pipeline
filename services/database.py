@@ -5,7 +5,7 @@ from models.job import Job
 import json
 from services.analysis_signatures import build_job_signature_from_values
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -144,6 +144,64 @@ def get_connection():
 def is_postgres() -> bool:
     return bool(
         os.getenv("DATABASE_URL")
+    )
+
+
+class CandidateJobAnalysisClaimLostError(RuntimeError):
+    """
+    Raised when a worker tries to persist an analysis after
+    losing ownership of the candidate-job analysis lease.
+    """
+
+
+def _ensure_candidate_job_analysis_claim_columns(
+    connection,
+) -> None:
+    """
+    Add infrastructure-only candidate-job analysis lease
+    columns without changing lifecycle state semantics.
+    """
+    claim_columns = (
+        "analysis_claim_token",
+        "analysis_claimed_at",
+        "analysis_claim_expires_at",
+    )
+
+    if is_postgres():
+        for column_name in claim_columns:
+            connection.execute(
+                f"""
+                ALTER TABLE candidate_job_analyses
+                ADD COLUMN IF NOT EXISTS {column_name} TEXT
+                """
+            )
+
+    else:
+        existing_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(candidate_job_analyses)"
+            ).fetchall()
+        }
+
+        for column_name in claim_columns:
+            if column_name not in existing_columns:
+                connection.execute(
+                    f"""
+                    ALTER TABLE candidate_job_analyses
+                    ADD COLUMN {column_name} TEXT
+                    """
+                )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_candidate_job_analyses_claim_expiry
+        ON candidate_job_analyses(
+            candidate_id,
+            analysis_claim_expires_at
+        )
+        """
     )
 
 
@@ -604,6 +662,10 @@ def initialize_postgres_database() -> None:
                 END
                 """
             )
+
+        _ensure_candidate_job_analysis_claim_columns(
+            connection
+        )
 
         _create_candidate_job_analysis_run_schema(
             connection
@@ -1293,6 +1355,10 @@ def initialize_sqlite_database() -> None:
                     ON DELETE CASCADE
             )
             """
+        )
+
+        _ensure_candidate_job_analysis_claim_columns(
+            connection
         )
 
         _create_candidate_job_analysis_run_schema(
@@ -2943,12 +3009,276 @@ def ensure_candidate_job_analysis(
     return cursor.rowcount > 0
 
 
+def _claim_candidate_job_analysis_rows(
+    *,
+    candidate_id: str,
+    rows: list[dict[str, Any]],
+    claim_token: str,
+    claim_ttl_seconds: int,
+    run_mode: str,
+    evidence_signature: str = "",
+    direction_signature: str = "",
+    constraint_signature: str = "",
+) -> list[dict[str, Any]]:
+    """
+    Claim candidate-job analysis work using compare-and-set.
+
+    The input rows may have been selected concurrently by
+    multiple workers. Ownership is established only by the
+    guarded UPDATE below.
+    """
+    normalized_candidate_id = str(
+        candidate_id or ""
+    ).strip()
+
+    normalized_token = str(
+        claim_token or ""
+    ).strip()
+
+    if not normalized_candidate_id:
+        raise ValueError(
+            "Candidate ID is required."
+        )
+
+    if not normalized_token:
+        raise ValueError(
+            "Analysis claim token is required."
+        )
+
+    if claim_ttl_seconds <= 0:
+        raise ValueError(
+            "Claim TTL must be greater than zero."
+        )
+
+    if run_mode not in {
+        "discovery",
+        "reanalysis",
+    }:
+        raise ValueError(
+            f"Invalid claim run mode: {run_mode}"
+        )
+
+    now_dt = datetime.now(
+        timezone.utc
+    )
+
+    claimed_at = now_dt.isoformat()
+
+    claim_expires_at = (
+        now_dt
+        + timedelta(
+            seconds=claim_ttl_seconds
+        )
+    ).isoformat()
+
+    claimed_rows: list[
+        dict[str, Any]
+    ] = []
+
+    with get_connection() as connection:
+        for source_row in rows:
+            job_id = str(
+                source_row.get(
+                    "id",
+                    ""
+                )
+            ).strip()
+
+            if not job_id:
+                continue
+
+            if run_mode == "discovery":
+                eligibility_sql = """
+                    AND analysis_state = 'pending'
+                    AND opportunity_state = 'none'
+                """
+
+                eligibility_params: list[Any] = []
+
+            else:
+                eligibility_sql = """
+                    AND analysis_state = 'analyzed'
+                    AND status = 'in_review'
+                    AND opportunity_state
+                        IN ('none', 'active')
+
+                    AND (
+                        COALESCE(
+                            evidence_signature,
+                            ''
+                        ) <> ?
+
+                        OR COALESCE(
+                            direction_signature,
+                            ''
+                        ) <> ?
+
+                        OR COALESCE(
+                            constraint_signature,
+                            ''
+                        ) <> ?
+                    )
+                """
+
+                eligibility_params = [
+                    str(
+                        evidence_signature or ""
+                    ),
+                    str(
+                        direction_signature or ""
+                    ),
+                    str(
+                        constraint_signature or ""
+                    ),
+                ]
+
+            cursor = connection.execute(
+                f"""
+                UPDATE candidate_job_analyses
+
+                SET
+                    analysis_claim_token = ?,
+                    analysis_claimed_at = ?,
+                    analysis_claim_expires_at = ?
+
+                WHERE
+                    candidate_id = ?
+                    AND job_id = ?
+
+                    {eligibility_sql}
+
+                    AND (
+                        COALESCE(
+                            TRIM(
+                                analysis_claim_token
+                            ),
+                            ''
+                        ) = ''
+
+                        OR analysis_claim_expires_at
+                            IS NULL
+
+                        OR analysis_claim_expires_at
+                            <= ?
+
+                        OR analysis_claim_token = ?
+                    )
+                """,
+                (
+                    normalized_token,
+                    claimed_at,
+                    claim_expires_at,
+                    normalized_candidate_id,
+                    job_id,
+                    *eligibility_params,
+                    claimed_at,
+                    normalized_token,
+                ),
+            )
+
+            if cursor.rowcount == 0:
+                continue
+
+            claimed_row = dict(
+                source_row
+            )
+
+            claimed_row[
+                "analysis_claim_token"
+            ] = normalized_token
+
+            claimed_row[
+                "analysis_claimed_at"
+            ] = claimed_at
+
+            claimed_row[
+                "analysis_claim_expires_at"
+            ] = claim_expires_at
+
+            claimed_rows.append(
+                claimed_row
+            )
+
+    return claimed_rows
+
+
+def release_candidate_job_analysis_claims(
+    *,
+    candidate_id: str,
+    job_ids: list[str],
+    claim_token: str,
+) -> int:
+    """
+    Release only leases still owned by this token.
+
+    An old worker therefore cannot clear a newer worker's
+    claim.
+    """
+    normalized_candidate_id = str(
+        candidate_id or ""
+    ).strip()
+
+    normalized_token = str(
+        claim_token or ""
+    ).strip()
+
+    normalized_job_ids = list(
+        dict.fromkeys(
+            str(job_id).strip()
+            for job_id in job_ids
+            if str(job_id).strip()
+        )
+    )
+
+    if (
+        not normalized_candidate_id
+        or not normalized_token
+        or not normalized_job_ids
+    ):
+        return 0
+
+    placeholders = ", ".join(
+        "?"
+        for _ in normalized_job_ids
+    )
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            f"""
+            UPDATE candidate_job_analyses
+
+            SET
+                analysis_claim_token = NULL,
+                analysis_claimed_at = NULL,
+                analysis_claim_expires_at = NULL
+
+            WHERE
+                candidate_id = ?
+                AND job_id IN ({placeholders})
+                AND analysis_claim_token = ?
+            """,
+            (
+                normalized_candidate_id,
+                *normalized_job_ids,
+                normalized_token,
+            ),
+        )
+
+        released = int(
+            cursor.rowcount
+        )
+
+    return released
+
+
 def list_pending_candidate_jobs(
     candidate_id: str,
     limit: int = 5,
     analysis_version: str | None = None,
     candidate_signature: str | None = None,
     job_ids: list[str] | None = None,
+    claim_token: str | None = None,
+    claim_ttl_seconds: int = 1800,
 ) -> list[dict[str, Any]]:
     """
     Return candidate-job relationships that have never
@@ -2987,10 +3317,47 @@ def list_pending_candidate_jobs(
             return []
 
     job_filter = ""
+    claim_filter = ""
 
     params: list[Any] = [
         candidate_id,
     ]
+
+    normalized_claim_token = str(
+        claim_token or ""
+    ).strip()
+
+    if normalized_claim_token:
+        claim_filter = """
+            AND (
+                COALESCE(
+                    TRIM(
+                        candidate_job_analyses
+                        .analysis_claim_token
+                    ),
+                    ''
+                ) = ''
+
+                OR candidate_job_analyses
+                    .analysis_claim_expires_at
+                    IS NULL
+
+                OR candidate_job_analyses
+                    .analysis_claim_expires_at
+                    <= ?
+
+                OR candidate_job_analyses
+                    .analysis_claim_token
+                    = ?
+            )
+        """
+
+        params.extend(
+            [
+                utc_now(),
+                normalized_claim_token,
+            ]
+        )
 
     if normalized_job_ids is not None:
         placeholders = ", ".join(
@@ -3050,6 +3417,8 @@ def list_pending_candidate_jobs(
 
                 AND jobs.archived_at IS NULL
 
+                {claim_filter}
+
                 {job_filter}
 
             ORDER BY
@@ -3057,15 +3426,29 @@ def list_pending_candidate_jobs(
 
             LIMIT ?
             """.format(
+                claim_filter=claim_filter,
                 job_filter=job_filter,
             ),
             tuple(params),
         ).fetchall()
 
-    return [
+    selected_rows = [
         dict(row)
         for row in rows
     ]
+
+    if not normalized_claim_token:
+        return selected_rows
+
+    return _claim_candidate_job_analysis_rows(
+        candidate_id=candidate_id,
+        rows=selected_rows,
+        claim_token=normalized_claim_token,
+        claim_ttl_seconds=(
+            claim_ttl_seconds
+        ),
+        run_mode="discovery",
+    )
 
 
 
@@ -3115,6 +3498,8 @@ def list_candidate_jobs_for_reanalysis(
     constraint_signature: str,
     limit: int = 50,
     job_ids: list[str] | None = None,
+    claim_token: str | None = None,
+    claim_ttl_seconds: int = 1800,
 ) -> list[dict[str, Any]]:
     """
     Return already-analyzed candidate jobs whose stored
@@ -3173,6 +3558,7 @@ def list_candidate_jobs_for_reanalysis(
             return []
 
     job_filter = ""
+    claim_filter = ""
 
     params: list[Any] = [
         normalized_candidate_id,
@@ -3180,6 +3566,42 @@ def list_candidate_jobs_for_reanalysis(
         current_direction_signature,
         current_constraint_signature,
     ]
+
+    normalized_claim_token = str(
+        claim_token or ""
+    ).strip()
+
+    if normalized_claim_token:
+        claim_filter = """
+            AND (
+                COALESCE(
+                    TRIM(
+                        candidate_job_analyses
+                        .analysis_claim_token
+                    ),
+                    ''
+                ) = ''
+
+                OR candidate_job_analyses
+                    .analysis_claim_expires_at
+                    IS NULL
+
+                OR candidate_job_analyses
+                    .analysis_claim_expires_at
+                    <= ?
+
+                OR candidate_job_analyses
+                    .analysis_claim_token
+                    = ?
+            )
+        """
+
+        params.extend(
+            [
+                utc_now(),
+                normalized_claim_token,
+            ]
+        )
 
     if normalized_job_ids is not None:
         placeholders = ", ".join(
@@ -3267,6 +3689,8 @@ def list_candidate_jobs_for_reanalysis(
                     ) <> ?
                 )
 
+                {claim_filter}
+
                 {job_filter}
 
             ORDER BY
@@ -3275,17 +3699,48 @@ def list_candidate_jobs_for_reanalysis(
 
             LIMIT ?
             """.format(
+                claim_filter=claim_filter,
                 job_filter=job_filter,
             ),
             tuple(params),
         ).fetchall()
 
+    selected_rows = [
+        dict(row)
+        for row in rows
+    ]
+
+    if normalized_claim_token:
+        selected_rows = (
+            _claim_candidate_job_analysis_rows(
+                candidate_id=(
+                    normalized_candidate_id
+                ),
+                rows=selected_rows,
+                claim_token=(
+                    normalized_claim_token
+                ),
+                claim_ttl_seconds=(
+                    claim_ttl_seconds
+                ),
+                run_mode="reanalysis",
+                evidence_signature=(
+                    current_evidence_signature
+                ),
+                direction_signature=(
+                    current_direction_signature
+                ),
+                constraint_signature=(
+                    current_constraint_signature
+                ),
+            )
+        )
+
     result: list[
         dict[str, Any]
     ] = []
 
-    for row in rows:
-        item = dict(row)
+    for item in selected_rows:
 
         reasons = (
             _candidate_job_reanalysis_reasons(
@@ -3367,6 +3822,7 @@ def _save_candidate_job_analysis_on_connection(
     direction_signature: str | None = None,
     constraint_signature: str | None = None,
     opportunity_state: str | None = None,
+    analysis_claim_token: str | None = None,
 ) -> None:
     """
     Persist the current candidate-job analysis using an
@@ -3442,8 +3898,35 @@ def _save_candidate_job_analysis_on_connection(
         else None
     )
 
-    cursor = connection.execute(
+    normalized_claim_token = str(
+        analysis_claim_token or ""
+    ).strip()
+
+    claim_clear_sql = ""
+    claim_guard_sql = ""
+    claim_guard_params: list[Any] = []
+
+    if normalized_claim_token:
+        claim_clear_sql = """
+            ,
+            analysis_claim_token = NULL,
+            analysis_claimed_at = NULL,
+            analysis_claim_expires_at = NULL
         """
+
+        claim_guard_sql = """
+            AND analysis_claim_token = ?
+            AND analysis_claim_expires_at IS NOT NULL
+            AND analysis_claim_expires_at > ?
+        """
+
+        claim_guard_params = [
+            normalized_claim_token,
+            now,
+        ]
+
+    cursor = connection.execute(
+        f"""
         UPDATE candidate_job_analyses
 
         SET
@@ -3464,9 +3947,13 @@ def _save_candidate_job_analysis_on_connection(
             rejected_at = ?,
             updated_at = ?
 
+            {claim_clear_sql}
+
         WHERE
             candidate_id = ?
             AND job_id = ?
+
+            {claim_guard_sql}
         """,
         (
             recommendation,
@@ -3490,10 +3977,18 @@ def _save_candidate_job_analysis_on_connection(
             now,
             candidate_id,
             job_id,
+            *claim_guard_params,
         ),
     )
 
     if cursor.rowcount == 0:
+        if normalized_claim_token:
+            raise CandidateJobAnalysisClaimLostError(
+                "Candidate-job analysis claim was lost "
+                "before persistence: "
+                f"{candidate_id} / {job_id}"
+            )
+
         raise ValueError(
             "Candidate-job relationship was not found: "
             f"{candidate_id} / {job_id}"
@@ -3706,6 +4201,7 @@ def save_candidate_job_analysis_with_run(
     career_memory_source_signature: str,
     career_memory_interpreted_source_signature: str,
     result_stage: str,
+    analysis_claim_token: str | None = None,
 ) -> None:
     """
     Atomically update current state and append its
@@ -3729,6 +4225,9 @@ def save_candidate_job_analysis_with_run(
             direction_signature=direction_signature,
             constraint_signature=constraint_signature,
             opportunity_state=opportunity_state,
+            analysis_claim_token=(
+                analysis_claim_token
+            ),
         )
 
         _append_candidate_job_analysis_run_on_connection(
@@ -4079,4 +4578,3 @@ def save_candidate_career_development(
                 now,
             ),
         )
-
