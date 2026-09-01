@@ -2,6 +2,7 @@ import json
 
 from models.candidate_profile import CandidateProfile
 from models.job import Job
+from models.job_profile import JobProfile
 from services.ai.ai_recommendation_service import AIRecommendationService
 from services.ai.fake_llm_client import FakeLLMClient
 
@@ -37,12 +38,24 @@ work with APIs, Linux systems and incident management.
 """.strip()
 
 
+job_profile = JobProfile(
+    job_id=job.id,
+    canonical_role=job.title,
+    role_family="Technical Support",
+    summary=(
+        "Technical support and incident "
+        "investigation role."
+    ),
+)
+
+
 service = AIRecommendationService(
     llm_client=FakeLLMClient(),
 )
 
 recommendation = service.analyze(
     job=job,
+    job_profile=job_profile,
     candidate_profile=candidate_profile,
 )
 

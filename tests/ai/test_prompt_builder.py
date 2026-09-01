@@ -1,5 +1,6 @@
 from models.candidate_profile import CandidateProfile
 from models.job import Job
+from models.job_profile import JobProfile
 from services.ai.prompt_builder import build_prompt
 
 
@@ -43,8 +44,19 @@ def test_build_prompt_contains_job_and_candidate_information():
         "and troubleshoot Linux systems."
     )
 
+    job_profile = JobProfile(
+        job_id=job.id,
+        canonical_role=job.title,
+        role_family="Technical Support",
+        summary=(
+            "Technical support and incident "
+            "investigation role."
+        ),
+    )
+
     prompt = build_prompt(
         job=job,
+        job_profile=job_profile,
         candidate_profile=candidate_profile,
     )
 

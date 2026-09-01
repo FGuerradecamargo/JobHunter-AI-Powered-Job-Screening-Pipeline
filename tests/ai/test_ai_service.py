@@ -1,5 +1,6 @@
 from models.candidate_profile import CandidateProfile
 from models.job import Job
+from models.job_profile import JobProfile
 from services.ai.ai_recommendation_service import AIRecommendationService
 from services.ai.fake_llm_client import FakeLLMClient
 
@@ -31,17 +32,28 @@ def test_ai_recommendation_service_returns_recommendation():
         "and troubleshoot Linux systems."
     )
 
+    job_profile = JobProfile(
+        job_id=job.id,
+        canonical_role=job.title,
+        role_family="Technical Support",
+        summary=(
+            "Technical support and incident "
+            "investigation role."
+        ),
+    )
+
     service = AIRecommendationService(
         llm_client=FakeLLMClient(),
     )
 
     result = service.analyze(
         job=job,
+        job_profile=job_profile,
         candidate_profile=candidate_profile,
     )
 
     assert result.job_id == "test-001"
-    assert result.recommendation == "recommended_apply"
+    assert result.recommendation == "best_match"
     assert result.competitive_status == "competitive_now"
     assert result.current_fit == 82
     assert result.growth_value == 78
