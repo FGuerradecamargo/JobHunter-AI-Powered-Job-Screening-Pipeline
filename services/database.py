@@ -781,6 +781,7 @@ def initialize_postgres_database() -> None:
                 gmail_address TEXT NOT NULL UNIQUE,
                 encrypted_refresh_token TEXT NOT NULL,
                 access_token TEXT,
+                encrypted_access_token TEXT,
                 token_expiry TEXT,
                 scopes_json TEXT NOT NULL,
                 last_history_id TEXT,
@@ -793,6 +794,14 @@ def initialize_postgres_database() -> None:
                     REFERENCES users(id)
                     ON DELETE CASCADE
             )
+            """
+        )
+
+        connection.execute(
+            """
+            ALTER TABLE gmail_connections
+            ADD COLUMN IF NOT EXISTS
+                encrypted_access_token TEXT
             """
         )
 
@@ -1479,6 +1488,7 @@ def initialize_sqlite_database() -> None:
                 gmail_address TEXT NOT NULL UNIQUE,
                 encrypted_refresh_token TEXT NOT NULL,
                 access_token TEXT,
+                encrypted_access_token TEXT,
                 token_expiry TEXT,
                 scopes_json TEXT NOT NULL,
                 last_history_id TEXT,
@@ -1553,6 +1563,32 @@ def initialize_sqlite_database() -> None:
                 """
                 ALTER TABLE users
                 ADD COLUMN password_hash TEXT
+                """
+            )
+
+        gmail_connection_columns = (
+            connection.execute(
+                """
+                PRAGMA table_info(
+                    gmail_connections
+                )
+                """
+            ).fetchall()
+        )
+
+        gmail_connection_column_names = {
+            column["name"]
+            for column in gmail_connection_columns
+        }
+
+        if (
+            "encrypted_access_token"
+            not in gmail_connection_column_names
+        ):
+            connection.execute(
+                """
+                ALTER TABLE gmail_connections
+                ADD COLUMN encrypted_access_token TEXT
                 """
             )
 
@@ -1740,6 +1776,7 @@ def initialize_sqlite_database() -> None:
                 gmail_address TEXT NOT NULL UNIQUE,
                 encrypted_refresh_token TEXT NOT NULL,
                 access_token TEXT,
+                encrypted_access_token TEXT,
                 token_expiry TEXT,
                 scopes_json TEXT NOT NULL,
                 last_history_id TEXT,

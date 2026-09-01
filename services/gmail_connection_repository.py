@@ -37,6 +37,15 @@ class GmailConnectionRepository:
             )
         )
 
+        encrypted_access_token = None
+
+        if gmail_connection.access_token:
+            encrypted_access_token = (
+                self._token_encryption_service.encrypt(
+                    gmail_connection.access_token,
+                )
+            )
+
         with get_connection() as connection:
             connection.execute(
                 """
@@ -45,6 +54,7 @@ class GmailConnectionRepository:
                     gmail_address,
                     encrypted_refresh_token,
                     access_token,
+                    encrypted_access_token,
                     token_expiry,
                     scopes_json,
                     last_history_id,
@@ -54,8 +64,8 @@ class GmailConnectionRepository:
                     updated_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?
                 )
 
                 ON CONFLICT(user_id)
@@ -66,8 +76,10 @@ class GmailConnectionRepository:
                     encrypted_refresh_token =
                         excluded.encrypted_refresh_token,
 
-                    access_token =
-                        excluded.access_token,
+                    access_token = NULL,
+
+                    encrypted_access_token =
+                        excluded.encrypted_access_token,
 
                     token_expiry =
                         excluded.token_expiry,
@@ -93,7 +105,8 @@ class GmailConnectionRepository:
                     .strip()
                     .lower(),
                     encrypted_refresh_token,
-                    gmail_connection.access_token,
+                    None,
+                    encrypted_access_token,
                     gmail_connection.token_expiry,
                     json.dumps(
                         gmail_connection.scopes,
@@ -119,13 +132,14 @@ class GmailConnectionRepository:
                     gmail_address,
                     encrypted_refresh_token,
                     access_token,
+                    encrypted_access_token,
                     token_expiry,
                     scopes_json,
                     last_history_id,
                     last_sync_at,
                     connection_status
                 FROM gmail_connections
-                WHERE user_id = %s
+                WHERE user_id = ?
                 """,
                 (user_id,),
             ).fetchone()
@@ -138,6 +152,17 @@ class GmailConnectionRepository:
             or not row["encrypted_refresh_token"]
         ):
             return None
+
+        access_token = None
+
+        if row["encrypted_access_token"]:
+            access_token = (
+                self._token_encryption_service.decrypt(
+                    row["encrypted_access_token"]
+                )
+            )
+        elif row["access_token"]:
+            access_token = row["access_token"]
 
         return GmailConnection(
             user_id=row["user_id"],
@@ -154,9 +179,7 @@ class GmailConnectionRepository:
             scopes=json.loads(
                 row["scopes_json"]
             ),
-            access_token=row[
-                "access_token"
-            ],
+            access_token=access_token,
             token_expiry=row[
                 "token_expiry"
             ],
@@ -209,10 +232,10 @@ class GmailConnectionRepository:
                 """
                 UPDATE gmail_connections
                 SET
-                    last_history_id = %s,
-                    last_sync_at = %s,
-                    updated_at = %s
-                WHERE user_id = %s
+                    last_history_id = ?,
+                    last_sync_at = ?,
+                    updated_at = ?
+                WHERE user_id = ?
                 """,
                 (
                     last_history_id,
@@ -243,9 +266,10 @@ class GmailConnectionRepository:
                 SET
                     connection_status = 'disconnected',
                     access_token = NULL,
+                    encrypted_access_token = NULL,
                     encrypted_refresh_token = '',
-                    updated_at = %s
-                WHERE user_id = %s
+                    updated_at = ?
+                WHERE user_id = ?
                 """,
                 (
                     now,
