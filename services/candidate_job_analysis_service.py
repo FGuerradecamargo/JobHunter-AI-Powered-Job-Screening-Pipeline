@@ -39,6 +39,7 @@ from services.career_update_repository import (
     CareerUpdateRepository,
 )
 from services.database import (
+    list_candidate_jobs_for_reanalysis,
     list_pending_candidate_jobs,
     save_candidate_job_analysis,
     update_shared_job_analysis_data,
@@ -694,6 +695,72 @@ def ai_analysis_should_be_visible(
     return True
 
 
+
+def _resolve_persistence_lifecycle(
+    *,
+    source_row: dict[str, Any],
+    analysis_status: str,
+    preserve_existing_lifecycle: bool,
+) -> tuple[str, str]:
+    """
+    Resolve the legacy status + opportunity lifecycle pair
+    used when persisting a candidate-job analysis.
+
+    Discovery owns no prior user lifecycle and therefore
+    keeps the current behavior: analytical result determines
+    status and opportunity_state remains none.
+
+    Reanalysis may update the analytical interpretation, but
+    it must never silently deactivate an existing active
+    opportunity.
+    """
+    if not preserve_existing_lifecycle:
+        return (
+            analysis_status,
+            "none",
+        )
+
+    existing_opportunity_state = str(
+        source_row.get(
+            "opportunity_state",
+            "none",
+        )
+        or "none"
+    ).strip()
+
+    existing_status = str(
+        source_row.get(
+            "status",
+            "in_review",
+        )
+        or "in_review"
+    ).strip()
+
+    if existing_opportunity_state not in {
+        "none",
+        "active",
+    }:
+        raise ValueError(
+            "Reanalysis received an unsupported "
+            "opportunity lifecycle state: "
+            f"{existing_opportunity_state}"
+        )
+
+    if existing_opportunity_state == "active":
+        # The user-facing lifecycle wins over a new
+        # analytical reject. The analysis payload itself
+        # still records the new recommendation.
+        return (
+            existing_status,
+            "active",
+        )
+
+    return (
+        analysis_status,
+        "none",
+    )
+
+
 class CandidateJobAnalysisService:
     def __init__(self) -> None:
         self.candidate_repository = (
@@ -761,6 +828,116 @@ class CandidateJobAnalysisService:
         target_opportunities: int | None = None,
         ai_budget: AIUsageBudget | None = None,
         job_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Analyze jobs that have never completed their
+        candidate-specific analysis.
+
+        Discovery and reanalysis intentionally use
+        different selectors.
+        """
+        source_rows = list_pending_candidate_jobs(
+            candidate_id=candidate_id,
+            limit=limit,
+            job_ids=job_ids,
+        )
+
+        return self._run_candidate_job_analysis(
+            candidate_id=candidate_id,
+            source_rows=source_rows,
+            target_opportunities=(
+                target_opportunities
+            ),
+            ai_budget=ai_budget,
+            preserve_existing_lifecycle=False,
+        )
+
+    def reanalyze_stale(
+        self,
+        candidate_id: str,
+        limit: int = 50,
+        ai_budget: AIUsageBudget | None = None,
+        job_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Reanalyze already-analyzed live candidate-job
+        relationships whose stored candidate-state
+        signatures no longer match the current state.
+
+        Reanalysis never re-enters the discovery queue.
+        """
+        candidate = self.candidate_repository.get(
+            candidate_id
+        )
+
+        if candidate is None:
+            raise ValueError(
+                f"Candidate not found: {candidate_id}"
+            )
+
+        career_objective = (
+            self.career_objective_repository
+            .get_active(candidate_id)
+        )
+
+        career_updates = (
+            self.career_update_repository
+            .list_for_candidate(candidate_id)
+        )
+
+        evidence_signature = (
+            build_candidate_evidence_signature(
+                candidate,
+                career_updates,
+            )
+        )
+
+        direction_signature = (
+            build_candidate_direction_signature(
+                candidate,
+                career_objective,
+                career_updates,
+            )
+        )
+
+        constraint_signature = (
+            build_candidate_constraint_signature(
+                candidate
+            )
+        )
+
+        source_rows = (
+            list_candidate_jobs_for_reanalysis(
+                candidate_id=candidate_id,
+                evidence_signature=(
+                    evidence_signature
+                ),
+                direction_signature=(
+                    direction_signature
+                ),
+                constraint_signature=(
+                    constraint_signature
+                ),
+                limit=limit,
+                job_ids=job_ids,
+            )
+        )
+
+        return self._run_candidate_job_analysis(
+            candidate_id=candidate_id,
+            source_rows=source_rows,
+            target_opportunities=None,
+            ai_budget=ai_budget,
+            preserve_existing_lifecycle=True,
+        )
+
+    def _run_candidate_job_analysis(
+        self,
+        candidate_id: str,
+        source_rows: list[dict[str, Any]],
+        target_opportunities: int | None = None,
+        ai_budget: AIUsageBudget | None = None,
+        preserve_existing_lifecycle: bool = False,
     ) -> dict[str, Any]:
         candidate = self.candidate_repository.get(
             candidate_id
@@ -832,16 +1009,8 @@ class CandidateJobAnalysisService:
             )
         )
 
-        pending_rows = list_pending_candidate_jobs(
-            candidate_id=candidate_id,
-            limit=limit,
-            analysis_version=ANALYSIS_VERSION,
-            candidate_signature=candidate_signature,
-            job_ids=job_ids,
-        )
-
         result = {
-            "selected": len(pending_rows),
+            "selected": len(source_rows),
             "analyzed": 0,
             "hard_rejected": 0,
             "ai_eligible": 0,
@@ -874,7 +1043,7 @@ class CandidateJobAnalysisService:
         # Enrich -> Job Profile -> Hard Filter
         # =============================================
 
-        for row in pending_rows:
+        for row in source_rows:
             job = row_to_job(row)
 
             try:
@@ -978,6 +1147,19 @@ class CandidateJobAnalysisService:
                         ),
                     }
 
+                    (
+                        persistence_status,
+                        persistence_opportunity_state,
+                    ) = _resolve_persistence_lifecycle(
+                        source_row=row,
+                        analysis_status=(
+                            "system_rejected"
+                        ),
+                        preserve_existing_lifecycle=(
+                            preserve_existing_lifecycle
+                        ),
+                    )
+
                     save_candidate_job_analysis(
                         candidate_id=candidate_id,
                         job_id=job.id,
@@ -1000,7 +1182,12 @@ class CandidateJobAnalysisService:
                         analysis_version=(
                             ANALYSIS_VERSION
                         ),
-                        status="system_rejected",
+                        status=(
+                            persistence_status
+                        ),
+                        opportunity_state=(
+                            persistence_opportunity_state
+                        ),
                     )
 
                     result["hard_rejected"] += 1
@@ -1012,6 +1199,7 @@ class CandidateJobAnalysisService:
                     {
                         "job": job,
                         "job_profile": job_profile,
+                        "source_row": row,
                     }
                 )
 
@@ -1295,6 +1483,21 @@ class CandidateJobAnalysisService:
                             "ai_rejected"
                         ] += 1
 
+                    (
+                        persistence_status,
+                        persistence_opportunity_state,
+                    ) = _resolve_persistence_lifecycle(
+                        source_row=(
+                            item["source_row"]
+                        ),
+                        analysis_status=(
+                            analysis_status
+                        ),
+                        preserve_existing_lifecycle=(
+                            preserve_existing_lifecycle
+                        ),
+                    )
+
                     save_candidate_job_analysis(
                         candidate_id=candidate_id,
                         job_id=job.id,
@@ -1317,8 +1520,12 @@ class CandidateJobAnalysisService:
                         analysis_version=(
                             ANALYSIS_VERSION
                         ),
-                        status=analysis_status,
-                        opportunity_state="none",
+                        status=(
+                            persistence_status
+                        ),
+                        opportunity_state=(
+                            persistence_opportunity_state
+                        ),
                     )
 
                     result[
