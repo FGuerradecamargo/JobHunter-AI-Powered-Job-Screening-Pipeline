@@ -5,6 +5,9 @@ from typing import Any, Callable
 from services.career_memory_repository import (
     CareerMemoryRepository,
 )
+from services.career_memory_interpreter import (
+    CareerMemoryInterpreter,
+)
 from services.career_memory_source_builder import (
     CareerMemorySourceSnapshot,
     build_career_memory_source_snapshot,
@@ -366,6 +369,7 @@ class CareerMemoryManager:
             [str],
             CareerMemorySourceSnapshot,
         ] = build_career_memory_source_snapshot,
+        interpreter: CareerMemoryInterpreter | None = None,
     ) -> None:
         self.repository = (
             repository
@@ -375,6 +379,154 @@ class CareerMemoryManager:
         self.source_builder = (
             source_builder
         )
+
+        self.interpreter = (
+            interpreter
+        )
+
+    def _complete_interpretation(
+        self,
+        *,
+        candidate_id: str,
+        source: CareerMemorySourceSnapshot,
+        snapshot: dict[str, Any],
+        recent_delta: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        source_signature = str(
+            snapshot.get(
+                "source_signature",
+                "",
+            )
+            or ""
+        )
+
+        interpreted_signature = str(
+            snapshot.get(
+                "interpreted_source_signature",
+                "",
+            )
+            or ""
+        )
+
+        pending = (
+            source_signature
+            != interpreted_signature
+        )
+
+        if not pending:
+            return {
+                "snapshot": snapshot,
+                "interpretation_pending": False,
+                "interpretation_attempted": False,
+                "interpretation_applied": False,
+                "interpretation_error": None,
+            }
+
+        if self.interpreter is None:
+            return {
+                "snapshot": snapshot,
+                "interpretation_pending": True,
+                "interpretation_attempted": False,
+                "interpretation_applied": False,
+                "interpretation_error": None,
+            }
+
+        # A fresh source change already has its
+        # precise semantic delta.
+        #
+        # On retry after an earlier LLM failure,
+        # recent_delta is empty because the
+        # deterministic source was already saved.
+        # In that case resend the complete current
+        # authoritative state. This costs slightly
+        # more only on recovery and guarantees no
+        # professional change can be lost.
+        interpretation_delta = (
+            recent_delta
+            if recent_delta
+            else _build_recent_delta(
+                source_payload=source.payload,
+                previous_memory={},
+                force_full_delta=True,
+            )
+        )
+
+        try:
+            interpretation = (
+                self.interpreter.interpret(
+                    current_memory=(
+                        snapshot.get(
+                            "memory",
+                            {},
+                        )
+                    ),
+                    recent_delta=(
+                        interpretation_delta
+                    ),
+                )
+            )
+
+            applied_snapshot = (
+                self.repository.apply_interpretation(
+                    candidate_id=candidate_id,
+                    source_signature=(
+                        source.source_signature
+                    ),
+                    interpretation=(
+                        interpretation
+                    ),
+                )
+            )
+
+            return {
+                "snapshot": applied_snapshot,
+                "interpretation_pending": False,
+                "interpretation_attempted": True,
+                "interpretation_applied": True,
+                "interpretation_error": None,
+            }
+
+        except Exception as exc:
+            # Interpretation is auxiliary.
+            # Deterministic professional memory must
+            # remain usable even when the LLM/API or
+            # parser fails.
+            latest_snapshot = (
+                self.repository.get_snapshot(
+                    candidate_id
+                )
+                or snapshot
+            )
+
+            latest_source = str(
+                latest_snapshot.get(
+                    "source_signature",
+                    "",
+                )
+                or ""
+            )
+
+            latest_interpreted = str(
+                latest_snapshot.get(
+                    "interpreted_source_signature",
+                    "",
+                )
+                or ""
+            )
+
+            return {
+                "snapshot": latest_snapshot,
+                "interpretation_pending": (
+                    latest_source
+                    != latest_interpreted
+                ),
+                "interpretation_attempted": True,
+                "interpretation_applied": False,
+                "interpretation_error": (
+                    f"{type(exc).__name__}: "
+                    f"{exc}"
+                ),
+            }
 
     def refresh(
         self,
@@ -410,13 +562,48 @@ class CareerMemoryManager:
             )
             == CAREER_MEMORY_SCHEMA_VERSION
         ):
+            interpretation_state = (
+                self._complete_interpretation(
+                    candidate_id=(
+                        normalized_candidate_id
+                    ),
+                    source=source,
+                    snapshot=existing,
+                    recent_delta=[],
+                )
+            )
+
             return {
                 "changed": False,
                 "new_events": 0,
                 "recent_delta": [],
-                "snapshot": existing,
+                "snapshot": (
+                    interpretation_state[
+                        "snapshot"
+                    ]
+                ),
                 "source_signature": (
                     source.source_signature
+                ),
+                "interpretation_pending": (
+                    interpretation_state[
+                        "interpretation_pending"
+                    ]
+                ),
+                "interpretation_attempted": (
+                    interpretation_state[
+                        "interpretation_attempted"
+                    ]
+                ),
+                "interpretation_applied": (
+                    interpretation_state[
+                        "interpretation_applied"
+                    ]
+                ),
+                "interpretation_error": (
+                    interpretation_state[
+                        "interpretation_error"
+                    ]
                 ),
             }
 
@@ -518,13 +705,48 @@ class CareerMemoryManager:
             )
         )
 
+        interpretation_state = (
+            self._complete_interpretation(
+                candidate_id=(
+                    normalized_candidate_id
+                ),
+                source=source,
+                snapshot=snapshot,
+                recent_delta=recent_delta,
+            )
+        )
+
         return {
             "changed": True,
             "new_events": new_events,
             "recent_delta": recent_delta,
-            "snapshot": snapshot,
+            "snapshot": (
+                interpretation_state[
+                    "snapshot"
+                ]
+            ),
             "source_signature": (
                 source.source_signature
+            ),
+            "interpretation_pending": (
+                interpretation_state[
+                    "interpretation_pending"
+                ]
+            ),
+            "interpretation_attempted": (
+                interpretation_state[
+                    "interpretation_attempted"
+                ]
+            ),
+            "interpretation_applied": (
+                interpretation_state[
+                    "interpretation_applied"
+                ]
+            ),
+            "interpretation_error": (
+                interpretation_state[
+                    "interpretation_error"
+                ]
             ),
         }
 
