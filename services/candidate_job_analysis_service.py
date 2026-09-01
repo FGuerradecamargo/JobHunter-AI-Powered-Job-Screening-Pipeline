@@ -3,6 +3,7 @@ import json
 import time
 from dataclasses import asdict
 from typing import Any
+from uuid import uuid4
 
 from openai import RateLimitError
 
@@ -39,13 +40,17 @@ from services.career_update_repository import (
     CareerUpdateRepository,
 )
 from services.database import (
+    append_candidate_job_analysis_run,
     list_candidate_jobs_for_reanalysis,
     list_pending_candidate_jobs,
-    save_candidate_job_analysis,
+    save_candidate_job_analysis_with_run,
     update_shared_job_analysis_data,
 )
 from services.job_enricher import JobEnricher
-from services.job_profile_manager import JobProfileManager
+from services.job_profile_manager import (
+    JOB_PROFILE_VERSION,
+    JobProfileManager,
+)
 from services.ai.job_profile_service import JobProfileService
 from services.job_matcher import JobMatcher
 from services.job_bucket_classifier import (
@@ -63,6 +68,101 @@ from services.ai_usage_budget import AIUsageBudget
 
 ANALYSIS_VERSION = "candidate-job-analysis-v15"
 REQUEST_DELAY_SECONDS = 2
+
+
+class _CareerMemoryContext(dict):
+    """
+    Dict-compatible Career Memory payload plus immutable
+    provenance metadata for one candidate-analysis scan.
+
+    The AI sees only normal dictionary contents.
+    """
+
+    def __init__(
+        self,
+        memory: dict[str, Any],
+        *,
+        memory_version: int | None = None,
+        memory_schema_version: str = "",
+        source_signature: str = "",
+        interpreted_source_signature: str = "",
+    ):
+        super().__init__(
+            memory
+        )
+
+        self.memory_version = (
+            memory_version
+            if (
+                isinstance(
+                    memory_version,
+                    int,
+                )
+                and not isinstance(
+                    memory_version,
+                    bool,
+                )
+            )
+            else None
+        )
+
+        self.memory_schema_version = str(
+            memory_schema_version or ""
+        ).strip()
+
+        self.source_signature = str(
+            source_signature or ""
+        ).strip()
+
+        self.interpreted_source_signature = str(
+            interpreted_source_signature or ""
+        ).strip()
+
+
+def _candidate_job_analysis_trigger_reasons(
+    source_row: dict[str, Any],
+    run_mode: str,
+) -> list[str]:
+    if run_mode == "discovery":
+        return [
+            "initial_analysis",
+        ]
+
+    raw_reasons = source_row.get(
+        "reanalysis_reasons",
+        [],
+    )
+
+    if not isinstance(
+        raw_reasons,
+        list,
+    ):
+        raise ValueError(
+            "reanalysis_reasons must be a list."
+        )
+
+    reasons: list[str] = []
+
+    for reason in raw_reasons:
+        normalized = str(
+            reason or ""
+        ).strip()
+
+        if (
+            normalized
+            and normalized not in reasons
+        ):
+            reasons.append(
+                normalized
+            )
+
+    if not reasons:
+        raise ValueError(
+            "Reanalysis requires at least one "
+            "explicit reanalysis reason."
+        )
+
+    return reasons
 
 
 AI_VISIBLE_RECOMMENDATIONS = {
@@ -806,7 +906,17 @@ class CandidateJobAnalysisService:
         )
 
         if not snapshot:
-            return {}
+            return _CareerMemoryContext(
+                {}
+            )
+
+        if not isinstance(
+            snapshot,
+            dict,
+        ):
+            return _CareerMemoryContext(
+                {}
+            )
 
         memory = snapshot.get(
             "memory",
@@ -817,9 +927,35 @@ class CandidateJobAnalysisService:
             memory,
             dict,
         ):
-            return {}
+            memory = {}
 
-        return memory
+        return _CareerMemoryContext(
+            dict(memory),
+            memory_version=(
+                snapshot.get(
+                    "memory_version"
+                )
+            ),
+            memory_schema_version=(
+                snapshot.get(
+                    "memory_schema_version",
+                    "",
+                )
+            ),
+            source_signature=(
+                snapshot.get(
+                    "source_signature",
+                    "",
+                )
+            ),
+            interpreted_source_signature=(
+                snapshot.get(
+                    "interpreted_source_signature",
+                    "",
+                )
+            ),
+        )
+
 
     def analyze_pending(
         self,
@@ -850,6 +986,11 @@ class CandidateJobAnalysisService:
             ),
             ai_budget=ai_budget,
             preserve_existing_lifecycle=False,
+            scan_id=(
+                "candidate_job_scan_"
+                + uuid4().hex
+            ),
+            run_mode="discovery",
         )
 
     def reanalyze_stale(
@@ -929,6 +1070,11 @@ class CandidateJobAnalysisService:
             target_opportunities=None,
             ai_budget=ai_budget,
             preserve_existing_lifecycle=True,
+            scan_id=(
+                "candidate_job_scan_"
+                + uuid4().hex
+            ),
+            run_mode="reanalysis",
         )
 
     def _run_candidate_job_analysis(
@@ -938,7 +1084,35 @@ class CandidateJobAnalysisService:
         target_opportunities: int | None = None,
         ai_budget: AIUsageBudget | None = None,
         preserve_existing_lifecycle: bool = False,
+        scan_id: str | None = None,
+        run_mode: str | None = None,
     ) -> dict[str, Any]:
+        resolved_scan_id = str(
+            scan_id
+            or (
+                "candidate_job_scan_"
+                + uuid4().hex
+            )
+        ).strip()
+
+        resolved_run_mode = str(
+            run_mode
+            or (
+                "reanalysis"
+                if preserve_existing_lifecycle
+                else "discovery"
+            )
+        ).strip()
+
+        if resolved_run_mode not in {
+            "discovery",
+            "reanalysis",
+        }:
+            raise ValueError(
+                "Invalid candidate-job analysis "
+                f"run mode: {resolved_run_mode}"
+            )
+
         candidate = self.candidate_repository.get(
             candidate_id
         )
@@ -1009,7 +1183,40 @@ class CandidateJobAnalysisService:
             )
         )
 
+        career_memory_version = getattr(
+            career_memory,
+            "memory_version",
+            None,
+        )
+
+        career_memory_schema_version = getattr(
+            career_memory,
+            "memory_schema_version",
+            "",
+        )
+
+        career_memory_source_signature = getattr(
+            career_memory,
+            "source_signature",
+            "",
+        )
+
+        career_memory_interpreted_source_signature = (
+            getattr(
+                career_memory,
+                "interpreted_source_signature",
+                "",
+            )
+        )
+
+        preparation_batch_id = (
+            "candidate_job_batch_"
+            + uuid4().hex
+        )
+
         result = {
+            "scan_id": resolved_scan_id,
+            "run_mode": resolved_run_mode,
             "selected": len(source_rows),
             "analyzed": 0,
             "hard_rejected": 0,
@@ -1046,6 +1253,21 @@ class CandidateJobAnalysisService:
         for row in source_rows:
             job = row_to_job(row)
 
+            trigger_reasons = (
+                _candidate_job_analysis_trigger_reasons(
+                    row,
+                    resolved_run_mode,
+                )
+            )
+
+            job_signature = (
+                build_job_signature(
+                    job
+                )
+            )
+
+            row_stage = "preparation"
+
             try:
                 if job.description:
                     result[
@@ -1073,10 +1295,18 @@ class CandidateJobAnalysisService:
                         REQUEST_DELAY_SECONDS
                     )
 
+                job_signature = (
+                    build_job_signature(
+                        job
+                    )
+                )
+
                 job_profile = (
                     self.job_profile_manager
                     .get_or_create(job)
                 )
+
+                row_stage = "hard_filter"
 
                 hard_filter_result = (
                     hard_filter.analyze(
@@ -1160,12 +1390,12 @@ class CandidateJobAnalysisService:
                         ),
                     )
 
-                    save_candidate_job_analysis(
+                    save_candidate_job_analysis_with_run(
                         candidate_id=candidate_id,
                         job_id=job.id,
                         analysis=analysis,
                         job_signature=(
-                            build_job_signature(job)
+                            job_signature
                         ),
                         candidate_signature=(
                             candidate_signature
@@ -1188,6 +1418,32 @@ class CandidateJobAnalysisService:
                         opportunity_state=(
                             persistence_opportunity_state
                         ),
+                        scan_id=resolved_scan_id,
+                        batch_id=(
+                            preparation_batch_id
+                        ),
+                        run_mode=(
+                            resolved_run_mode
+                        ),
+                        trigger_reasons=(
+                            trigger_reasons
+                        ),
+                        job_profile_version=(
+                            JOB_PROFILE_VERSION
+                        ),
+                        career_memory_version=(
+                            career_memory_version
+                        ),
+                        career_memory_schema_version=(
+                            career_memory_schema_version
+                        ),
+                        career_memory_source_signature=(
+                            career_memory_source_signature
+                        ),
+                        career_memory_interpreted_source_signature=(
+                            career_memory_interpreted_source_signature
+                        ),
+                        result_stage="hard_filter",
                     )
 
                     result["hard_rejected"] += 1
@@ -1200,10 +1456,64 @@ class CandidateJobAnalysisService:
                         "job": job,
                         "job_profile": job_profile,
                         "source_row": row,
+                        "job_signature": (
+                            job_signature
+                        ),
+                        "trigger_reasons": (
+                            trigger_reasons
+                        ),
                     }
                 )
 
             except Exception as error:
+                append_candidate_job_analysis_run(
+                    scan_id=resolved_scan_id,
+                    batch_id=preparation_batch_id,
+                    candidate_id=candidate_id,
+                    job_id=job.id,
+                    run_mode=resolved_run_mode,
+                    trigger_reasons=(
+                        trigger_reasons
+                    ),
+                    analysis_version=(
+                        ANALYSIS_VERSION
+                    ),
+                    job_profile_version=(
+                        JOB_PROFILE_VERSION
+                    ),
+                    job_signature=(
+                        job_signature
+                    ),
+                    candidate_signature=(
+                        candidate_signature
+                    ),
+                    evidence_signature=(
+                        evidence_signature
+                    ),
+                    direction_signature=(
+                        direction_signature
+                    ),
+                    constraint_signature=(
+                        constraint_signature
+                    ),
+                    career_memory_version=(
+                        career_memory_version
+                    ),
+                    career_memory_schema_version=(
+                        career_memory_schema_version
+                    ),
+                    career_memory_source_signature=(
+                        career_memory_source_signature
+                    ),
+                    career_memory_interpreted_source_signature=(
+                        career_memory_interpreted_source_signature
+                    ),
+                    result_state="failed",
+                    result_stage=row_stage,
+                    analysis=None,
+                    error_text=str(error),
+                )
+
                 result["failed"] += 1
 
                 result["errors"].append(
@@ -1278,6 +1588,11 @@ class CandidateJobAnalysisService:
 
             queue_index += batch_size
 
+            batch_id = (
+                "candidate_job_batch_"
+                + uuid4().hex
+            )
+
             batch_items = [
                 (
                     item["job"],
@@ -1294,6 +1609,12 @@ class CandidateJobAnalysisService:
                         career_memory=career_memory,
                     )
                 )
+
+                if len(ai_analyses) != len(batch):
+                    raise RuntimeError(
+                        "Validated AI batch size does not "
+                        "match requested batch size."
+                    )
 
                 # The candidate-specific AI analyses were
                 # successfully created. Meter analyses,
@@ -1314,6 +1635,56 @@ class CandidateJobAnalysisService:
 
                 for item in batch:
                     job = item["job"]
+
+                    append_candidate_job_analysis_run(
+                        scan_id=resolved_scan_id,
+                        batch_id=batch_id,
+                        candidate_id=candidate_id,
+                        job_id=job.id,
+                        run_mode=resolved_run_mode,
+                        trigger_reasons=(
+                            item["trigger_reasons"]
+                        ),
+                        analysis_version=(
+                            ANALYSIS_VERSION
+                        ),
+                        job_profile_version=(
+                            JOB_PROFILE_VERSION
+                        ),
+                        job_signature=(
+                            item["job_signature"]
+                        ),
+                        candidate_signature=(
+                            candidate_signature
+                        ),
+                        evidence_signature=(
+                            evidence_signature
+                        ),
+                        direction_signature=(
+                            direction_signature
+                        ),
+                        constraint_signature=(
+                            constraint_signature
+                        ),
+                        career_memory_version=(
+                            career_memory_version
+                        ),
+                        career_memory_schema_version=(
+                            career_memory_schema_version
+                        ),
+                        career_memory_source_signature=(
+                            career_memory_source_signature
+                        ),
+                        career_memory_interpreted_source_signature=(
+                            career_memory_interpreted_source_signature
+                        ),
+                        result_state="failed",
+                        result_stage="batch_ai",
+                        analysis=None,
+                        error_text=(
+                            "OpenAI API quota unavailable."
+                        ),
+                    )
 
                     result["errors"].append(
                         {
@@ -1340,6 +1711,57 @@ class CandidateJobAnalysisService:
                 for item in batch:
                     job = item["job"]
 
+                    append_candidate_job_analysis_run(
+                        scan_id=resolved_scan_id,
+                        batch_id=batch_id,
+                        candidate_id=candidate_id,
+                        job_id=job.id,
+                        run_mode=resolved_run_mode,
+                        trigger_reasons=(
+                            item["trigger_reasons"]
+                        ),
+                        analysis_version=(
+                            ANALYSIS_VERSION
+                        ),
+                        job_profile_version=(
+                            JOB_PROFILE_VERSION
+                        ),
+                        job_signature=(
+                            item["job_signature"]
+                        ),
+                        candidate_signature=(
+                            candidate_signature
+                        ),
+                        evidence_signature=(
+                            evidence_signature
+                        ),
+                        direction_signature=(
+                            direction_signature
+                        ),
+                        constraint_signature=(
+                            constraint_signature
+                        ),
+                        career_memory_version=(
+                            career_memory_version
+                        ),
+                        career_memory_schema_version=(
+                            career_memory_schema_version
+                        ),
+                        career_memory_source_signature=(
+                            career_memory_source_signature
+                        ),
+                        career_memory_interpreted_source_signature=(
+                            career_memory_interpreted_source_signature
+                        ),
+                        result_state="failed",
+                        result_stage="batch_ai",
+                        analysis=None,
+                        error_text=(
+                            "Batch AI analysis failed: "
+                            f"{error}"
+                        ),
+                    )
+
                     result["errors"].append(
                         {
                             "job_id": job.id,
@@ -1353,17 +1775,12 @@ class CandidateJobAnalysisService:
 
                 break
 
-            if len(ai_analyses) != len(batch):
-                raise RuntimeError(
-                    "Validated AI batch size does not "
-                    "match requested batch size."
-                )
-
             for item, ai_analysis in zip(
                 batch,
                 ai_analyses,
             ):
                 job = item["job"]
+                item_stage = "batch_ai"
 
                 try:
                     if (
@@ -1498,12 +1915,14 @@ class CandidateJobAnalysisService:
                         ),
                     )
 
-                    save_candidate_job_analysis(
+                    item_stage = "persistence"
+
+                    save_candidate_job_analysis_with_run(
                         candidate_id=candidate_id,
                         job_id=job.id,
                         analysis=analysis,
                         job_signature=(
-                            build_job_signature(job)
+                            item["job_signature"]
                         ),
                         candidate_signature=(
                             candidate_signature
@@ -1526,6 +1945,30 @@ class CandidateJobAnalysisService:
                         opportunity_state=(
                             persistence_opportunity_state
                         ),
+                        scan_id=resolved_scan_id,
+                        batch_id=batch_id,
+                        run_mode=(
+                            resolved_run_mode
+                        ),
+                        trigger_reasons=(
+                            item["trigger_reasons"]
+                        ),
+                        job_profile_version=(
+                            JOB_PROFILE_VERSION
+                        ),
+                        career_memory_version=(
+                            career_memory_version
+                        ),
+                        career_memory_schema_version=(
+                            career_memory_schema_version
+                        ),
+                        career_memory_source_signature=(
+                            career_memory_source_signature
+                        ),
+                        career_memory_interpreted_source_signature=(
+                            career_memory_interpreted_source_signature
+                        ),
+                        result_stage="batch_ai",
                     )
 
                     result[
@@ -1536,6 +1979,59 @@ class CandidateJobAnalysisService:
                     # One persistence/processing failure
                     # must not discard valid analyses for
                     # the other jobs in the batch.
+                    #
+                    # The completed current-state + run write
+                    # is atomic. If it failed, no completed
+                    # history row exists, so a failed run can
+                    # now be appended safely.
+                    append_candidate_job_analysis_run(
+                        scan_id=resolved_scan_id,
+                        batch_id=batch_id,
+                        candidate_id=candidate_id,
+                        job_id=job.id,
+                        run_mode=resolved_run_mode,
+                        trigger_reasons=(
+                            item["trigger_reasons"]
+                        ),
+                        analysis_version=(
+                            ANALYSIS_VERSION
+                        ),
+                        job_profile_version=(
+                            JOB_PROFILE_VERSION
+                        ),
+                        job_signature=(
+                            item["job_signature"]
+                        ),
+                        candidate_signature=(
+                            candidate_signature
+                        ),
+                        evidence_signature=(
+                            evidence_signature
+                        ),
+                        direction_signature=(
+                            direction_signature
+                        ),
+                        constraint_signature=(
+                            constraint_signature
+                        ),
+                        career_memory_version=(
+                            career_memory_version
+                        ),
+                        career_memory_schema_version=(
+                            career_memory_schema_version
+                        ),
+                        career_memory_source_signature=(
+                            career_memory_source_signature
+                        ),
+                        career_memory_interpreted_source_signature=(
+                            career_memory_interpreted_source_signature
+                        ),
+                        result_state="failed",
+                        result_stage=item_stage,
+                        analysis=None,
+                        error_text=str(error),
+                    )
+
                     result["failed"] += 1
 
                     result["errors"].append(

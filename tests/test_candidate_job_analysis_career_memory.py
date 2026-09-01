@@ -406,6 +406,12 @@ def test_analyze_pending_forwards_same_candidates_memory_to_batch(
     )
 
 
+    monkeypatch.setattr(
+        module,
+        "append_candidate_job_analysis_run",
+        lambda **kwargs: None,
+    )
+
     result = service.analyze_pending(
         candidate_id="candidate-a",
         limit=1,

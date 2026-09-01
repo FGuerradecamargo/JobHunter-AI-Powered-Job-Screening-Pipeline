@@ -555,7 +555,7 @@ def test_reanalysis_ai_reject_preserves_active_lifecycle(
 
     monkeypatch.setattr(
         module,
-        "save_candidate_job_analysis",
+        "save_candidate_job_analysis_with_run",
         fake_save_candidate_job_analysis,
     )
 
