@@ -14,36 +14,94 @@ from services.user_repository import UserRepository
 
 
 class AuthService:
-    ITERATIONS = 310_000
+    ITERATIONS = 600_000
+    MIN_PASSWORD_LENGTH = 15
+    MAX_PASSWORD_LENGTH = 128
 
     def __init__(self) -> None:
         self.user_repository = UserRepository()
         self.candidate_repository = CandidateRepository()
 
     @classmethod
-    def hash_password(
+    def validate_password_policy(
         cls,
         password: str,
-    ) -> str:
-        if len(password) < 8:
+    ) -> None:
+        if not isinstance(password, str):
             raise ValueError(
-                "Password must contain at least 8 characters."
+                "Password must be text."
             )
 
+        if len(password) < cls.MIN_PASSWORD_LENGTH:
+            raise ValueError(
+                "Password must contain at least "
+                f"{cls.MIN_PASSWORD_LENGTH} characters."
+            )
+
+        if len(password) > cls.MAX_PASSWORD_LENGTH:
+            raise ValueError(
+                "Password must contain at most "
+                f"{cls.MAX_PASSWORD_LENGTH} characters."
+            )
+
+    @classmethod
+    def _build_password_hash(
+        cls,
+        password: str,
+        *,
+        iterations: int,
+    ) -> str:
         salt = os.urandom(16)
 
         password_hash = hashlib.pbkdf2_hmac(
             "sha256",
             password.encode("utf-8"),
             salt,
-            cls.ITERATIONS,
+            iterations,
         )
 
         return (
-            f"{cls.ITERATIONS}$"
+            f"{iterations}$"
             f"{salt.hex()}$"
             f"{password_hash.hex()}"
         )
+
+    @classmethod
+    def hash_password(
+        cls,
+        password: str,
+    ) -> str:
+        cls.validate_password_policy(
+            password
+        )
+
+        return cls._build_password_hash(
+            password,
+            iterations=cls.ITERATIONS,
+        )
+
+    @classmethod
+    def needs_password_rehash(
+        cls,
+        stored_hash: str,
+    ) -> bool:
+        try:
+            iterations_text, _, _ = (
+                stored_hash.split("$")
+            )
+
+            iterations = int(
+                iterations_text
+            )
+
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+        ):
+            return False
+
+        return iterations < cls.ITERATIONS
 
     @classmethod
     def verify_password(
@@ -132,11 +190,44 @@ class AuthService:
         if row is None:
             return None
 
+        stored_hash = row[
+            "password_hash"
+        ]
+
         if not self.verify_password(
             password,
-            row["password_hash"],
+            stored_hash,
         ):
             return None
+
+        if self.needs_password_rehash(
+            stored_hash
+        ):
+            upgraded_hash = (
+                self._build_password_hash(
+                    password,
+                    iterations=self.ITERATIONS,
+                )
+            )
+
+            with get_connection() as connection:
+                connection.execute(
+                    """
+                    UPDATE users
+                    SET
+                        password_hash = %s,
+                        updated_at = %s
+                    WHERE
+                        id = %s
+                        AND password_hash = %s
+                    """,
+                    (
+                        upgraded_hash,
+                        utc_now(),
+                        row["id"],
+                        stored_hash,
+                    ),
+                )
 
         return self.user_repository.get_by_id(
             row["id"]
