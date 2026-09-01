@@ -1,4 +1,6 @@
-﻿from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+import hashlib
+import os
 import secrets
 
 import streamlit as st
@@ -13,13 +15,40 @@ SESSION_COOKIE = "jobhunter_session"
 SESSION_DAYS = 7
 
 
+SESSION_COOKIE_KEY = os.getenv(
+    "SESSION_COOKIE_KEY"
+)
+
+if not SESSION_COOKIE_KEY:
+    raise RuntimeError(
+        "SESSION_COOKIE_KEY is not configured."
+    )
+
+
 cookies = EncryptedCookieManager(
     prefix="jobhunter_",
-    password="jobhunter-beta-cookie-key",
+    password=SESSION_COOKIE_KEY,
 )
 
 if not cookies.ready():
     st.stop()
+
+
+def _hash_session_token(
+    token: str,
+) -> str:
+    normalized_token = str(
+        token or ""
+    ).strip()
+
+    if not normalized_token:
+        raise ValueError(
+            "Session token cannot be empty."
+        )
+
+    return hashlib.sha256(
+        normalized_token.encode("utf-8")
+    ).hexdigest()
 
 
 def ensure_session_table() -> None:
@@ -57,6 +86,10 @@ def get_current_user() -> AppUser | None:
     if not token:
         return None
 
+    token_hash = _hash_session_token(
+        token
+    )
+
     with get_connection() as connection:
         row = connection.execute(
             """
@@ -66,7 +99,7 @@ def get_current_user() -> AppUser | None:
             FROM user_sessions
             WHERE token = %s
             """,
-            (token,),
+            (token_hash,),
         ).fetchone()
 
     if row is None:
@@ -100,6 +133,10 @@ def login_user(
 
     token = secrets.token_urlsafe(48)
 
+    token_hash = _hash_session_token(
+        token
+    )
+
     expires_at = (
         datetime.now(timezone.utc)
         + timedelta(days=SESSION_DAYS)
@@ -117,7 +154,7 @@ def login_user(
             VALUES (%s, %s, %s, %s)
             """,
             (
-                token,
+                token_hash,
                 user.id,
                 expires_at,
                 utc_now(),
@@ -136,13 +173,17 @@ def logout_user() -> None:
     )
 
     if token:
+        token_hash = _hash_session_token(
+            token
+        )
+
         with get_connection() as connection:
             connection.execute(
                 """
                 DELETE FROM user_sessions
                 WHERE token = %s
                 """,
-                (token,),
+                (token_hash,),
             )
 
     cookies[SESSION_COOKIE] = ""
