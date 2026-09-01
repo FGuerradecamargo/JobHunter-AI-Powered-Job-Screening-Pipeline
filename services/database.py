@@ -2912,6 +2912,271 @@ def list_pending_candidate_jobs(
     ]
 
 
+
+def _candidate_job_reanalysis_reasons(
+    *,
+    stored_evidence_signature: str | None,
+    stored_direction_signature: str | None,
+    stored_constraint_signature: str | None,
+    current_evidence_signature: str,
+    current_direction_signature: str,
+    current_constraint_signature: str,
+) -> list[str]:
+    reasons: list[str] = []
+
+    if (
+        (stored_evidence_signature or "")
+        != current_evidence_signature
+    ):
+        reasons.append(
+            "evidence"
+        )
+
+    if (
+        (stored_direction_signature or "")
+        != current_direction_signature
+    ):
+        reasons.append(
+            "direction"
+        )
+
+    if (
+        (stored_constraint_signature or "")
+        != current_constraint_signature
+    ):
+        reasons.append(
+            "constraint"
+        )
+
+    return reasons
+
+
+def list_candidate_jobs_for_reanalysis(
+    *,
+    candidate_id: str,
+    evidence_signature: str,
+    direction_signature: str,
+    constraint_signature: str,
+    limit: int = 50,
+    job_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Return already-analyzed candidate jobs whose stored
+    candidate-state signatures no longer match the current
+    candidate state.
+
+    Reanalysis is deliberately separate from discovery.
+
+    Only live evaluation relationships are eligible:
+    - analyzed
+    - still in_review
+    - opportunity_state none or active
+    - job not archived
+
+    Application/outcome lifecycle states are historical and
+    are not silently rewritten by candidate-state changes.
+    """
+    normalized_candidate_id = str(
+        candidate_id or ""
+    ).strip()
+
+    if not normalized_candidate_id:
+        raise ValueError(
+            "Candidate ID is required."
+        )
+
+    if limit <= 0:
+        raise ValueError(
+            "Limit must be greater than zero."
+        )
+
+    current_evidence_signature = str(
+        evidence_signature or ""
+    )
+
+    current_direction_signature = str(
+        direction_signature or ""
+    )
+
+    current_constraint_signature = str(
+        constraint_signature or ""
+    )
+
+    normalized_job_ids = None
+
+    if job_ids is not None:
+        normalized_job_ids = list(
+            dict.fromkeys(
+                str(job_id).strip()
+                for job_id in job_ids
+                if str(job_id).strip()
+            )
+        )
+
+        if not normalized_job_ids:
+            return []
+
+    job_filter = ""
+
+    params: list[Any] = [
+        normalized_candidate_id,
+        current_evidence_signature,
+        current_direction_signature,
+        current_constraint_signature,
+    ]
+
+    if normalized_job_ids is not None:
+        placeholders = ", ".join(
+            "?"
+            for _ in normalized_job_ids
+        )
+
+        job_filter = (
+            " AND candidate_job_analyses.job_id "
+            f"IN ({placeholders})"
+        )
+
+        params.extend(
+            normalized_job_ids
+        )
+
+    params.append(
+        limit
+    )
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                jobs.id,
+                jobs.raw_text,
+                jobs.url,
+                jobs.title,
+                jobs.company,
+                jobs.location,
+                jobs.remote,
+                jobs.salary,
+                jobs.easy_apply,
+                jobs.description,
+
+                candidate_job_analyses.analysis_version,
+                candidate_job_analyses.candidate_signature,
+                candidate_job_analyses.job_signature,
+
+                candidate_job_analyses.evidence_signature,
+                candidate_job_analyses.direction_signature,
+                candidate_job_analyses.constraint_signature,
+
+                candidate_job_analyses.recommendation,
+                candidate_job_analyses.analysis_state,
+                candidate_job_analyses.opportunity_state,
+                candidate_job_analyses.status,
+                candidate_job_analyses.created_at,
+                candidate_job_analyses.updated_at
+
+            FROM candidate_job_analyses
+
+            INNER JOIN jobs
+                ON jobs.id =
+                    candidate_job_analyses.job_id
+
+            WHERE
+                candidate_job_analyses.candidate_id = ?
+
+                AND candidate_job_analyses.analysis_state
+                    = 'analyzed'
+
+                AND candidate_job_analyses.status
+                    = 'in_review'
+
+                AND candidate_job_analyses.opportunity_state
+                    IN ('none', 'active')
+
+                AND jobs.archived_at IS NULL
+
+                AND (
+                    COALESCE(
+                        candidate_job_analyses.evidence_signature,
+                        ''
+                    ) <> ?
+
+                    OR COALESCE(
+                        candidate_job_analyses.direction_signature,
+                        ''
+                    ) <> ?
+
+                    OR COALESCE(
+                        candidate_job_analyses.constraint_signature,
+                        ''
+                    ) <> ?
+                )
+
+                {job_filter}
+
+            ORDER BY
+                candidate_job_analyses.updated_at ASC,
+                candidate_job_analyses.created_at ASC
+
+            LIMIT ?
+            """.format(
+                job_filter=job_filter,
+            ),
+            tuple(params),
+        ).fetchall()
+
+    result: list[
+        dict[str, Any]
+    ] = []
+
+    for row in rows:
+        item = dict(row)
+
+        reasons = (
+            _candidate_job_reanalysis_reasons(
+                stored_evidence_signature=(
+                    item.get(
+                        "evidence_signature"
+                    )
+                ),
+                stored_direction_signature=(
+                    item.get(
+                        "direction_signature"
+                    )
+                ),
+                stored_constraint_signature=(
+                    item.get(
+                        "constraint_signature"
+                    )
+                ),
+                current_evidence_signature=(
+                    current_evidence_signature
+                ),
+                current_direction_signature=(
+                    current_direction_signature
+                ),
+                current_constraint_signature=(
+                    current_constraint_signature
+                ),
+            )
+        )
+
+        # SQL already guarantees at least one mismatch.
+        # Keep this guard so the Python contract remains
+        # correct even if the query changes later.
+        if not reasons:
+            continue
+
+        item[
+            "reanalysis_reasons"
+        ] = reasons
+
+        result.append(
+            item
+        )
+
+    return result
+
+
 def update_shared_job_analysis_data(
     job: Job,
 ) -> None:
