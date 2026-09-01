@@ -245,6 +245,14 @@ st.markdown(
 )
 
 
+password_reset_page = st.Page(
+    "pages/0_Reset_Password.py",
+    title="Reset password",
+    url_path="reset-password",
+    visibility="hidden",
+)
+
+
 current_user = get_current_user()
 
 
@@ -262,6 +270,7 @@ if current_user is None:
                 title="Log in",
                 icon=":material/login:",
             ),
+            password_reset_page,
         ]
     )
 
@@ -288,6 +297,7 @@ else:
                     icon=":material/person_add:",
                     default=True,
                 ),
+                password_reset_page,
             ]
         )
 
@@ -320,6 +330,7 @@ else:
                     title="Improvements",
                     icon=":material/trending_up:",
                 ),
+                password_reset_page,
             ]
         )
 

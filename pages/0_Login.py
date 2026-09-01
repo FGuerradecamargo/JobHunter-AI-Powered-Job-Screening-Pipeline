@@ -1,5 +1,8 @@
-﻿import streamlit as st
+import streamlit as st
 
+from services.account_recovery_service import (
+    AccountRecoveryService,
+)
 from services.auth_service import AuthService
 from services.session_auth import (
     get_current_user,
@@ -104,6 +107,55 @@ with login_tab:
                 )
 
                 st.rerun()
+
+
+    with st.expander(
+        "Forgot password?"
+    ):
+        st.write(
+            "Enter your email address and "
+            "we'll send password reset "
+            "instructions if the account "
+            "supports password sign-in."
+        )
+
+        with st.form(
+            "forgot_password_form"
+        ):
+            recovery_email = (
+                st.text_input(
+                    "Email",
+                    key=(
+                        "password_recovery_email"
+                    ),
+                )
+            )
+
+            recovery_submitted = (
+                st.form_submit_button(
+                    "Send reset instructions"
+                )
+            )
+
+            if recovery_submitted:
+                if not str(
+                    recovery_email or ""
+                ).strip():
+                    st.error(
+                        "Enter your email address."
+                    )
+
+                else:
+                    response = (
+                        AccountRecoveryService
+                        .request_password_reset(
+                            recovery_email
+                        )
+                    )
+
+                    st.success(
+                        response
+                    )
 
 
 # ---------------------------------------------------------
