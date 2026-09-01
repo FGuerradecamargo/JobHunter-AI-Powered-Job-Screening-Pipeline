@@ -798,6 +798,7 @@ def initialize_postgres_database() -> None:
                 memory_version INTEGER NOT NULL,
                 memory_schema_version TEXT NOT NULL,
                 source_signature TEXT NOT NULL,
+                interpreted_source_signature TEXT NOT NULL DEFAULT '',
                 memory_json TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -806,6 +807,17 @@ def initialize_postgres_database() -> None:
                     REFERENCES candidates(id)
                     ON DELETE CASCADE
             )
+            """
+        )
+
+        # Existing PostgreSQL databases:
+        # interpretation starts pending.
+        connection.execute(
+            """
+            ALTER TABLE candidate_career_memory
+            ADD COLUMN IF NOT EXISTS
+                interpreted_source_signature
+                TEXT NOT NULL DEFAULT ''
             """
         )
 
@@ -1686,6 +1698,7 @@ def initialize_sqlite_database() -> None:
                 memory_version INTEGER NOT NULL,
                 memory_schema_version TEXT NOT NULL,
                 source_signature TEXT NOT NULL,
+                interpreted_source_signature TEXT NOT NULL DEFAULT '',
                 memory_json TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -1696,6 +1709,32 @@ def initialize_sqlite_database() -> None:
             )
             """
         )
+
+        # Existing SQLite databases:
+        # SQLite does not support ADD COLUMN IF NOT EXISTS
+        # consistently across supported versions.
+        career_memory_columns = {
+            row["name"]
+            for row in connection.execute(
+                """
+                PRAGMA table_info(
+                    candidate_career_memory
+                )
+                """
+            ).fetchall()
+        }
+
+        if (
+            "interpreted_source_signature"
+            not in career_memory_columns
+        ):
+            connection.execute(
+                """
+                ALTER TABLE candidate_career_memory
+                ADD COLUMN interpreted_source_signature
+                    TEXT NOT NULL DEFAULT ''
+                """
+            )
 
         connection.execute(
             """

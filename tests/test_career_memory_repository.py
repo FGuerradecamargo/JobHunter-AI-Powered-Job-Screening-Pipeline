@@ -4,6 +4,7 @@ import pytest
 
 from services.career_memory_repository import (
     CareerMemoryRepository,
+    StaleCareerMemoryInterpretationError,
     build_memory_event_signature,
 )
 from services.database import (
@@ -298,6 +299,366 @@ def test_snapshot_json_parse_is_safe():
 
         assert snapshot is not None
         assert snapshot["memory"] == {}
+
+    finally:
+        _delete_temp_candidate(
+            candidate_id
+        )
+
+
+
+def test_interpretation_updates_only_low_authority_memory():
+    repository = CareerMemoryRepository()
+    candidate_id = _create_temp_candidate()
+
+    try:
+        first = repository.save_snapshot(
+            candidate_id=candidate_id,
+            memory={
+                "facts": {
+                    "candidate": {
+                        "current_role": "Role A",
+                    },
+                },
+                "market_evidence": {
+                    "sample_size": 10,
+                },
+                "outcomes": [
+                    {
+                        "job_id": "job-1",
+                        "status": "applied",
+                    }
+                ],
+                "inferences": [],
+                "hypotheses": [],
+                "continuity_note": "",
+            },
+            source_signature="source-v1",
+            memory_schema_version=(
+                "career-memory-v1"
+            ),
+        )
+
+        assert first["memory_version"] == 1
+        assert (
+            first[
+                "interpreted_source_signature"
+            ]
+            == ""
+        )
+
+        interpreted = (
+            repository.apply_interpretation(
+                candidate_id=candidate_id,
+                source_signature="source-v1",
+                interpretation={
+                    "inferences": [
+                        {
+                            "statement": (
+                                "Possible technical "
+                                "direction."
+                            ),
+                            "confidence": 70,
+                            "evidence_refs": [
+                                "fact:test"
+                            ],
+                        }
+                    ],
+                    "hypotheses": [
+                        {
+                            "statement": (
+                                "May prefer more "
+                                "technical work."
+                            ),
+                            "confidence": 40,
+                            "evidence_refs": [
+                                "fact:test"
+                            ],
+                        }
+                    ],
+                    "continuity_note": (
+                        "Watch technical-role evidence."
+                    ),
+                },
+            )
+        )
+
+        # Interpretation completes the same
+        # professional memory version.
+        assert (
+            interpreted[
+                "memory_version"
+            ]
+            == 1
+        )
+
+        assert (
+            interpreted[
+                "interpreted_source_signature"
+            ]
+            == "source-v1"
+        )
+
+        memory = interpreted["memory"]
+
+        # Authoritative layers survive untouched.
+        assert (
+            memory["facts"]["candidate"][
+                "current_role"
+            ]
+            == "Role A"
+        )
+
+        assert (
+            memory["market_evidence"][
+                "sample_size"
+            ]
+            == 10
+        )
+
+        assert (
+            memory["outcomes"][0][
+                "job_id"
+            ]
+            == "job-1"
+        )
+
+        assert len(
+            memory["inferences"]
+        ) == 1
+
+        assert len(
+            memory["hypotheses"]
+        ) == 1
+
+        assert (
+            memory["continuity_note"]
+            == (
+                "Watch technical-role evidence."
+            )
+        )
+
+    finally:
+        _delete_temp_candidate(
+            candidate_id
+        )
+
+
+def test_new_source_keeps_previous_interpreted_signature_pending():
+    repository = CareerMemoryRepository()
+    candidate_id = _create_temp_candidate()
+
+    try:
+        repository.save_snapshot(
+            candidate_id=candidate_id,
+            memory={
+                "facts": {},
+                "market_evidence": {},
+                "outcomes": [],
+                "inferences": [],
+                "hypotheses": [],
+                "continuity_note": "",
+            },
+            source_signature="source-v1",
+            memory_schema_version=(
+                "career-memory-v1"
+            ),
+        )
+
+        repository.apply_interpretation(
+            candidate_id=candidate_id,
+            source_signature="source-v1",
+            interpretation={
+                "inferences": [],
+                "hypotheses": [],
+                "continuity_note": (
+                    "Version one interpreted."
+                ),
+            },
+        )
+
+        second = repository.save_snapshot(
+            candidate_id=candidate_id,
+            memory={
+                "facts": {
+                    "candidate": {
+                        "current_role": "Role B",
+                    },
+                },
+                "market_evidence": {},
+                "outcomes": [],
+                "inferences": [],
+                "hypotheses": [],
+                "continuity_note": (
+                    "Version one interpreted."
+                ),
+            },
+            source_signature="source-v2",
+            memory_schema_version=(
+                "career-memory-v1"
+            ),
+        )
+
+        assert second["memory_version"] == 2
+
+        assert (
+            second["source_signature"]
+            == "source-v2"
+        )
+
+        # The pointer deliberately remains on
+        # the last successfully interpreted source.
+        assert (
+            second[
+                "interpreted_source_signature"
+            ]
+            == "source-v1"
+        )
+
+    finally:
+        _delete_temp_candidate(
+            candidate_id
+        )
+
+
+def test_stale_interpretation_is_rejected():
+    repository = CareerMemoryRepository()
+    candidate_id = _create_temp_candidate()
+
+    try:
+        repository.save_snapshot(
+            candidate_id=candidate_id,
+            memory={
+                "facts": {},
+                "market_evidence": {},
+                "outcomes": [],
+                "inferences": [],
+                "hypotheses": [],
+                "continuity_note": "",
+            },
+            source_signature="source-v2",
+            memory_schema_version=(
+                "career-memory-v1"
+            ),
+        )
+
+        with pytest.raises(
+            StaleCareerMemoryInterpretationError
+        ):
+            repository.apply_interpretation(
+                candidate_id=candidate_id,
+                source_signature="source-v1",
+                interpretation={
+                    "inferences": [
+                        {
+                            "statement": "Stale",
+                        }
+                    ],
+                    "hypotheses": [],
+                    "continuity_note": "Stale",
+                },
+            )
+
+        snapshot = repository.get_snapshot(
+            candidate_id
+        )
+
+        assert snapshot is not None
+
+        assert (
+            snapshot[
+                "interpreted_source_signature"
+            ]
+            == ""
+        )
+
+        assert (
+            snapshot["memory"][
+                "inferences"
+            ]
+            == []
+        )
+
+    finally:
+        _delete_temp_candidate(
+            candidate_id
+        )
+
+
+def test_same_source_interpretation_is_idempotent():
+    repository = CareerMemoryRepository()
+    candidate_id = _create_temp_candidate()
+
+    try:
+        repository.save_snapshot(
+            candidate_id=candidate_id,
+            memory={
+                "facts": {},
+                "market_evidence": {},
+                "outcomes": [],
+                "inferences": [],
+                "hypotheses": [],
+                "continuity_note": "",
+            },
+            source_signature="source-v1",
+            memory_schema_version=(
+                "career-memory-v1"
+            ),
+        )
+
+        first = repository.apply_interpretation(
+            candidate_id=candidate_id,
+            source_signature="source-v1",
+            interpretation={
+                "inferences": [
+                    {
+                        "statement": "First result",
+                    }
+                ],
+                "hypotheses": [],
+                "continuity_note": "First note",
+            },
+        )
+
+        second = repository.apply_interpretation(
+            candidate_id=candidate_id,
+            source_signature="source-v1",
+            interpretation={
+                "inferences": [
+                    {
+                        "statement": (
+                            "Different later result"
+                        ),
+                    }
+                ],
+                "hypotheses": [],
+                "continuity_note": (
+                    "Different later note"
+                ),
+            },
+        )
+
+        assert (
+            second["memory_version"]
+            == first["memory_version"]
+            == 1
+        )
+
+        # Once this exact source is interpreted,
+        # a later LLM response cannot rewrite it.
+        assert (
+            second["memory"][
+                "inferences"
+            ][0]["statement"]
+            == "First result"
+        )
+
+        assert (
+            second["memory"][
+                "continuity_note"
+            ]
+            == "First note"
+        )
 
     finally:
         _delete_temp_candidate(

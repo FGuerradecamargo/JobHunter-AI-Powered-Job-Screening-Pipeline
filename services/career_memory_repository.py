@@ -22,6 +22,15 @@ VALID_MEMORY_AUTHORITIES = {
 }
 
 
+class StaleCareerMemoryInterpretationError(
+    RuntimeError
+):
+    """
+    Raised when an interpretation was generated
+    from an older Career Memory source state.
+    """
+
+
 def _canonical_json(
     value: Any,
 ) -> str:
@@ -220,6 +229,224 @@ class CareerMemoryRepository:
         if snapshot is None:
             raise RuntimeError(
                 "Career Memory snapshot was not persisted."
+            )
+
+        return snapshot
+
+    def apply_interpretation(
+        self,
+        *,
+        candidate_id: str,
+        source_signature: str,
+        interpretation: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Apply only low-authority interpretation fields.
+
+        memory_version is deliberately NOT incremented.
+
+        The update is optimistic: if source_signature
+        changed while interpretation was being generated,
+        the stale interpretation is rejected.
+        """
+
+        normalized_candidate_id = str(
+            candidate_id or ""
+        ).strip()
+
+        normalized_source_signature = str(
+            source_signature or ""
+        ).strip()
+
+        if not normalized_candidate_id:
+            raise ValueError(
+                "candidate_id must be non-empty."
+            )
+
+        if not normalized_source_signature:
+            raise ValueError(
+                "source_signature must be non-empty."
+            )
+
+        if not isinstance(
+            interpretation,
+            dict,
+        ):
+            raise ValueError(
+                "interpretation must be "
+                "a dictionary."
+            )
+
+        expected_fields = {
+            "inferences",
+            "hypotheses",
+            "continuity_note",
+        }
+
+        if (
+            set(interpretation.keys())
+            != expected_fields
+        ):
+            raise ValueError(
+                "interpretation has invalid fields."
+            )
+
+        inferences = interpretation[
+            "inferences"
+        ]
+
+        hypotheses = interpretation[
+            "hypotheses"
+        ]
+
+        continuity_note = interpretation[
+            "continuity_note"
+        ]
+
+        if not isinstance(
+            inferences,
+            list,
+        ):
+            raise ValueError(
+                "inferences must be a list."
+            )
+
+        if not isinstance(
+            hypotheses,
+            list,
+        ):
+            raise ValueError(
+                "hypotheses must be a list."
+            )
+
+        if not isinstance(
+            continuity_note,
+            str,
+        ):
+            raise ValueError(
+                "continuity_note must be a string."
+            )
+
+        with get_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    source_signature,
+                    interpreted_source_signature,
+                    memory_json
+                FROM candidate_career_memory
+                WHERE candidate_id = %s
+                """,
+                (
+                    normalized_candidate_id,
+                ),
+            ).fetchone()
+
+        if row is None:
+            raise ValueError(
+                "Career Memory snapshot "
+                "does not exist."
+            )
+
+        current_source_signature = str(
+            row["source_signature"]
+            or ""
+        )
+
+        interpreted_source_signature = str(
+            row[
+                "interpreted_source_signature"
+            ]
+            or ""
+        )
+
+        if (
+            current_source_signature
+            != normalized_source_signature
+        ):
+            raise (
+                StaleCareerMemoryInterpretationError(
+                    "Career Memory source changed "
+                    "before interpretation could "
+                    "be applied."
+                )
+            )
+
+        # Successful interpretation for this exact
+        # source was already persisted.
+        #
+        # Do not allow a later nondeterministic LLM
+        # response to rewrite the same memory version.
+        if (
+            interpreted_source_signature
+            == normalized_source_signature
+        ):
+            snapshot = self.get_snapshot(
+                normalized_candidate_id
+            )
+
+            if snapshot is None:
+                raise RuntimeError(
+                    "Career Memory snapshot "
+                    "disappeared unexpectedly."
+                )
+
+            return snapshot
+
+        memory = _safe_json_object(
+            row["memory_json"]
+        )
+
+        # Only these three low-authority fields
+        # are writable by interpretation.
+        memory["inferences"] = inferences
+        memory["hypotheses"] = hypotheses
+        memory["continuity_note"] = (
+            continuity_note.strip()
+        )
+
+        now = utc_now()
+
+        with get_connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE candidate_career_memory
+                SET
+                    memory_json = %s,
+                    interpreted_source_signature = %s,
+                    updated_at = %s
+                WHERE
+                    candidate_id = %s
+                    AND source_signature = %s
+                """,
+                (
+                    _canonical_json(
+                        memory
+                    ),
+                    normalized_source_signature,
+                    now,
+                    normalized_candidate_id,
+                    normalized_source_signature,
+                ),
+            )
+
+        if not cursor.rowcount:
+            raise (
+                StaleCareerMemoryInterpretationError(
+                    "Career Memory source changed "
+                    "while interpretation was "
+                    "being persisted."
+                )
+            )
+
+        snapshot = self.get_snapshot(
+            normalized_candidate_id
+        )
+
+        if snapshot is None:
+            raise RuntimeError(
+                "Career Memory interpretation "
+                "was not persisted."
             )
 
         return snapshot
