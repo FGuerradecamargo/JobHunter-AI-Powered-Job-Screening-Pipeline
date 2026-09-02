@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 from urllib.parse import urlencode
@@ -96,5 +96,34 @@ class PublicUrlService:
         return (
             f"{cls._base_url()}"
             "/reset-password"
+            f"?{query}"
+        )
+
+    @classmethod
+    def email_verification_url(
+        cls,
+        token: str,
+    ) -> str:
+        normalized_token = str(
+            token or ""
+        ).strip()
+
+        if not normalized_token:
+            raise ValueError(
+                "Email verification token "
+                "is required."
+            )
+
+        query = urlencode(
+            {
+                "token": (
+                    normalized_token
+                )
+            }
+        )
+
+        return (
+            f"{cls._base_url()}"
+            "/verify-email"
             f"?{query}"
         )

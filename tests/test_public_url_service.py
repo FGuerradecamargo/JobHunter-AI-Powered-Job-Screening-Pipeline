@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from urllib.parse import (
     parse_qs,
@@ -218,6 +218,95 @@ def test_empty_reset_token_is_rejected(
         (
             PublicUrlService
             .password_reset_url(
+                "   "
+            )
+        )
+
+
+def test_https_public_base_url_builds_verification_link(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "WORKPILOT_PUBLIC_BASE_URL",
+        "https://app.workpilot.example",
+    )
+
+    url = (
+        PublicUrlService
+        .email_verification_url(
+            "verification-token-value"
+        )
+    )
+
+    assert url == (
+        "https://app.workpilot.example"
+        "/verify-email"
+        "?token=verification-token-value"
+    )
+
+
+def test_verification_token_is_safely_url_encoded(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "WORKPILOT_PUBLIC_BASE_URL",
+        "https://app.workpilot.example",
+    )
+
+    raw_token = (
+        "secret token+/=?&value"
+    )
+
+    url = (
+        PublicUrlService
+        .email_verification_url(
+            raw_token
+        )
+    )
+
+    parsed = urlparse(
+        url
+    )
+
+    query = parse_qs(
+        parsed.query
+    )
+
+    assert (
+        parsed.path
+        == "/verify-email"
+    )
+
+    assert query == {
+        "token": [
+            raw_token
+        ]
+    }
+
+    assert (
+        raw_token
+        not in url
+    )
+
+
+def test_empty_verification_token_is_rejected(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "WORKPILOT_PUBLIC_BASE_URL",
+        "https://app.workpilot.example",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Email verification token "
+            "is required"
+        ),
+    ):
+        (
+            PublicUrlService
+            .email_verification_url(
                 "   "
             )
         )

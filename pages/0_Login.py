@@ -4,6 +4,9 @@ from services.account_recovery_service import (
     AccountRecoveryService,
 )
 from services.auth_service import AuthService
+from services.email_verification_delivery_service import (
+    EmailVerificationDeliveryService,
+)
 from services.session_auth import (
     get_current_user,
     login_user,
@@ -207,6 +210,13 @@ with signup_tab:
                         email=signup_email,
                         display_name=display_name,
                         password=signup_password,
+                    )
+
+                    (
+                        EmailVerificationDeliveryService
+                        .send_verification_email(
+                            user.id
+                        )
                     )
 
                     login_user(user)

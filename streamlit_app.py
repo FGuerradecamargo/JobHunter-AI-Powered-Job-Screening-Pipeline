@@ -253,6 +253,14 @@ password_reset_page = st.Page(
 )
 
 
+email_verification_page = st.Page(
+    "pages/0_Verify_Email.py",
+    title="Verify email",
+    url_path="verify-email",
+    visibility="hidden",
+)
+
+
 current_user = get_current_user()
 
 
@@ -271,6 +279,7 @@ if current_user is None:
                 icon=":material/login:",
             ),
             password_reset_page,
+            email_verification_page,
         ]
     )
 
@@ -298,6 +307,7 @@ else:
                     default=True,
                 ),
                 password_reset_page,
+            email_verification_page,
             ]
         )
 
@@ -331,6 +341,7 @@ else:
                     icon=":material/trending_up:",
                 ),
                 password_reset_page,
+            email_verification_page,
             ]
         )
 
