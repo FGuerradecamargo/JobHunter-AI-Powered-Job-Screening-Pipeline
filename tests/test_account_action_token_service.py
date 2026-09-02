@@ -623,3 +623,142 @@ def test_concurrent_consumption_has_exactly_one_winner(
     assert results.count(
         None
     ) == 1
+
+
+
+def test_active_token_is_reported_as_active(
+    monkeypatch,
+    tmp_path,
+):
+    _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    token = (
+        AccountActionTokenService
+        .issue_token(
+            user_id="token-user",
+            purpose=(
+                AccountActionTokenService
+                .PASSWORD_RESET
+            ),
+        )
+    )
+
+    assert (
+        AccountActionTokenService
+        .is_token_active(
+            token,
+            (
+                AccountActionTokenService
+                .PASSWORD_RESET
+            ),
+        )
+        is True
+    )
+
+
+def test_consumed_token_is_not_reported_as_active(
+    monkeypatch,
+    tmp_path,
+):
+    _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    token = (
+        AccountActionTokenService
+        .issue_token(
+            user_id="token-user",
+            purpose=(
+                AccountActionTokenService
+                .PASSWORD_RESET
+            ),
+        )
+    )
+
+    assert (
+        AccountActionTokenService
+        .consume_token(
+            token,
+            (
+                AccountActionTokenService
+                .PASSWORD_RESET
+            ),
+        )
+        == "token-user"
+    )
+
+    assert (
+        AccountActionTokenService
+        .is_token_active(
+            token,
+            (
+                AccountActionTokenService
+                .PASSWORD_RESET
+            ),
+        )
+        is False
+    )
+
+
+def test_expired_token_is_not_reported_as_active(
+    monkeypatch,
+    tmp_path,
+):
+    database_file = _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    token = (
+        AccountActionTokenService
+        .issue_token(
+            user_id="token-user",
+            purpose=(
+                AccountActionTokenService
+                .PASSWORD_RESET
+            ),
+        )
+    )
+
+    token_hash = (
+        AccountActionTokenService
+        .hash_token(token)
+    )
+
+    connection = _open_database(
+        database_file
+    )
+
+    try:
+        connection.execute(
+            """
+            UPDATE account_action_tokens
+            SET expires_at = ?
+            WHERE token_hash = ?
+            """,
+            (
+                "2000-01-01T00:00:00+00:00",
+                token_hash,
+            ),
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    assert (
+        AccountActionTokenService
+        .is_token_active(
+            token,
+            (
+                AccountActionTokenService
+                .PASSWORD_RESET
+            ),
+        )
+        is False
+    )

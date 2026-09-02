@@ -1,7 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import streamlit as st
 
+from services.account_action_token_service import (
+    AccountActionTokenService,
+)
 from services.password_reset_service import (
     PasswordResetService,
 )
@@ -108,6 +111,31 @@ if not token:
     st.error(
         "This password reset link is "
         "missing, invalid, or has expired."
+    )
+
+    st.stop()
+
+
+token_is_active = (
+    AccountActionTokenService
+    .is_token_active(
+        token,
+        (
+            AccountActionTokenService
+            .PASSWORD_RESET
+        ),
+    )
+)
+
+if not token_is_active:
+    st.session_state.pop(
+        _TOKEN_SESSION_KEY,
+        None,
+    )
+
+    st.error(
+        "This password reset link "
+        "is invalid or has expired."
     )
 
     st.stop()

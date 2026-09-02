@@ -168,6 +168,56 @@ class AccountActionTokenService:
         return raw_token
 
     @classmethod
+    def is_token_active(
+        cls,
+        token: str,
+        purpose: str,
+    ) -> bool:
+        """
+        Check whether a token is currently usable
+        without consuming it.
+        """
+        normalized_purpose = (
+            cls._validate_purpose(
+                purpose
+            )
+        )
+
+        token_hash = cls.hash_token(
+            token
+        )
+
+        now_text = datetime.now(
+            timezone.utc
+        ).isoformat()
+
+        with get_connection() as connection:
+            create_account_security_schema(
+                connection
+            )
+
+            row = connection.execute(
+                """
+                SELECT 1
+                FROM account_action_tokens
+                WHERE
+                    token_hash = ?
+                    AND purpose = ?
+                    AND used_at IS NULL
+                    AND invalidated_at IS NULL
+                    AND expires_at > ?
+                LIMIT 1
+                """,
+                (
+                    token_hash,
+                    normalized_purpose,
+                    now_text,
+                ),
+            ).fetchone()
+
+        return row is not None
+
+    @classmethod
     def consume_token_with_connection(
         cls,
         connection,
