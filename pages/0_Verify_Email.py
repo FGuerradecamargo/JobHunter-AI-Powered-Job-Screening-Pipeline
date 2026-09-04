@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import streamlit as st
 
+from services.candidate_repository import (
+    CandidateRepository,
+)
 from services.email_verification_delivery_service import (
     EmailVerificationDeliveryService,
 )
@@ -85,8 +88,82 @@ if result is True:
             None,
         )
 
+        if current_user is None:
+            st.switch_page(
+                "pages/0_Login.py"
+            )
+
+        candidate = None
+
+        if current_user.candidate_id:
+            candidate = (
+                CandidateRepository()
+                .get(
+                    current_user.candidate_id
+                )
+            )
+
+        profile_ready = bool(
+            candidate
+            and candidate.professional_summary.strip()
+            and candidate.current_role.strip()
+        )
+
+        if profile_ready:
+            st.switch_page(
+                "app.py"
+            )
+
         st.switch_page(
-            "pages/0_Login.py"
+            "pages/3_Profile.py"
+        )
+
+    st.stop()
+
+
+if (
+    current_user is not None
+    and EmailVerificationService
+    .is_email_verified(
+        current_user.id
+    )
+):
+    st.success(
+        "Your email is already verified."
+    )
+
+    st.write(
+        "Your WorkPilot account is ready."
+    )
+
+    if st.button(
+        "Continue to WorkPilot",
+        type="primary",
+        key="continue_verified_account",
+    ):
+        candidate = None
+
+        if current_user.candidate_id:
+            candidate = (
+                CandidateRepository()
+                .get(
+                    current_user.candidate_id
+                )
+            )
+
+        profile_ready = bool(
+            candidate
+            and candidate.professional_summary.strip()
+            and candidate.current_role.strip()
+        )
+
+        if profile_ready:
+            st.switch_page(
+                "app.py"
+            )
+
+        st.switch_page(
+            "pages/3_Profile.py"
         )
 
     st.stop()

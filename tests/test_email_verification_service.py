@@ -329,3 +329,90 @@ def test_invalid_token_does_not_verify_email(
 
     finally:
         connection.close()
+
+def test_email_verification_state_is_reported(
+    monkeypatch,
+    tmp_path,
+):
+    _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert (
+        EmailVerificationService
+        .is_email_verified(
+            "unverified-user"
+        )
+        is False
+    )
+
+    assert (
+        EmailVerificationService
+        .is_email_verified(
+            "verified-user"
+        )
+        is True
+    )
+
+
+def test_email_verification_state_rejects_unknown_user(
+    monkeypatch,
+    tmp_path,
+):
+    _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="User not found",
+    ):
+        (
+            EmailVerificationService
+            .is_email_verified(
+                "missing-user"
+            )
+        )
+
+
+def test_verification_state_changes_after_success(
+    monkeypatch,
+    tmp_path,
+):
+    _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert (
+        EmailVerificationService
+        .is_email_verified(
+            "unverified-user"
+        )
+        is False
+    )
+
+    token = (
+        EmailVerificationService
+        .issue_verification_token(
+            "unverified-user"
+        )
+    )
+
+    assert token is not None
+
+    assert (
+        EmailVerificationService
+        .verify_email(token)
+        is True
+    )
+
+    assert (
+        EmailVerificationService
+        .is_email_verified(
+            "unverified-user"
+        )
+        is True
+    )

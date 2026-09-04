@@ -12,6 +12,45 @@ from services.database import (
 
 class EmailVerificationService:
     @classmethod
+    def is_email_verified(
+        cls,
+        user_id: str,
+    ) -> bool:
+        normalized_user_id = str(
+            user_id or ""
+        ).strip()
+
+        if not normalized_user_id:
+            raise ValueError(
+                "User ID is required."
+            )
+
+        with get_connection() as connection:
+            create_account_security_schema(
+                connection
+            )
+
+            row = connection.execute(
+                """
+                SELECT email_verified_at
+                FROM users
+                WHERE id = ?
+                """,
+                (
+                    normalized_user_id,
+                ),
+            ).fetchone()
+
+        if row is None:
+            raise ValueError(
+                "User not found."
+            )
+
+        return bool(
+            row["email_verified_at"]
+        )
+
+    @classmethod
     def issue_verification_token(
         cls,
         user_id: str,
