@@ -2,8 +2,14 @@ from __future__ import annotations
 
 import streamlit as st
 
+from services.email_verification_delivery_service import (
+    EmailVerificationDeliveryService,
+)
 from services.email_verification_service import (
     EmailVerificationService,
+)
+from services.session_auth import (
+    get_current_user,
 )
 
 
@@ -18,6 +24,9 @@ _RESULT_SESSION_KEY = (
 
 
 st.title("Verify your email")
+
+
+current_user = get_current_user()
 
 
 query_token = str(
@@ -89,10 +98,42 @@ if result is False:
         "is invalid or has expired."
     )
 
-    st.write(
-        "Request a new verification email "
-        "from WorkPilot."
-    )
+    if current_user is not None:
+        st.write(
+            "You can send a new verification "
+            "email to your account."
+        )
+
+        if st.button(
+            "Resend verification email",
+            type="primary",
+        ):
+            sent = (
+                EmailVerificationDeliveryService
+                .send_verification_email(
+                    current_user.id
+                )
+            )
+
+            if sent:
+                st.success(
+                    "If your account still needs "
+                    "verification, a new email "
+                    "has been sent."
+                )
+            else:
+                st.error(
+                    "We could not send a new "
+                    "verification email. "
+                    "Please try again later."
+                )
+
+    else:
+        st.write(
+            "Log in to WorkPilot, then return "
+            "here to request a new "
+            "verification email."
+        )
 
     st.stop()
 
@@ -101,3 +142,27 @@ st.info(
     "Open the verification link from "
     "your WorkPilot email."
 )
+
+if current_user is not None:
+    if st.button(
+        "Resend verification email",
+    ):
+        sent = (
+            EmailVerificationDeliveryService
+            .send_verification_email(
+                current_user.id
+            )
+        )
+
+        if sent:
+            st.success(
+                "If your account still needs "
+                "verification, a new email "
+                "has been sent."
+            )
+        else:
+            st.error(
+                "We could not send a new "
+                "verification email. "
+                "Please try again later."
+            )
