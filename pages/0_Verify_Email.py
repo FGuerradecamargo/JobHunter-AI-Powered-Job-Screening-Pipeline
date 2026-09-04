@@ -110,7 +110,7 @@ if result is False:
         ):
             sent = (
                 EmailVerificationDeliveryService
-                .send_verification_email(
+                .resend_verification_email(
                     current_user.id
                 )
             )
@@ -149,7 +149,7 @@ if current_user is not None:
     ):
         sent = (
             EmailVerificationDeliveryService
-            .send_verification_email(
+            .resend_verification_email(
                 current_user.id
             )
         )

@@ -3,6 +3,9 @@
 from html import escape
 import logging
 
+from services.account_action_rate_limiter import (
+    AccountActionRateLimiter,
+)
 from services.account_action_token_service import (
     AccountActionTokenService,
 )
@@ -41,6 +44,16 @@ class AccountRecoveryService:
         whether URL configuration is available, or
         whether email delivery succeeded.
         """
+        allowed = (
+            AccountActionRateLimiter.consume(
+                "password_reset_request",
+                email,
+            )
+        )
+
+        if not allowed:
+            return cls.GENERIC_RESET_RESPONSE
+
         token = (
             PasswordResetService
             .request_reset_token(

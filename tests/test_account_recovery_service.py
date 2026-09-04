@@ -1,5 +1,10 @@
 ﻿from __future__ import annotations
 
+import pytest
+
+from services.account_action_rate_limiter import (
+    AccountActionRateLimiter,
+)
 from services.account_action_token_service import (
     AccountActionTokenService,
 )
@@ -17,6 +22,19 @@ from services.transactional_email_service import (
     TransactionalEmailError,
     TransactionalEmailService,
 )
+
+
+@pytest.fixture(autouse=True)
+def allow_account_actions(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        AccountActionRateLimiter,
+        "consume",
+        classmethod(
+            lambda cls, action, identifier: True
+        ),
+    )
 
 
 def test_public_response_is_identical_for_existing_and_missing_accounts(
@@ -314,4 +332,43 @@ def test_public_url_configuration_failure_does_not_attempt_email_delivery(
     assert (
         "private configuration detail"
         not in response
+    )
+
+
+def test_rate_limited_reset_keeps_generic_response_and_does_not_issue_token(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        AccountActionRateLimiter,
+        "consume",
+        classmethod(
+            lambda cls, action, identifier: False
+        ),
+    )
+
+    def must_not_issue_token(email):
+        raise AssertionError(
+            "Rate-limited request must not "
+            "issue a reset token."
+        )
+
+    monkeypatch.setattr(
+        PasswordResetService,
+        "request_reset_token",
+        staticmethod(
+            must_not_issue_token
+        ),
+    )
+
+    response = (
+        AccountRecoveryService
+        .request_password_reset(
+            "user@example.com"
+        )
+    )
+
+    assert (
+        response
+        == AccountRecoveryService
+        .GENERIC_RESET_RESPONSE
     )

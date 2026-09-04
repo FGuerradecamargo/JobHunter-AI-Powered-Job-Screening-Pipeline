@@ -3,6 +3,9 @@ from __future__ import annotations
 from html import escape
 import logging
 
+from services.account_action_rate_limiter import (
+    AccountActionRateLimiter,
+)
 from services.account_action_token_service import (
     AccountActionTokenService,
 )
@@ -27,6 +30,34 @@ logger = logging.getLogger(__name__)
 
 
 class EmailVerificationDeliveryService:
+    @classmethod
+    def resend_verification_email(
+        cls,
+        user_id: str,
+    ) -> bool:
+        normalized_user_id = str(
+            user_id or ""
+        ).strip()
+
+        if not normalized_user_id:
+            raise ValueError(
+                "User ID is required."
+            )
+
+        allowed = (
+            AccountActionRateLimiter.consume(
+                "email_verification_resend",
+                normalized_user_id,
+            )
+        )
+
+        if not allowed:
+            return False
+
+        return cls.send_verification_email(
+            normalized_user_id
+        )
+
     @classmethod
     def send_verification_email(
         cls,

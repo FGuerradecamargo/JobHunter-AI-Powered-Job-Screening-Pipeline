@@ -3,6 +3,9 @@ from __future__ import annotations
 import sqlite3
 
 import services.database as database_module
+from services.account_action_rate_limiter import (
+    AccountActionRateLimiter,
+)
 from services.account_action_token_service import (
     AccountActionTokenService,
 )
@@ -326,4 +329,115 @@ def test_provider_failure_is_contained(
             "unverified-user"
         )
         is False
+    )
+
+
+def test_resend_is_rate_limited(
+    monkeypatch,
+    tmp_path,
+):
+    _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    monkeypatch.setattr(
+        PublicUrlService,
+        "email_verification_url",
+        classmethod(
+            lambda cls, token: (
+                "https://workpilot.example"
+                f"/verify-email?token={token}"
+            )
+        ),
+    )
+
+    sent_count = 0
+
+    def fake_send_email(**kwargs):
+        nonlocal sent_count
+        sent_count += 1
+
+    monkeypatch.setattr(
+        TransactionalEmailService,
+        "send_email",
+        fake_send_email,
+    )
+
+    for _ in range(
+        AccountActionRateLimiter.REQUEST_LIMIT
+    ):
+        assert (
+            EmailVerificationDeliveryService
+            .resend_verification_email(
+                "unverified-user"
+            )
+            is True
+        )
+
+    assert (
+        EmailVerificationDeliveryService
+        .resend_verification_email(
+            "unverified-user"
+        )
+        is False
+    )
+
+    assert (
+        sent_count
+        == AccountActionRateLimiter.REQUEST_LIMIT
+    )
+
+
+def test_direct_verification_send_is_not_blocked_by_resend_limit(
+    monkeypatch,
+    tmp_path,
+):
+    _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+
+    monkeypatch.setattr(
+        PublicUrlService,
+        "email_verification_url",
+        classmethod(
+            lambda cls, token: (
+                "https://workpilot.example"
+                f"/verify-email?token={token}"
+            )
+        ),
+    )
+
+    monkeypatch.setattr(
+        TransactionalEmailService,
+        "send_email",
+        lambda **kwargs: None,
+    )
+
+    for _ in range(
+        AccountActionRateLimiter.REQUEST_LIMIT
+    ):
+        assert (
+            EmailVerificationDeliveryService
+            .resend_verification_email(
+                "unverified-user"
+            )
+            is True
+        )
+
+    assert (
+        EmailVerificationDeliveryService
+        .resend_verification_email(
+            "unverified-user"
+        )
+        is False
+    )
+
+    assert (
+        EmailVerificationDeliveryService
+        .send_verification_email(
+            "unverified-user"
+        )
+        is True
     )

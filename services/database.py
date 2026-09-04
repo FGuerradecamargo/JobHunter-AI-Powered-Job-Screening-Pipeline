@@ -388,6 +388,44 @@ def create_auth_login_failure_schema(
     )
 
 
+def create_account_action_request_schema(
+    connection,
+) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS
+        account_action_requests (
+            id TEXT PRIMARY KEY,
+            action TEXT NOT NULL,
+            identifier_hash TEXT NOT NULL,
+            requested_at TEXT NOT NULL
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_account_action_requests_lookup
+        ON account_action_requests(
+            action,
+            identifier_hash,
+            requested_at
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_account_action_requests_time
+        ON account_action_requests(
+            requested_at
+        )
+        """
+    )
+
+
 def create_account_security_schema(
     connection,
 ) -> None:
@@ -649,6 +687,10 @@ def initialize_postgres_database() -> None:
         )
 
         create_auth_login_failure_schema(
+            connection
+        )
+
+        create_account_action_request_schema(
             connection
         )
 
@@ -1455,6 +1497,10 @@ def initialize_sqlite_database() -> None:
         )
 
         create_auth_login_failure_schema(
+            connection
+        )
+
+        create_account_action_request_schema(
             connection
         )
 
