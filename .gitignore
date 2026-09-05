@@ -48,3 +48,8 @@ data/collector_state.json
 
 
 data/jobhunter.db
+
+# ==========================
+# Streamlit Secrets
+# ==========================
+.streamlit/secrets.toml
