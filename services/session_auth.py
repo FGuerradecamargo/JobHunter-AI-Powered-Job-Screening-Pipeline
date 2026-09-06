@@ -238,5 +238,9 @@ def render_logout_button() -> None:
             key="global_logout_button",
         ):
             logout_user()
+
+            if st.user.is_logged_in:
+                st.logout()
+
             st.rerun()
 

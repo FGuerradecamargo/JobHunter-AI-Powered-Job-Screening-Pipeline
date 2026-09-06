@@ -516,6 +516,60 @@ def create_account_security_schema(
     )
 
 
+def create_user_identity_schema(
+    connection,
+) -> None:
+    """
+    Persist external authentication identities
+    separately from WorkPilot user accounts.
+
+    provider + subject is the authoritative
+    external identity key. Provider email is
+    stored only as identity metadata.
+    """
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS
+        user_identities (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+
+            provider TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            provider_email TEXT,
+
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_authenticated_at TEXT NOT NULL,
+
+            UNIQUE (
+                provider,
+                subject
+            ),
+
+            UNIQUE (
+                user_id,
+                provider
+            ),
+
+            FOREIGN KEY (user_id)
+                REFERENCES users(id)
+                ON DELETE CASCADE
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_user_identities_user
+        ON user_identities(
+            user_id
+        )
+        """
+    )
+
+
 def initialize_postgres_database() -> None:
     with get_connection() as connection:
         connection.execute(
@@ -695,6 +749,10 @@ def initialize_postgres_database() -> None:
         )
 
         create_account_security_schema(
+            connection
+        )
+
+        create_user_identity_schema(
             connection
         )
 
@@ -1505,6 +1563,10 @@ def initialize_sqlite_database() -> None:
         )
 
         create_account_security_schema(
+            connection
+        )
+
+        create_user_identity_schema(
             connection
         )
 
