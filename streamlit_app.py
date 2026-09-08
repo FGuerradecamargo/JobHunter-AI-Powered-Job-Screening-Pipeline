@@ -263,6 +263,11 @@ email_verification_page = st.Page(
 
 current_user = get_current_user()
 
+google_oidc_pending = bool(
+    current_user is None
+    and st.user.is_logged_in
+)
+
 
 if current_user is None:
     navigation = st.navigation(
@@ -271,12 +276,15 @@ if current_user is None:
                 "pages/00_Home.py",
                 title="Home",
                 icon=":material/home:",
-                default=True,
+                default=(
+                    not google_oidc_pending
+                ),
             ),
             st.Page(
                 "pages/0_Login.py",
                 title="Log in",
                 icon=":material/login:",
+                default=google_oidc_pending,
             ),
             password_reset_page,
             email_verification_page,
