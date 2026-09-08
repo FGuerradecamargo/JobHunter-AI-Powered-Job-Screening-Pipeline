@@ -270,26 +270,36 @@ google_oidc_pending = bool(
 
 
 if current_user is None:
+    home_page = st.Page(
+        "pages/00_Home.py",
+        title="Home",
+        icon=":material/home:",
+        default=True,
+    )
+
+    login_page = st.Page(
+        "pages/0_Login.py",
+        title="Log in",
+        icon=":material/login:",
+    )
+
     navigation = st.navigation(
         [
-            st.Page(
-                "pages/00_Home.py",
-                title="Home",
-                icon=":material/home:",
-                default=(
-                    not google_oidc_pending
-                ),
-            ),
-            st.Page(
-                "pages/0_Login.py",
-                title="Log in",
-                icon=":material/login:",
-                default=google_oidc_pending,
-            ),
+            home_page,
+            login_page,
             password_reset_page,
             email_verification_page,
         ]
     )
+
+    if (
+        google_oidc_pending
+        and navigation.url_path
+        != login_page.url_path
+    ):
+        st.switch_page(
+            login_page
+        )
 
 else:
     candidate = None
