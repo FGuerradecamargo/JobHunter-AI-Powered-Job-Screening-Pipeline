@@ -1,7 +1,13 @@
 import streamlit as st
 
+from services.access_policy import AccessPolicy
 from services.candidate_repository import CandidateRepository
 from services.session_auth import get_authenticated_user
+from services.user_context_runtime import (
+    get_active_user_context,
+    set_active_user,
+)
+from services.user_repository import UserRepository
 
 
 st.set_page_config(
@@ -302,11 +308,98 @@ if authenticated_user is None:
         )
 
 else:
+    user_context = (
+        get_active_user_context(
+            authenticated_user=authenticated_user
+        )
+    )
+
+    active_user = user_context.active_user
+
+    if AccessPolicy.can_view_all_users(
+        authenticated_user
+    ):
+        users = UserRepository().list_all()
+
+        user_by_id = {
+            user.id: user
+            for user in users
+        }
+
+        if authenticated_user.id not in user_by_id:
+            user_by_id[
+                authenticated_user.id
+            ] = authenticated_user
+
+        user_ids = list(
+            user_by_id.keys()
+        )
+
+        active_index = (
+            user_ids.index(active_user.id)
+            if active_user.id in user_by_id
+            else user_ids.index(
+                authenticated_user.id
+            )
+        )
+
+        st.sidebar.caption(
+            "ADMIN"
+        )
+
+        st.sidebar.caption(
+            "Signed in as "
+            f"{authenticated_user.display_name}"
+        )
+
+        viewing_as_key = (
+            "admin_viewing_as_"
+            f"{authenticated_user.id}"
+        )
+
+        if (
+            st.session_state.get(
+                viewing_as_key
+            )
+            not in user_ids
+        ):
+            st.session_state[
+                viewing_as_key
+            ] = active_user.id
+
+        selected_active_user_id = (
+            st.sidebar.selectbox(
+                "Viewing as",
+                options=user_ids,
+                index=active_index,
+                format_func=lambda user_id: (
+                    f"{user_by_id[user_id].display_name} "
+                    f"({user_by_id[user_id].email})"
+                ),
+                key=viewing_as_key,
+            )
+        )
+
+        if (
+            selected_active_user_id
+            != active_user.id
+        ):
+            set_active_user(
+                authenticated_user=(
+                    authenticated_user
+                ),
+                active_user_id=(
+                    selected_active_user_id
+                ),
+            )
+
+            st.rerun()
+
     candidate = None
 
-    if authenticated_user.candidate_id:
+    if active_user.candidate_id:
         candidate = CandidateRepository().get(
-            authenticated_user.candidate_id
+            active_user.candidate_id
         )
 
     profile_ready = bool(

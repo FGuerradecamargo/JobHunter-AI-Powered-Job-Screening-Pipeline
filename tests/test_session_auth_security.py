@@ -482,3 +482,58 @@ def test_revoke_user_sessions_requires_user_id():
         session_auth.revoke_user_sessions(
             ""
         )
+
+
+def test_logout_clears_operational_and_impersonation_state(
+    session_runtime,
+):
+    runtime = session_runtime
+
+    session_auth.login_user(
+        runtime.user
+    )
+
+    runtime.streamlit.session_state[
+        "active_user_id"
+    ] = "other-user"
+
+    runtime.streamlit.session_state[
+        "active_user_owner_id"
+    ] = runtime.user.id
+
+    runtime.streamlit.session_state[
+        f"admin_viewing_as_{runtime.user.id}"
+    ] = "other-user"
+
+    runtime.streamlit.session_state[
+        "unrelated_cached_state"
+    ] = "value"
+
+    session_auth.logout_user()
+
+    assert (
+        "current_user"
+        not in runtime.streamlit.session_state
+    )
+
+    assert (
+        "active_user_id"
+        not in runtime.streamlit.session_state
+    )
+
+    assert (
+        "active_user_owner_id"
+        not in runtime.streamlit.session_state
+    )
+
+    assert (
+        f"admin_viewing_as_{runtime.user.id}"
+        not in runtime.streamlit.session_state
+    )
+
+    assert (
+        runtime.streamlit.session_state[
+            "unrelated_cached_state"
+        ]
+        == "value"
+    )

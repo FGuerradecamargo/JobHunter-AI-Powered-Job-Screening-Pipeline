@@ -7,7 +7,7 @@ from services.session_auth import (
     render_logout_button,
     require_authenticated_user,
 )
-from services.user_context_service import UserContextService
+from services.user_context_runtime import get_active_user_context
 from services.database import (
     count_candidate_jobs_by_status,
     get_candidate_application_outcome,
@@ -781,7 +781,7 @@ def main() -> None:
     )
 
     user_context = (
-        UserContextService().resolve(
+        get_active_user_context(
             authenticated_user=(
                 authenticated_user
             )
@@ -816,47 +816,23 @@ def main() -> None:
         """
     )
 
-    if authenticated_user.access_level == "admin":
-        candidates = candidate_repository.list_all()
-
-        if not candidates:
-            st.warning(
-                "No candidates were found in the database."
-            )
-            return
-
-        candidate_options = {
-            candidate.name: candidate.id
-            for candidate in candidates
-        }
-
-        selected_candidate_name = st.selectbox(
-            "Candidate",
-            options=list(candidate_options.keys()),
+    if not active_user.candidate_id:
+        st.warning(
+            "This account does not have a professional profile yet."
         )
+        return
 
-        selected_candidate_id = candidate_options[
-            selected_candidate_name
-        ]
+    selected_candidate_id = active_user.candidate_id
 
-    else:
-        if not active_user.candidate_id:
-            st.warning(
-                "Your account does not have a professional profile yet."
-            )
-            return
+    candidate = candidate_repository.get(
+        selected_candidate_id
+    )
 
-        selected_candidate_id = active_user.candidate_id
-
-        candidate = candidate_repository.get(
-            selected_candidate_id
+    if candidate is None:
+        st.warning(
+            "The professional profile could not be found."
         )
-
-        if candidate is None:
-            st.warning(
-                "Your professional profile could not be found."
-            )
-            return
+        return
 
     counts = count_candidate_jobs_by_status(
         selected_candidate_id

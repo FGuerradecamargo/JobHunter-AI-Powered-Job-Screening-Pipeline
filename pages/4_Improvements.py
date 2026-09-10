@@ -10,7 +10,7 @@ from services.session_auth import (
     render_logout_button,
     require_authenticated_user,
 )
-from services.user_context_service import UserContextService
+from services.user_context_runtime import get_active_user_context
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ authenticated_user = (
 )
 
 user_context = (
-    UserContextService().resolve(
+    get_active_user_context(
         authenticated_user=authenticated_user
     )
 )

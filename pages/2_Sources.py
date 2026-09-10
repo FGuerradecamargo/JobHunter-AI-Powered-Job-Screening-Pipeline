@@ -32,9 +32,7 @@ from services.session_auth import (
     render_logout_button,
     require_authenticated_user,
 )
-from services.user_context_service import UserContextService
-from services.user_repository import UserRepository
-from services.access_policy import AccessPolicy
+from services.user_context_runtime import get_active_user_context
 
 load_dotenv()
 initialize_database()
@@ -44,7 +42,7 @@ authenticated_user = (
 )
 
 user_context = (
-    UserContextService().resolve(
+    get_active_user_context(
         authenticated_user=authenticated_user
     )
 )
@@ -73,7 +71,6 @@ st.caption(
 )
 
 
-user_repository = UserRepository()
 gmail_repository = GmailConnectionRepository()
 oauth_state_repository = OAuthStateRepository()
 oauth_service = GmailOAuthService()
@@ -226,50 +223,7 @@ def handle_oauth_callback() -> None:
 handle_oauth_callback()
 
 
-ADMIN_BYPASS_EMAILS = {
-    "felipehev@gmail.com",
-}
-
-is_admin = (
-    AccessPolicy.can_view_all_users(
-        authenticated_user
-    )
-    or (
-        authenticated_user.email
-        and authenticated_user.email.lower()
-        in ADMIN_BYPASS_EMAILS
-    )
-)
-
-if is_admin:
-    users = user_repository.list_all()
-
-    if not users:
-        st.warning(
-            "No users are available."
-        )
-        st.stop()
-
-    user_by_id = {
-        user.id: user
-        for user in users
-    }
-
-    selected_user_id = st.selectbox(
-        "Manage sources for",
-        options=list(user_by_id.keys()),
-        format_func=lambda user_id: (
-            f"{user_by_id[user_id].display_name} "
-            f"({user_by_id[user_id].email})"
-        ),
-    )
-
-    selected_user = user_by_id[
-        selected_user_id
-    ]
-
-else:
-    selected_user = active_user
+selected_user = active_user
 
 
 existing_connection = (

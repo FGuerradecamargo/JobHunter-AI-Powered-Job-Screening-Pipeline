@@ -210,8 +210,34 @@ def logout_user() -> None:
     cookies[SESSION_COOKIE] = ""
     cookies.save()
 
-    if "current_user" in st.session_state:
-        del st.session_state["current_user"]
+    # Clear WorkPilot identity and operational
+    # context without wiping Streamlit component
+    # state used by the encrypted cookie manager.
+    st.session_state.pop(
+        "current_user",
+        None,
+    )
+
+    st.session_state.pop(
+        "active_user_id",
+        None,
+    )
+
+    st.session_state.pop(
+        "active_user_owner_id",
+        None,
+    )
+
+    for key in list(
+        st.session_state.keys()
+    ):
+        if str(key).startswith(
+            "admin_viewing_as_"
+        ):
+            st.session_state.pop(
+                key,
+                None,
+            )
 
 
 def require_authenticated_user() -> AppUser:

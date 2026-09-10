@@ -13,7 +13,6 @@ from services.candidate_onboarding_repository import (
 from services.career_update_repository import (
     CareerUpdateRepository,
 )
-from services.user_repository import UserRepository
 
 from services.ai.openai_client import OpenAIClient
 from services.candidate_profile_generation_service import (
@@ -27,7 +26,7 @@ from services.session_auth import (
     render_logout_button,
     require_authenticated_user,
 )
-from services.user_context_service import UserContextService
+from services.user_context_runtime import get_active_user_context
 from components.profile_onboarding import render_profile_onboarding
 
 authenticated_user = (
@@ -35,7 +34,7 @@ authenticated_user = (
 )
 
 user_context = (
-    UserContextService().resolve(
+    get_active_user_context(
         authenticated_user=authenticated_user
     )
 )
@@ -58,7 +57,6 @@ st.write(
     "direction, strengths and professional evidence."
 )
 
-user_repository = UserRepository()
 onboarding_repository = CandidateOnboardingRepository()
 
 candidate_repository = CandidateRepository()
@@ -74,31 +72,7 @@ profile_generation_service = (
     )
 )
 
-users = user_repository.list_all()
-
-if not users:
-    st.warning("No users found.")
-    st.stop()
-
-if AccessPolicy.can_view_all_users(
-    authenticated_user
-):
-    accessible_users = [
-        user
-        for user in users
-        if user.candidate_id is not None
-    ]
-
-    selected_user = st.selectbox(
-        "Profile",
-        accessible_users,
-        format_func=lambda user: (
-            f"{user.display_name} - {user.email}"
-        ),
-    )
-
-else:
-    selected_user = active_user
+selected_user = active_user
 
 if selected_user.candidate_id is None:
     st.warning(

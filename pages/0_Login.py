@@ -248,6 +248,10 @@ if authenticated_user is not None:
 
     if st.button("Log out"):
         logout_user()
+
+        if st.user.is_logged_in:
+            st.logout()
+
         st.rerun()
 
     st.stop()
