@@ -29,16 +29,28 @@ from services.oauth_state_repository import (
     OAuthStateRepository,
 )
 from services.session_auth import (
-    require_login,
     render_logout_button,
+    require_authenticated_user,
 )
+from services.user_context_service import UserContextService
 from services.user_repository import UserRepository
 from services.access_policy import AccessPolicy
 
 load_dotenv()
 initialize_database()
 
-current_user = require_login()
+authenticated_user = (
+    require_authenticated_user()
+)
+
+user_context = (
+    UserContextService().resolve(
+        authenticated_user=authenticated_user
+    )
+)
+
+active_user = user_context.active_user
+
 render_logout_button()
 
 st.set_page_config(
@@ -220,11 +232,11 @@ ADMIN_BYPASS_EMAILS = {
 
 is_admin = (
     AccessPolicy.can_view_all_users(
-        current_user
+        authenticated_user
     )
     or (
-        current_user.email
-        and current_user.email.lower()
+        authenticated_user.email
+        and authenticated_user.email.lower()
         in ADMIN_BYPASS_EMAILS
     )
 )
@@ -257,7 +269,7 @@ if is_admin:
     ]
 
 else:
-    selected_user = current_user
+    selected_user = active_user
 
 
 existing_connection = (

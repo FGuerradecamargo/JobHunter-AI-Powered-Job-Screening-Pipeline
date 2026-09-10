@@ -1,7 +1,7 @@
 import streamlit as st
 
 from services.candidate_repository import CandidateRepository
-from services.session_auth import get_current_user
+from services.session_auth import get_authenticated_user
 
 
 st.set_page_config(
@@ -261,15 +261,15 @@ email_verification_page = st.Page(
 )
 
 
-current_user = get_current_user()
+authenticated_user = get_authenticated_user()
 
 google_oidc_pending = bool(
-    current_user is None
+    authenticated_user is None
     and st.user.is_logged_in
 )
 
 
-if current_user is None:
+if authenticated_user is None:
     home_page = st.Page(
         "pages/00_Home.py",
         title="Home",
@@ -304,9 +304,9 @@ if current_user is None:
 else:
     candidate = None
 
-    if current_user.candidate_id:
+    if authenticated_user.candidate_id:
         candidate = CandidateRepository().get(
-            current_user.candidate_id
+            authenticated_user.candidate_id
         )
 
     profile_ready = bool(

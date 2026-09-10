@@ -7,9 +7,10 @@ from services.career_development_manager import (
     get_or_generate_career_development,
 )
 from services.session_auth import (
-    require_login,
     render_logout_button,
+    require_authenticated_user,
 )
+from services.user_context_service import UserContextService
 
 
 logger = logging.getLogger(__name__)
@@ -29,10 +30,21 @@ st.write(
     "showing and what may be worth developing next."
 )
 
-current_user = require_login()
+authenticated_user = (
+    require_authenticated_user()
+)
+
+user_context = (
+    UserContextService().resolve(
+        authenticated_user=authenticated_user
+    )
+)
+
+active_user = user_context.active_user
+
 render_logout_button()
 
-candidate_id = current_user.candidate_id
+candidate_id = active_user.candidate_id
 
 if not candidate_id:
     st.error(

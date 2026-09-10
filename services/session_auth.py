@@ -243,7 +243,7 @@ def require_login() -> AppUser:
 
 
 def render_logout_button() -> None:
-    user = get_current_user()
+    user = get_authenticated_user()
 
     if user is None:
         return

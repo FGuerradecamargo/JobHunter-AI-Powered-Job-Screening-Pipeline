@@ -12,7 +12,7 @@ from services.email_verification_service import (
     EmailVerificationService,
 )
 from services.session_auth import (
-    get_current_user,
+    get_authenticated_user,
 )
 
 
@@ -29,7 +29,7 @@ _RESULT_SESSION_KEY = (
 st.title("Verify your email")
 
 
-current_user = get_current_user()
+authenticated_user = get_authenticated_user()
 
 
 query_token = str(
@@ -88,18 +88,18 @@ if result is True:
             None,
         )
 
-        if current_user is None:
+        if authenticated_user is None:
             st.switch_page(
                 "pages/0_Login.py"
             )
 
         candidate = None
 
-        if current_user.candidate_id:
+        if authenticated_user.candidate_id:
             candidate = (
                 CandidateRepository()
                 .get(
-                    current_user.candidate_id
+                    authenticated_user.candidate_id
                 )
             )
 
@@ -122,10 +122,10 @@ if result is True:
 
 
 if (
-    current_user is not None
+    authenticated_user is not None
     and EmailVerificationService
     .is_email_verified(
-        current_user.id
+        authenticated_user.id
     )
 ):
     st.success(
@@ -143,11 +143,11 @@ if (
     ):
         candidate = None
 
-        if current_user.candidate_id:
+        if authenticated_user.candidate_id:
             candidate = (
                 CandidateRepository()
                 .get(
-                    current_user.candidate_id
+                    authenticated_user.candidate_id
                 )
             )
 
@@ -175,7 +175,7 @@ if result is False:
         "is invalid or has expired."
     )
 
-    if current_user is not None:
+    if authenticated_user is not None:
         st.write(
             "You can send a new verification "
             "email to your account."
@@ -188,7 +188,7 @@ if result is False:
             sent = (
                 EmailVerificationDeliveryService
                 .resend_verification_email(
-                    current_user.id
+                    authenticated_user.id
                 )
             )
 
@@ -220,14 +220,14 @@ st.info(
     "your WorkPilot email."
 )
 
-if current_user is not None:
+if authenticated_user is not None:
     if st.button(
         "Resend verification email",
     ):
         sent = (
             EmailVerificationDeliveryService
             .resend_verification_email(
-                current_user.id
+                authenticated_user.id
             )
         )
 

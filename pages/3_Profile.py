@@ -23,10 +23,25 @@ from services.candidate_repository import CandidateRepository
 from models.career_objective import CareerObjective
 from services.career_objective_repository import CareerObjectiveRepository
 from services.access_policy import AccessPolicy
-from services.session_auth import require_login, render_logout_button
+from services.session_auth import (
+    render_logout_button,
+    require_authenticated_user,
+)
+from services.user_context_service import UserContextService
 from components.profile_onboarding import render_profile_onboarding
 
-current_user = require_login()
+authenticated_user = (
+    require_authenticated_user()
+)
+
+user_context = (
+    UserContextService().resolve(
+        authenticated_user=authenticated_user
+    )
+)
+
+active_user = user_context.active_user
+
 render_logout_button()
 
 st.set_page_config(
@@ -66,7 +81,7 @@ if not users:
     st.stop()
 
 if AccessPolicy.can_view_all_users(
-    current_user
+    authenticated_user
 ):
     accessible_users = [
         user
@@ -83,7 +98,7 @@ if AccessPolicy.can_view_all_users(
     )
 
 else:
-    selected_user = current_user
+    selected_user = active_user
 
 if selected_user.candidate_id is None:
     st.warning(
@@ -94,7 +109,7 @@ if selected_user.candidate_id is None:
 candidate_id = selected_user.candidate_id
 
 if not AccessPolicy.can_access_candidate(
-    current_user,
+    authenticated_user,
     candidate_id,
 ):
     st.error("Access denied.")
@@ -119,7 +134,7 @@ profile_ready = bool(
 if not profile_ready:
     render_profile_onboarding(
         candidate_id=candidate_id,
-        candidate_name=current_user.display_name,
+        candidate_name=selected_user.display_name,
         onboarding_repository=onboarding_repository,
         profile_generation_service=profile_generation_service,
     )

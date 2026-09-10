@@ -9,7 +9,11 @@ from components.job_analysis_view import render_job_analysis
 
 
 from services.job_search_repository import JobSearchRepository
-from services.session_auth import require_login, render_logout_button
+from services.session_auth import (
+    render_logout_button,
+    require_authenticated_user,
+)
+from services.user_context_service import UserContextService
 from services.candidate_repository import CandidateRepository
 from services.career_objective_repository import CareerObjectiveRepository
 from services.career_update_repository import CareerUpdateRepository
@@ -44,7 +48,18 @@ st.set_page_config(
     layout="wide",
 )
 
-current_user = require_login()
+authenticated_user = (
+    require_authenticated_user()
+)
+
+user_context = (
+    UserContextService().resolve(
+        authenticated_user=authenticated_user
+    )
+)
+
+active_user = user_context.active_user
+
 render_logout_button()
 
 repository = JobSearchRepository()
@@ -53,14 +68,14 @@ analysis_service = CandidateJobAnalysisService()
 
 
 
-if not current_user.candidate_id:
+if not active_user.candidate_id:
     st.error(
         "Your account does not have a professional profile."
     )
     st.stop()
 
 
-candidate_id = current_user.candidate_id
+candidate_id = active_user.candidate_id
 
 candidate = candidate_repository.get(
     candidate_id

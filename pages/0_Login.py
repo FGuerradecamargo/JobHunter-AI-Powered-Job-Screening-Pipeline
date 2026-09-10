@@ -14,7 +14,7 @@ from services.google_identity_service import (
     GoogleIdentityService,
 )
 from services.session_auth import (
-    get_current_user,
+    get_authenticated_user,
     login_user,
     logout_user,
 )
@@ -29,14 +29,14 @@ st.title("WorkPilot")
 
 auth_service = AuthService()
 
-current_user = get_current_user()
+authenticated_user = get_authenticated_user()
 
 
 # ---------------------------------------------------------
 # GOOGLE OIDC
 # ---------------------------------------------------------
 
-if current_user is None:
+if authenticated_user is None:
     if st.user.is_logged_in:
         google_claims = {
             "sub": st.user.get(
@@ -224,18 +224,18 @@ if current_user is None:
 # ALREADY LOGGED IN
 # ---------------------------------------------------------
 
-if current_user is not None:
+if authenticated_user is not None:
     st.success(
-        f"Logged in as {current_user.display_name}"
+        f"Logged in as {authenticated_user.display_name}"
     )
 
     st.write(
-        f"Access level: {current_user.access_level}"
+        f"Access level: {authenticated_user.access_level}"
     )
 
-    if current_user.candidate_id:
+    if authenticated_user.candidate_id:
         st.write(
-            f"Profile: {current_user.candidate_id}"
+            f"Profile: {authenticated_user.candidate_id}"
         )
 
     if st.button(
