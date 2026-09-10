@@ -62,7 +62,7 @@ def ensure_session_table() -> None:
         )
 
 
-def get_current_user() -> AppUser | None:
+def get_authenticated_user() -> AppUser | None:
     ensure_session_table()
 
     token = cookies.get(
@@ -115,6 +115,17 @@ def get_current_user() -> AppUser | None:
     st.session_state.current_user = user
 
     return user
+
+
+def get_current_user() -> AppUser | None:
+    """
+    Backward-compatible alias.
+
+    New code should use get_authenticated_user()
+    when referring to the identity that actually
+    owns the WorkPilot session.
+    """
+    return get_authenticated_user()
 
 
 def login_user(
@@ -203,8 +214,8 @@ def logout_user() -> None:
         del st.session_state["current_user"]
 
 
-def require_login() -> AppUser:
-    user = get_current_user()
+def require_authenticated_user() -> AppUser:
+    user = get_authenticated_user()
 
     if user is None:
         st.warning(
@@ -219,6 +230,16 @@ def require_login() -> AppUser:
         st.stop()
 
     return user
+
+
+def require_login() -> AppUser:
+    """
+    Backward-compatible alias.
+
+    New code should use
+    require_authenticated_user().
+    """
+    return require_authenticated_user()
 
 
 def render_logout_button() -> None:

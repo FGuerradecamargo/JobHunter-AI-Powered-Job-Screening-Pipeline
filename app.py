@@ -3,7 +3,11 @@ import streamlit as st
 from components.job_analysis_view import render_job_analysis
 
 from services.candidate_repository import CandidateRepository
-from services.session_auth import require_login, render_logout_button
+from services.session_auth import (
+    render_logout_button,
+    require_authenticated_user,
+)
+from services.user_context_service import UserContextService
 from services.database import (
     count_candidate_jobs_by_status,
     get_candidate_application_outcome,
@@ -772,7 +776,22 @@ def main() -> None:
 
     initialize_database()
 
-    current_user = require_login()
+    authenticated_user = (
+        require_authenticated_user()
+    )
+
+    user_context = (
+        UserContextService().resolve(
+            authenticated_user=(
+                authenticated_user
+            )
+        )
+    )
+
+    active_user = (
+        user_context.active_user
+    )
+
     render_logout_button()
 
     candidate_repository = CandidateRepository()
@@ -797,7 +816,7 @@ def main() -> None:
         """
     )
 
-    if current_user.access_level == "admin":
+    if authenticated_user.access_level == "admin":
         candidates = candidate_repository.list_all()
 
         if not candidates:
@@ -821,13 +840,13 @@ def main() -> None:
         ]
 
     else:
-        if not current_user.candidate_id:
+        if not active_user.candidate_id:
             st.warning(
                 "Your account does not have a professional profile yet."
             )
             return
 
-        selected_candidate_id = current_user.candidate_id
+        selected_candidate_id = active_user.candidate_id
 
         candidate = candidate_repository.get(
             selected_candidate_id
