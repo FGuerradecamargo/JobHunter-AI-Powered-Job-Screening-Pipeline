@@ -68,6 +68,22 @@ class TailoredCVGenerationRequest:
 
 
 @dataclass(frozen=True)
+class TailoredCVRepairRequest:
+    candidate_id: str
+    job_id: str
+    application_context_signature: str
+    original_request_signature: str
+    previous_draft: dict
+    validation_issues: list[dict] = field(default_factory=list)
+    selected_evidence: list[dict] = field(default_factory=list)
+    protected_structural_gaps: list[str] = field(default_factory=list)
+    output_schema_version: str = "tailored-cv-v1"
+    prompt: str = ""
+    source_signature: str = ""
+    schema_version: str = "tailored-cv-repair-request-v1"
+
+
+@dataclass(frozen=True)
 class TailoredCVGenerationResult:
     status: str
     cv: DraftTailoredCV | None = None
@@ -75,3 +91,5 @@ class TailoredCVGenerationResult:
     error_code: str = ""
     error_message: str = ""
     request_signature: str = ""
+    repair_signature: str = ""
+    attempt_count: int = 0
