@@ -62,4 +62,16 @@ class TailoredCVGenerationRequest:
     protected_structural_gaps: list[str] = field(default_factory=list)
     allowed_claim_types: list[str] = field(default_factory=list)
     output_schema_version: str = "tailored-cv-v1"
+    prompt: str = ""
+    source_signature: str = ""
+    schema_version: str = "tailored-cv-generation-request-v1"
 
+
+@dataclass(frozen=True)
+class TailoredCVGenerationResult:
+    status: str
+    cv: DraftTailoredCV | None = None
+    validation_issues: list[CVValidationIssue] = field(default_factory=list)
+    error_code: str = ""
+    error_message: str = ""
+    request_signature: str = ""

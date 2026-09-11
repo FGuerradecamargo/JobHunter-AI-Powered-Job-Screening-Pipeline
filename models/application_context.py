@@ -39,4 +39,5 @@ class ApplicationContext:
     source_signature: str = ""
     schema_version: str = "application-context-v1"
     authority: str = "derived_application_selection"
-
+    recommendation: str = ""
+    eligible: bool = True

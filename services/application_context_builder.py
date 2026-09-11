@@ -167,4 +167,6 @@ def build_application_context(
         positioning_themes=themes,
         source_signature=build_source_signature(signature_payload),
         schema_version=APPLICATION_CONTEXT_SCHEMA_VERSION,
+        recommendation=contract.recommendation,
+        eligible=contract.eligible,
     )
