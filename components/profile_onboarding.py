@@ -734,7 +734,8 @@ def render_profile_onboarding(
                                 ),
                             ):
                                 onboarding_repository.delete_work_experience(
-                                    experience.id
+                                    experience.id,
+                                    candidate_id,
                                 )
                                 st.rerun()
 

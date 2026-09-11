@@ -540,7 +540,8 @@ with experience_tab:
                         use_container_width=True,
                     ):
                         onboarding_repository.delete_work_experience(
-                            experience.id
+                            experience.id,
+                            candidate_id,
                         )
 
                         st.success(

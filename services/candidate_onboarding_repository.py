@@ -202,7 +202,7 @@ class CandidateOnboardingRepository:
         now = utc_now()
 
         with get_connection() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 UPDATE candidate_work_experiences
                 SET
@@ -212,7 +212,9 @@ class CandidateOnboardingRepository:
                     career_story = %s,
                     day_to_day_narrative = %s,
                     updated_at = %s
-                WHERE id = %s
+                WHERE
+                    id = %s
+                    AND candidate_id = %s
                 """,
                 (
                     experience.company.strip(),
@@ -222,18 +224,35 @@ class CandidateOnboardingRepository:
                     experience.day_to_day_narrative.strip(),
                     now,
                     experience.id,
+                    experience.candidate_id,
                 ),
+            )
+
+        if cursor.rowcount != 1:
+            raise ValueError(
+                "Work experience was not found for candidate."
             )
 
     def delete_work_experience(
         self,
         experience_id: str,
+        candidate_id: str,
     ) -> None:
         with get_connection() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 DELETE FROM candidate_work_experiences
-                WHERE id = %s
+                WHERE
+                    id = %s
+                    AND candidate_id = %s
                 """,
-                (experience_id,),
+                (
+                    experience_id,
+                    candidate_id,
+                ),
+            )
+
+        if cursor.rowcount != 1:
+            raise ValueError(
+                "Work experience was not found for candidate."
             )
