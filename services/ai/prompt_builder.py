@@ -313,76 +313,6 @@ Important:
 - Potential means the candidate can plausibly compete but is not yet a strong candidate.
 - Good opportunity means the candidate can compete strongly enough, but the opportunity has relevant trade-offs.
 - Best match requires both strong competitiveness and strong opportunity quality.
-STEP 8 - Build a tailored CV for approved opportunities
-
-Generate tailored_cv whenever the final recommendation is:
-- best_match;
-- potential;
-- good_opportunity.
-
-If the final recommendation is reject, tailored_cv must be null.
-
-The CV generation decision must follow the final recommendation.
-Do not suppress tailored_cv because of direction_alignment, competitive_status,
-development gaps, priority conflicts or opportunity trade-offs when the final
-recommendation is best_match, potential or good_opportunity.
-
-The purpose of the tailored CV is:
-
-"What in this candidate's real professional evidence makes this application stronger?"
-
-Start from the job's real needs, then select the strongest truthful evidence
-from the candidate profile.
-
-You may:
-- select the most relevant experiences;
-- reduce emphasis on irrelevant experiences;
-- reorder evidence by relevance;
-- rewrite bullets to communicate existing evidence more clearly;
-- emphasize transferable capabilities when genuinely supported;
-- include relevant career_updates;
-- use terminology from the job when it accurately describes existing evidence.
-
-You must NOT:
-- invent responsibilities;
-- invent tools or technologies;
-- invent achievements or metrics;
-- invent seniority;
-- turn a course or developing skill into professional experience;
-- claim production experience that is not supported;
-- create evidence merely to match a keyword.
-
-Each experience must retain its real source_experience_id whenever available.
-
-The CV should be concise and application-oriented.
-Prefer evidence that directly increases the candidate's credibility for this specific role.
-
-STEP 9 - Prepare the candidate for a possible interview
-
-Generate interview_prep whenever tailored_cv is generated.
-For reject recommendations, interview_prep must be null.
-
-The candidate may never need this material.
-Generate it now because all relevant job and candidate context is already available,
-but it may only be shown later if the application progresses.
-
-The purpose is not to predict exact interview questions.
-
-The purpose is to answer:
-
-1. What kind of person is the company trying to hire?
-2. What should this candidate demonstrate in an interview?
-3. Which real experiences provide the strongest evidence?
-4. Which gaps, uncertainties or weak points require careful positioning?
-5. Which themes are likely to matter in an interview for this role?
-6. What central professional narrative should the candidate communicate?
-
-Use the real job description and the candidate's real evidence.
-
-Do not invent interview stages, questions, technologies, responsibilities,
-achievements or professional experience.
-
-Keep the preparation practical, concise and specific to this opportunity.
 
 Return only valid JSON using exactly this structure:
 
@@ -414,9 +344,7 @@ Return only valid JSON using exactly this structure:
     "best_match_blockers": [],
     "market_strengths": [],
     "what_would_raise_fit": []
-  }},
-  "tailored_cv": null,
-  "interview_prep": null
+  }}
 }}
 
 Rules:
@@ -460,36 +388,6 @@ Market signal rules:
 - Do not write candidate-specific prefixes such as "No", "Lacks", "Missing", "Candidate lacks" or "Needs".
 - Prefer stable labels such as "Direct AML/KYC experience", "Banking regulatory experience", "Enterprise troubleshooting depth", "Fraud investigation", or "Python/Selenium automation".
 - Use the same label whenever the underlying signal is materially the same across different jobs.
-- For an approved opportunity, tailored_cv must be an object using exactly this structure:
-  {{
-    "headline": "",
-    "professional_summary": "",
-    "key_skills": [],
-    "experiences": [
-      {{
-        "source_experience_id": "",
-        "company": "",
-        "role": "",
-        "tailored_bullets": []
-      }}
-    ],
-    "additional_relevant_information": []
-  }}
-- For best_match, potential and good_opportunity, tailored_cv must be a populated object.
-- For reject, tailored_cv must be null.
-- Every tailored CV statement must be supportable from the candidate profile or career_updates.
-- For an approved opportunity, interview_prep must be an object using exactly this structure:
-  {{
-    "what_the_company_needs": "",
-    "what_you_should_demonstrate": [],
-    "strongest_evidence": [],
-    "points_to_be_careful_with": [],
-    "likely_interview_topics": [],
-    "positioning": ""
-  }}
-- For best_match, potential and good_opportunity, interview_prep must be a populated object.
-- For reject, interview_prep must be null.
-- Interview preparation must be grounded in the actual job description and candidate evidence.
 """.strip()
 
 BATCH_MAX_SIZE = 10
