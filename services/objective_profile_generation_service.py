@@ -30,6 +30,11 @@ class ObjectiveProfileGenerationService:
         candidate: Candidate,
         objective: CareerObjective,
     ) -> ObjectiveProfile:
+        if candidate.id != objective.candidate_id:
+            raise PermissionError(
+                "Career objective does not belong to candidate."
+            )
+
         prompt = build_objective_profile_prompt(
             candidate=candidate,
             objective=objective,

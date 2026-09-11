@@ -27,9 +27,14 @@ class ObjectiveProfileRepository:
                 """
                 SELECT created_at
                 FROM candidate_objective_profiles
-                WHERE objective_id = %s
+                WHERE
+                    objective_id = %s
+                    AND candidate_id = %s
                 """,
-                (profile.objective_id,),
+                (
+                    profile.objective_id,
+                    profile.candidate_id,
+                ),
             ).fetchone()
 
             created_at = (
@@ -38,7 +43,7 @@ class ObjectiveProfileRepository:
                 else now
             )
 
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT INTO candidate_objective_profiles (
                     objective_id,
@@ -52,9 +57,11 @@ class ObjectiveProfileRepository:
                 )
 
                 ON CONFLICT(objective_id) DO UPDATE SET
-                    candidate_id = excluded.candidate_id,
                     profile_json = excluded.profile_json,
                     updated_at = excluded.updated_at
+                WHERE
+                    candidate_objective_profiles.candidate_id
+                        = excluded.candidate_id
                 """,
                 (
                     profile.objective_id,
@@ -68,18 +75,29 @@ class ObjectiveProfileRepository:
                 ),
             )
 
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "Objective profile was not found for candidate."
+                )
+
     def get_for_objective(
         self,
         objective_id: str,
+        candidate_id: str,
     ) -> ObjectiveProfile | None:
         with get_connection() as connection:
             row = connection.execute(
                 """
                 SELECT profile_json
                 FROM candidate_objective_profiles
-                WHERE objective_id = %s
+                WHERE
+                    objective_id = %s
+                    AND candidate_id = %s
                 """,
-                (objective_id,),
+                (
+                    objective_id,
+                    candidate_id,
+                ),
             ).fetchone()
 
         if row is None:
