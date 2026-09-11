@@ -41,7 +41,7 @@ class CareerObjectiveRepository:
                     ),
                 )
 
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT INTO candidate_career_objectives (
                     id,
@@ -64,6 +64,9 @@ class CareerObjectiveRepository:
                     active = excluded.active,
                     desired_role_families_json = excluded.desired_role_families_json,
                     updated_at = excluded.updated_at
+                WHERE
+                    candidate_career_objectives.candidate_id
+                        = excluded.candidate_id
                 """,
                 (
                     objective.id,
@@ -79,6 +82,11 @@ class CareerObjectiveRepository:
                     now,
                 ),
             )
+
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "Career objective was not found for candidate."
+                )
 
     def get_active(
         self,

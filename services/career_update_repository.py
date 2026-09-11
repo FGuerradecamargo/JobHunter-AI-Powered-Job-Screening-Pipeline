@@ -20,7 +20,7 @@ class CareerUpdateRepository:
         )
 
         with get_connection() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT INTO candidate_career_updates (
                     id,
@@ -37,6 +37,9 @@ class CareerUpdateRepository:
                     update_type = excluded.update_type,
                     description = excluded.description,
                     created_at = excluded.created_at
+                WHERE
+                    candidate_career_updates.candidate_id
+                        = excluded.candidate_id
                 """,
                 (
                     career_update.id,
@@ -46,6 +49,11 @@ class CareerUpdateRepository:
                     created_at,
                 ),
             )
+
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "Career update was not found for candidate."
+                )
 
     def list_for_candidate(
         self,
@@ -84,14 +92,20 @@ class CareerUpdateRepository:
     def delete(
         self,
         update_id: str,
+        candidate_id: str,
     ) -> bool:
         with get_connection() as connection:
             cursor = connection.execute(
                 """
                 DELETE FROM candidate_career_updates
-                WHERE id = %s
+                WHERE
+                    id = %s
+                    AND candidate_id = %s
                 """,
-                (update_id,),
+                (
+                    update_id,
+                    candidate_id,
+                ),
             )
 
         return cursor.rowcount > 0
