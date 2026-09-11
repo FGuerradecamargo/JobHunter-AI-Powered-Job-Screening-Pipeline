@@ -1,6 +1,9 @@
 import streamlit as st
 
 from services.access_policy import AccessPolicy
+from services.admin_access_audit_service import (
+    AdminAccessAuditService,
+)
 from services.admin_access_session import AdminAccessSession
 from services.admin_reauthentication_service import (
     AdminReauthenticationService,
@@ -322,6 +325,7 @@ else:
     admin_access_session = AdminAccessSession(
         st.session_state
     )
+    admin_access_audit = AdminAccessAuditService()
 
     if AccessPolicy.can_view_all_users(
         authenticated_user
@@ -383,6 +387,13 @@ else:
                     authenticated_user_id=(
                         authenticated_user.id
                     )
+                )
+
+                admin_access_audit.record_ended(
+                    authenticated_user=(
+                        authenticated_user
+                    ),
+                    previous_active_user=active_user,
                 )
 
                 st.session_state.pop(
@@ -470,6 +481,17 @@ else:
                         password=admin_password,
                     )
                 ):
+                    target_user = user_by_id[
+                        selected_active_user_id
+                    ]
+
+                    admin_access_audit.record_started(
+                        authenticated_user=(
+                            authenticated_user
+                        ),
+                        target_user=target_user,
+                    )
+
                     admin_access_session.authorize(
                         authenticated_user_id=(
                             authenticated_user.id
@@ -496,6 +518,16 @@ else:
                     st.rerun()
 
                 else:
+                    admin_access_audit.record_denied(
+                        authenticated_user=(
+                            authenticated_user
+                        ),
+                        active_user=active_user,
+                        target_user_id=(
+                            selected_active_user_id
+                        ),
+                    )
+
                     st.sidebar.error(
                         "Administrative access was not verified. "
                         "Use your WorkPilot password or reset it "
