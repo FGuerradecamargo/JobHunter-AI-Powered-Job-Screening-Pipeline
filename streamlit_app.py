@@ -1,6 +1,10 @@
 import streamlit as st
 
 from services.access_policy import AccessPolicy
+from services.admin_access_session import AdminAccessSession
+from services.admin_reauthentication_service import (
+    AdminReauthenticationService,
+)
 from services.candidate_repository import CandidateRepository
 from services.session_auth import get_authenticated_user
 from services.user_context_runtime import (
@@ -315,33 +319,31 @@ else:
     )
 
     active_user = user_context.active_user
+    admin_access_session = AdminAccessSession(
+        st.session_state
+    )
 
     if AccessPolicy.can_view_all_users(
         authenticated_user
     ):
-        users = UserRepository().list_all()
-
-        user_by_id = {
-            user.id: user
-            for user in users
-        }
-
-        if authenticated_user.id not in user_by_id:
-            user_by_id[
-                authenticated_user.id
-            ] = authenticated_user
-
-        user_ids = list(
-            user_by_id.keys()
-        )
-
-        active_index = (
-            user_ids.index(active_user.id)
-            if active_user.id in user_by_id
-            else user_ids.index(
-                authenticated_user.id
+        authorized_target_id = (
+            admin_access_session.get_authorized_target(
+                authenticated_user_id=(
+                    authenticated_user.id
+                )
             )
         )
+
+        if (
+            active_user.id != authenticated_user.id
+            and active_user.id != authorized_target_id
+        ):
+            set_active_user(
+                authenticated_user=authenticated_user,
+                active_user_id=authenticated_user.id,
+            )
+
+            st.rerun()
 
         st.sidebar.caption(
             "ADMIN"
@@ -352,48 +354,161 @@ else:
             f"{authenticated_user.display_name}"
         )
 
-        viewing_as_key = (
-            "admin_viewing_as_"
+        admin_access_key = (
+            "admin_access_open_"
             f"{authenticated_user.id}"
         )
 
-        if (
-            st.session_state.get(
-                viewing_as_key
+        if active_user.id != authenticated_user.id:
+            st.sidebar.write(
+                "Viewing as "
+                f"**{active_user.display_name}**"
             )
-            not in user_ids
-        ):
-            st.session_state[
-                viewing_as_key
-            ] = active_user.id
 
-        selected_active_user_id = (
-            st.sidebar.selectbox(
-                "Viewing as",
-                options=user_ids,
-                index=active_index,
-                format_func=lambda user_id: (
-                    f"{user_by_id[user_id].display_name} "
-                    f"({user_by_id[user_id].email})"
-                ),
-                key=viewing_as_key,
+            if st.sidebar.button(
+                "Return to my profile",
+                use_container_width=True,
+                key="admin_return_to_self",
+            ):
+                set_active_user(
+                    authenticated_user=(
+                        authenticated_user
+                    ),
+                    active_user_id=(
+                        authenticated_user.id
+                    ),
+                )
+
+                admin_access_session.reset(
+                    authenticated_user_id=(
+                        authenticated_user.id
+                    )
+                )
+
+                st.session_state.pop(
+                    admin_access_key,
+                    None,
+                )
+
+                st.rerun()
+
+        access_button_label = (
+            "Change viewed profile"
+            if active_user.id != authenticated_user.id
+            else "Administrative access"
+        )
+
+        if st.sidebar.button(
+            access_button_label,
+            use_container_width=True,
+            key="admin_open_access",
+        ):
+            st.session_state[admin_access_key] = True
+
+        if st.session_state.get(admin_access_key):
+            users = UserRepository().list_all()
+
+            user_by_id = {
+                user.id: user
+                for user in users
+            }
+
+            user_by_id.setdefault(
+                authenticated_user.id,
+                authenticated_user,
+            )
+
+            target_ids = [
+                user_id
+                for user_id in user_by_id
+                if user_id != authenticated_user.id
+            ]
+
+            if not target_ids:
+                st.sidebar.info(
+                    "No other profiles are available."
+                )
+
+            else:
+                with st.sidebar.form(
+                    "admin_access_form_"
+                    f"{authenticated_user.id}"
+                ):
+                    selected_active_user_id = st.selectbox(
+                        "Profile",
+                        options=target_ids,
+                        format_func=lambda user_id: (
+                            f"{user_by_id[user_id].display_name} "
+                            f"({user_by_id[user_id].email})"
+                        ),
+                        key=(
+                            "admin_access_target_"
+                            f"{authenticated_user.id}"
+                        ),
+                    )
+
+                    admin_password = st.text_input(
+                        "WorkPilot password",
+                        type="password",
+                    )
+
+                    access_submitted = (
+                        st.form_submit_button(
+                            "Confirm access",
+                            type="primary",
+                            use_container_width=True,
+                        )
+                    )
+
+            if target_ids and access_submitted:
+                if (
+                    AdminReauthenticationService()
+                    .reauthenticate(
+                        authenticated_user=(
+                            authenticated_user
+                        ),
+                        password=admin_password,
+                    )
+                ):
+                    admin_access_session.authorize(
+                        authenticated_user_id=(
+                            authenticated_user.id
+                        ),
+                        target_user_id=(
+                            selected_active_user_id
+                        ),
+                    )
+
+                    set_active_user(
+                        authenticated_user=(
+                            authenticated_user
+                        ),
+                        active_user_id=(
+                            selected_active_user_id
+                        ),
+                    )
+
+                    st.session_state.pop(
+                        admin_access_key,
+                        None,
+                    )
+
+                    st.rerun()
+
+                else:
+                    st.sidebar.error(
+                        "Administrative access was not verified. "
+                        "Use your WorkPilot password or reset it "
+                        "from the login page."
+                    )
+
+    else:
+        admin_access_session.reset(
+            authenticated_user_id=(
+                authenticated_user.id
             )
         )
 
-        if (
-            selected_active_user_id
-            != active_user.id
-        ):
-            set_active_user(
-                authenticated_user=(
-                    authenticated_user
-                ),
-                active_user_id=(
-                    selected_active_user_id
-                ),
-            )
-
-            st.rerun()
 
     candidate = None
 

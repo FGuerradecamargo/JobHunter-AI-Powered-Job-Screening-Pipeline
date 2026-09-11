@@ -506,6 +506,14 @@ def test_logout_clears_operational_and_impersonation_state(
     ] = "other-user"
 
     runtime.streamlit.session_state[
+        f"admin_access_open_{runtime.user.id}"
+    ] = True
+
+    runtime.streamlit.session_state[
+        f"admin_access_target_{runtime.user.id}"
+    ] = "other-user"
+
+    runtime.streamlit.session_state[
         "unrelated_cached_state"
     ] = "value"
 
@@ -529,6 +537,11 @@ def test_logout_clears_operational_and_impersonation_state(
     assert (
         f"admin_viewing_as_{runtime.user.id}"
         not in runtime.streamlit.session_state
+    )
+
+    assert not any(
+        str(key).startswith("admin_access_")
+        for key in runtime.streamlit.session_state
     )
 
     assert (

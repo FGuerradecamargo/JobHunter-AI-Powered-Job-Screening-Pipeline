@@ -231,9 +231,10 @@ def logout_user() -> None:
     for key in list(
         st.session_state.keys()
     ):
-        if str(key).startswith(
-            "admin_viewing_as_"
-        ):
+        if str(key).startswith((
+            "admin_viewing_as_",
+            "admin_access_",
+        )):
             st.session_state.pop(
                 key,
                 None,
