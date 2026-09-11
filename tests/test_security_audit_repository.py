@@ -74,6 +74,26 @@ def test_records_actor_active_user_and_safe_metadata(monkeypatch):
     )
 
 
+def test_records_with_existing_connection(monkeypatch):
+    repository, connection = _repository(monkeypatch)
+
+    event_id = repository.record_with_connection(
+        connection,
+        event_type="account.password_reset.completed",
+        outcome="success",
+        authenticated_user_id="user-a",
+        active_user_id="user-a",
+        target_type="user",
+        target_id="user-a",
+    )
+
+    assert len(event_id) == 32
+    assert any(
+        sql.startswith("INSERT INTO security_audit_events")
+        for sql, _ in connection.calls
+    )
+
+
 def test_records_event_in_sqlite(
     monkeypatch,
     tmp_path,

@@ -12,6 +12,9 @@ from services.database import (
 from services.session_store import (
     revoke_user_sessions_with_connection,
 )
+from services.security_audit_repository import (
+    SecurityAuditRepository,
+)
 
 
 class PasswordResetService:
@@ -154,6 +157,17 @@ class PasswordResetService:
                         .PASSWORD_RESET
                     ),
                 ),
+            )
+
+            SecurityAuditRepository().record_with_connection(
+                connection,
+                event_type="account.password_reset.completed",
+                outcome="success",
+                authenticated_user_id=user_id,
+                active_user_id=user_id,
+                target_type="user",
+                target_id=user_id,
+                metadata={},
             )
 
         return True

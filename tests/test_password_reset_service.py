@@ -371,6 +371,24 @@ def test_successful_reset_changes_password_revokes_sessions_and_is_one_time(
         assert action_token is not None
         assert action_token["used_at"] is not None
 
+        audit_event = connection.execute(
+            """
+            SELECT *
+            FROM security_audit_events
+            WHERE event_type = ?
+            """,
+            ("account.password_reset.completed",),
+        ).fetchone()
+
+        assert audit_event is not None
+        assert audit_event["outcome"] == "success"
+        assert (
+            audit_event["authenticated_user_id"]
+            == "local-user"
+        )
+        assert audit_event["active_user_id"] == "local-user"
+        assert audit_event["target_id"] == "local-user"
+
     finally:
         connection.close()
 
@@ -545,6 +563,15 @@ def test_reset_transaction_rolls_back_everything_on_failure(
         ).fetchone()["total"]
 
         assert session_count == 1
+
+        audit_count = connection.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM security_audit_events
+            """
+        ).fetchone()["total"]
+
+        assert audit_count == 0
 
     finally:
         connection.close()

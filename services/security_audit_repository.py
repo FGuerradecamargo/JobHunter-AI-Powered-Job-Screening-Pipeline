@@ -39,6 +39,32 @@ class SecurityAuditRepository:
         target_id: str = "",
         metadata: Mapping[str, Any] | None = None,
     ) -> str:
+        with get_connection() as connection:
+            return self.record_with_connection(
+                connection,
+                event_type=event_type,
+                outcome=outcome,
+                authenticated_user_id=(
+                    authenticated_user_id
+                ),
+                active_user_id=active_user_id,
+                target_type=target_type,
+                target_id=target_id,
+                metadata=metadata,
+            )
+
+    def record_with_connection(
+        self,
+        connection,
+        *,
+        event_type: str,
+        outcome: str,
+        authenticated_user_id: str,
+        active_user_id: str,
+        target_type: str = "",
+        target_id: str = "",
+        metadata: Mapping[str, Any] | None = None,
+    ) -> str:
         normalized_event_type = self._required(
             event_type,
             "Event type",
@@ -65,43 +91,42 @@ class SecurityAuditRepository:
 
         event_id = uuid4().hex
 
-        with get_connection() as connection:
-            create_security_audit_schema(connection)
+        create_security_audit_schema(connection)
 
-            connection.execute(
-                """
-                INSERT INTO security_audit_events (
-                    id,
-                    event_type,
-                    outcome,
-                    authenticated_user_id,
-                    active_user_id,
-                    target_type,
-                    target_id,
-                    metadata_json,
-                    created_at
-                )
-                VALUES (
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?
-                )
-                """,
-                (
-                    event_id,
-                    normalized_event_type,
-                    normalized_outcome,
-                    normalized_authenticated_user_id,
-                    normalized_active_user_id,
-                    str(target_type or "").strip(),
-                    str(target_id or "").strip(),
-                    json.dumps(
-                        safe_metadata,
-                        ensure_ascii=True,
-                        sort_keys=True,
-                    ),
-                    utc_now(),
-                ),
+        connection.execute(
+            """
+            INSERT INTO security_audit_events (
+                id,
+                event_type,
+                outcome,
+                authenticated_user_id,
+                active_user_id,
+                target_type,
+                target_id,
+                metadata_json,
+                created_at
             )
+            VALUES (
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?
+            )
+            """,
+            (
+                event_id,
+                normalized_event_type,
+                normalized_outcome,
+                normalized_authenticated_user_id,
+                normalized_active_user_id,
+                str(target_type or "").strip(),
+                str(target_id or "").strip(),
+                json.dumps(
+                    safe_metadata,
+                    ensure_ascii=True,
+                    sort_keys=True,
+                ),
+                utc_now(),
+            ),
+        )
 
         return event_id
 
