@@ -116,7 +116,7 @@ class CareerMemoryRepository:
                 """
                 SELECT *
                 FROM candidate_career_memory
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 """,
                 (
                     candidate_id,
@@ -196,7 +196,7 @@ class CareerMemoryRepository:
                     updated_at
                 )
                 VALUES (
-                    %s, 1, %s, %s, %s, %s, %s
+                    ?, 1, ?, ?, ?, ?, ?
                 )
 
                 ON CONFLICT(candidate_id)
@@ -337,8 +337,8 @@ class CareerMemoryRepository:
                 created_at
             )
             VALUES (
-                %s, %s, %s, %s, %s,
-                %s, %s, %s, %s
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?
             )
 
             ON CONFLICT(
@@ -537,7 +537,7 @@ class CareerMemoryRepository:
                     interpreted_source_signature,
                     memory_json
                 FROM candidate_career_memory
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 """,
                 (
                     normalized_candidate_id,
@@ -606,16 +606,16 @@ class CareerMemoryRepository:
                     """
                     UPDATE candidate_career_memory
                     SET
-                        memory_json = %s,
-                        interpreted_source_signature = %s,
-                        updated_at = %s
+                        memory_json = ?,
+                        interpreted_source_signature = ?,
+                        updated_at = ?
                     WHERE
-                        candidate_id = %s
-                        AND source_signature = %s
+                        candidate_id = ?
+                        AND source_signature = ?
                         AND COALESCE(
                             interpreted_source_signature,
                             ''
-                        ) <> %s
+                        ) <> ?
                     """,
                     (
                         _canonical_json(
@@ -639,7 +639,7 @@ class CareerMemoryRepository:
                             source_signature,
                             interpreted_source_signature
                         FROM candidate_career_memory
-                        WHERE candidate_id = %s
+                        WHERE candidate_id = ?
                         """,
                         (
                             normalized_candidate_id,
@@ -756,7 +756,7 @@ class CareerMemoryRepository:
                 """
                 SELECT *
                 FROM candidate_career_memory_events
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 ORDER BY
                     created_at ASC,
                     id ASC

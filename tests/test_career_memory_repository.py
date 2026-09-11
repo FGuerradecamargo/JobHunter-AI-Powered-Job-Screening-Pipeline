@@ -9,6 +9,7 @@ from services.career_memory_repository import (
 )
 from services.database import (
     get_connection,
+    utc_now,
 )
 
 
@@ -17,64 +18,48 @@ def _create_temp_candidate() -> str:
         "career_memory_repo_test_"
         + uuid4().hex
     )
+    now = utc_now()
 
     with get_connection() as connection:
-        source = connection.execute(
-            """
-            SELECT id
-            FROM candidates
-            LIMIT 1
-            """
-        ).fetchone()
-
-        if source is None:
-            raise RuntimeError(
-                "No candidate available for test."
-            )
-
-        columns = connection.execute(
-            """
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE
-                table_schema = current_schema()
-                AND table_name = 'candidates'
-            ORDER BY ordinal_position
-            """
-        ).fetchall()
-
-        column_names = [
-            row["column_name"]
-            for row in columns
-        ]
-
-        quoted_columns = ", ".join(
-            f'"{name}"'
-            for name in column_names
-        )
-
-        select_parts = [
-            (
-                "%s"
-                if name == "id"
-                else f'"{name}"'
-            )
-            for name in column_names
-        ]
-
         connection.execute(
-            f"""
+            """
             INSERT INTO candidates (
-                {quoted_columns}
+                id,
+                name,
+                current_role,
+                current_level,
+                professional_summary,
+                target_roles_json,
+                spoken_languages_json,
+                skills_json,
+                strengths_json,
+                development_areas_json,
+                preferences_json,
+                constraints_json,
+                created_at,
+                updated_at
             )
-            SELECT
-                {", ".join(select_parts)}
-            FROM candidates
-            WHERE id = %s
+            VALUES (
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?
+            )
             """,
             (
                 candidate_id,
-                source["id"],
+                "Career Memory Test Candidate",
+                "Test Role",
+                "Test Level",
+                "Test candidate.",
+                "[]",
+                "[]",
+                "[]",
+                "[]",
+                "[]",
+                "{}",
+                "{}",
+                now,
+                now,
             ),
         )
 
@@ -88,11 +73,9 @@ def _delete_temp_candidate(
         connection.execute(
             """
             DELETE FROM candidates
-            WHERE id = %s
+            WHERE id = ?
             """,
-            (
-                candidate_id,
-            ),
+            (candidate_id,),
         )
 
 
@@ -284,8 +267,8 @@ def test_snapshot_json_parse_is_safe():
             connection.execute(
                 """
                 UPDATE candidate_career_memory
-                SET memory_json = %s
-                WHERE candidate_id = %s
+                SET memory_json = ?
+                WHERE candidate_id = ?
                 """,
                 (
                     "{not-valid-json",
