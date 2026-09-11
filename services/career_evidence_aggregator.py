@@ -99,7 +99,7 @@ def _is_near_market_metadata(
     )
 
 
-def _confidence(
+def confidence_from_observations(
     *,
     independent_sources: int,
     sample_size: int,
@@ -369,7 +369,7 @@ def aggregate_market_evidence(
                     frequency,
                     4,
                 ),
-                confidence=_confidence(
+                confidence=confidence_from_observations(
                     independent_sources=(
                         independent_sources
                     ),
