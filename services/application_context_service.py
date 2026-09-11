@@ -55,3 +55,13 @@ class ApplicationContextService:
             contract=contract,
             analysis_source=source,
         )
+
+    def build_from_contract(
+        self,
+        contract,
+        analysis_source,
+    ) -> ApplicationContext:
+        return build_application_context(
+            contract=contract,
+            analysis_source=analysis_source,
+        )

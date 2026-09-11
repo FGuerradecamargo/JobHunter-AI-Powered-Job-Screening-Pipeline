@@ -5,6 +5,10 @@ from services.candidate_repository import CandidateRepository
 from services.career_update_repository import CareerUpdateRepository
 
 
+class ApplicationAnalysisNotFoundError(ValueError):
+    pass
+
+
 class ApplicationContractService:
     def __init__(
         self,
@@ -22,6 +26,14 @@ class ApplicationContractService:
         )
 
     def build(self, candidate_id: str, job_id: str) -> ApplicationContract:
+        contract, _ = self.build_with_source(candidate_id, job_id)
+        return contract
+
+    def build_with_source(
+        self,
+        candidate_id: str,
+        job_id: str,
+    ):
         normalized_candidate_id = str(candidate_id or "").strip()
         normalized_job_id = str(job_id or "").strip()
         if not normalized_candidate_id:
@@ -43,10 +55,13 @@ class ApplicationContractService:
             normalized_job_id,
         )
         if source is None:
-            raise ValueError("Analyzed candidate-job opportunity was not found.")
+            raise ApplicationAnalysisNotFoundError(
+                "Analyzed candidate-job opportunity was not found."
+            )
 
-        return build_application_contract(
+        contract = build_application_contract(
             candidate=candidate,
             career_updates=updates,
             analysis_source=source,
         )
+        return contract, source
