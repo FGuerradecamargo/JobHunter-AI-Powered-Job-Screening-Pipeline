@@ -10,6 +10,7 @@ from models.gap_and_leverage import (
     MarketLeverageStrength,
     RecurringBlocker,
 )
+from services.role_family_normalizer import normalize_role_family, role_family_key
 
 
 _ACTION_MARKERS = (
@@ -47,9 +48,9 @@ def _normalize(value) -> str:
 def _labels(values) -> dict[str, str]:
     result = {}
     for value in values or []:
-        label = _normalize(value)
+        label = normalize_role_family(value)
         if label:
-            result.setdefault(label.casefold(), label)
+            result.setdefault(role_family_key(label), label)
     return result
 
 
@@ -59,7 +60,7 @@ def _direction_relevance(
 ) -> str:
     if not target_keys:
         return "unknown"
-    role_keys = {_normalize(item).casefold() for item in role_families}
+    role_keys = {role_family_key(item) for item in role_families if role_family_key(item)}
     return "aligned" if role_keys & target_keys else "unrelated"
 
 

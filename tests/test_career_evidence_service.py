@@ -319,3 +319,24 @@ def test_empty_market_history_is_valid():
     assert result[
         "counts"
     ]["outcomes"] == 0
+
+
+def test_all_external_loaders_are_scoped_to_requested_candidate():
+    calls = {"market": [], "outcomes": []}
+    service = CareerEvidenceService(
+        candidate_repository=FakeCandidateRepository(_candidate()),
+        career_update_repository=FakeCareerUpdateRepository(),
+        market_signal_loader=lambda candidate_id: (
+            calls["market"].append(candidate_id) or []
+        ),
+        outcome_loader=lambda candidate_id: (
+            calls["outcomes"].append(candidate_id) or []
+        ),
+    )
+
+    service.build("candidate-1")
+
+    assert calls == {
+        "market": ["candidate-1"],
+        "outcomes": ["candidate-1"],
+    }

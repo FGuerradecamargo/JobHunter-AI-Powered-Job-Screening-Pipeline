@@ -13,6 +13,7 @@ from services.career_evidence_aggregator import (
     NEAR_MATCH_MIN_FIT,
     confidence_from_observations,
 )
+from services.role_family_normalizer import normalize_role_family, role_family_key
 
 
 def _normalize(value) -> str:
@@ -28,9 +29,9 @@ def _valid_fit(value) -> int | None:
 def _unique_labels(values) -> dict[str, str]:
     labels = {}
     for value in values or []:
-        label = _normalize(value)
+        label = normalize_role_family(value)
         if label:
-            labels.setdefault(label.casefold(), label)
+            labels.setdefault(role_family_key(label), label)
     return labels
 
 
@@ -63,10 +64,10 @@ def _market_jobs(
         )
 
         if record.signal_type == "role_family":
-            role = _normalize(record.role_family or record.statement)
+            role = normalize_role_family(record.role_family or record.statement)
             if role:
                 role_item = job["roles"].setdefault(
-                    role.casefold(),
+                    role_family_key(role),
                     {"label": role, "evidence_refs": set()},
                 )
                 role_item["evidence_refs"].add(record.evidence_id)

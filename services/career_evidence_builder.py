@@ -7,6 +7,7 @@ from typing import Any
 from models.candidate import Candidate
 from models.career_evidence import CareerEvidence
 from models.career_update import CareerUpdate
+from services.role_family_normalizer import normalize_role_family
 
 
 _CANDIDATE_SIGNAL_FIELDS = {
@@ -199,7 +200,7 @@ def build_market_evidence(
         ):
             continue
 
-        role_family = _normalize(
+        role_family = normalize_role_family(
             market_signal.get(
                 "role_family"
             )

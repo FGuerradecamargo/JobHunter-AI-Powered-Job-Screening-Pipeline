@@ -8,6 +8,7 @@ from models.career_evidence import CareerEvidence
 from models.career_evidence_signal import (
     CareerEvidenceSignal,
 )
+from services.role_family_normalizer import normalize_role_family, role_family_key
 
 
 COMPETITIVE_RECOMMENDATIONS = {
@@ -255,8 +256,10 @@ def aggregate_market_evidence(
             record.signal_type
         )
 
-        statement = _normalize(
-            record.statement
+        statement = (
+            normalize_role_family(record.statement)
+            if signal_type == "role_family"
+            else _normalize(record.statement)
         )
 
         key = (
@@ -287,12 +290,15 @@ def aggregate_market_evidence(
 
         statement = labels[key]
 
-        evidence_refs = sorted(
-            {
-                item.evidence_id
-                for item in items
-            }
-        )
+        evidence_by_source = {}
+        for item in items:
+            source_ref = str(item.source_ref or "").strip()
+            if source_ref and item.evidence_id:
+                current = evidence_by_source.get(source_ref)
+                if current is None or item.evidence_id < current:
+                    evidence_by_source[source_ref] = item.evidence_id
+
+        evidence_refs = sorted(evidence_by_source.values())
 
         source_refs = sorted(
             {
@@ -302,18 +308,13 @@ def aggregate_market_evidence(
             }
         )
 
-        role_families = sorted(
-            {
-                _normalize(
-                    item.role_family
-                )
-                for item in items
-                if _normalize(
-                    item.role_family
-                )
-            },
-            key=str.casefold,
-        )
+        role_family_labels = {}
+        for item in items:
+            label = normalize_role_family(item.role_family)
+            if label:
+                role_family_labels.setdefault(role_family_key(label), label)
+
+        role_families = sorted(role_family_labels.values(), key=str.casefold)
 
         sample_sources = (
             _sample_sources_for_signal(

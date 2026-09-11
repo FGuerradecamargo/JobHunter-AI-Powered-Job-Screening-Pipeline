@@ -16,6 +16,7 @@ from models.gap_and_leverage import (
     RecurringBlocker,
 )
 from models.improvement_plan import ImprovementPlan, ImprovementPriority
+from models.objective_profile import ObjectiveProfile
 from services.career_intelligence_snapshot_builder import (
     CAREER_INTELLIGENCE_SCHEMA_VERSION,
     build_career_intelligence_snapshot,
@@ -300,7 +301,11 @@ class FakeEvidenceService:
         self.candidate_id = candidate_id
 
     def build(self, candidate_id):
-        return {"candidate_id": self.candidate_id, "records": [_record()]}
+        return {
+            "candidate_id": self.candidate_id,
+            "records": [_record()],
+            "market_signals": [],
+        }
 
 
 class FakeObjectiveRepository:
@@ -311,30 +316,32 @@ class FakeObjectiveRepository:
         return self.objective
 
 
-class FakeService:
-    def __init__(self, value):
-        self.value = value
+class FakeProfileRepository:
+    def __init__(self, profile=None):
+        self.profile = profile
 
-    def build(self, candidate_id):
-        return self.value
+    def get_active_for_candidate(self, candidate_id):
+        return self.profile
 
 
 def _snapshot_service(
     *,
     evidence_candidate="candidate-a",
     objective_candidate="candidate-a",
-    position_candidate="candidate-a",
-    assessment_candidate="candidate-a",
-    plan_candidate="candidate-a",
+    profile_candidate="candidate-a",
 ):
     return CareerIntelligenceSnapshotService(
         evidence_service=FakeEvidenceService(evidence_candidate),
         objective_repository=FakeObjectiveRepository(
             _objective(candidate_id=objective_candidate)
         ),
-        market_position_service=FakeService(_position(position_candidate)),
-        gap_and_leverage_service=FakeService(_assessment(assessment_candidate)),
-        improvement_plan_service=FakeService(_plan(plan_candidate)),
+        objective_profile_repository=FakeProfileRepository(
+            ObjectiveProfile(
+                candidate_id=profile_candidate,
+                objective_id="objective-a",
+                target_role_families=["Product Operations"],
+            )
+        ),
         clock=lambda: "2026-09-11T10:00:00Z",
     )
 
@@ -343,31 +350,23 @@ def _snapshot_service(
     (
         "evidence_candidate",
         "objective_candidate",
-        "position_candidate",
-        "assessment_candidate",
-        "plan_candidate",
+        "profile_candidate",
     ),
     [
-        ("candidate-b", "candidate-a", "candidate-a", "candidate-a", "candidate-a"),
-        ("candidate-a", "candidate-b", "candidate-a", "candidate-a", "candidate-a"),
-        ("candidate-a", "candidate-a", "candidate-b", "candidate-a", "candidate-a"),
-        ("candidate-a", "candidate-a", "candidate-a", "candidate-b", "candidate-a"),
-        ("candidate-a", "candidate-a", "candidate-a", "candidate-a", "candidate-b"),
+        ("candidate-b", "candidate-a", "candidate-a"),
+        ("candidate-a", "candidate-b", "candidate-a"),
+        ("candidate-a", "candidate-a", "candidate-b"),
     ],
 )
 def test_service_rejects_cross_candidate_dependencies(
     evidence_candidate,
     objective_candidate,
-    position_candidate,
-    assessment_candidate,
-    plan_candidate,
+    profile_candidate,
 ):
     service = _snapshot_service(
         evidence_candidate=evidence_candidate,
         objective_candidate=objective_candidate,
-        position_candidate=position_candidate,
-        assessment_candidate=assessment_candidate,
-        plan_candidate=plan_candidate,
+        profile_candidate=profile_candidate,
     )
 
     with pytest.raises(PermissionError):
@@ -379,3 +378,50 @@ def test_service_returns_snapshot_without_ai_dependency():
 
     assert isinstance(snapshot, CareerIntelligenceSnapshot)
     assert snapshot.generated_at == "2026-09-11T10:00:00Z"
+
+
+def test_snapshot_service_reads_each_source_once():
+    evidence_service = FakeEvidenceService()
+    objective_repository = FakeObjectiveRepository(_objective())
+    profile_repository = FakeProfileRepository(
+        ObjectiveProfile(
+            candidate_id="candidate-a",
+            objective_id="objective-a",
+            target_role_families=["Product Operations"],
+        )
+    )
+    evidence_service.calls = 0
+    objective_repository.calls = 0
+    profile_repository.calls = 0
+
+    original_evidence_build = evidence_service.build
+    original_objective_get = objective_repository.get_active
+    original_profile_get = profile_repository.get_active_for_candidate
+
+    def evidence_build(candidate_id):
+        evidence_service.calls += 1
+        return original_evidence_build(candidate_id)
+
+    def objective_get(candidate_id):
+        objective_repository.calls += 1
+        return original_objective_get(candidate_id)
+
+    def profile_get(candidate_id):
+        profile_repository.calls += 1
+        return original_profile_get(candidate_id)
+
+    evidence_service.build = evidence_build
+    objective_repository.get_active = objective_get
+    profile_repository.get_active_for_candidate = profile_get
+
+    service = CareerIntelligenceSnapshotService(
+        evidence_service=evidence_service,
+        objective_repository=objective_repository,
+        objective_profile_repository=profile_repository,
+        clock=lambda: "2026-09-11T10:00:00Z",
+    )
+    service.build("candidate-a")
+
+    assert evidence_service.calls == 1
+    assert objective_repository.calls == 1
+    assert profile_repository.calls == 1

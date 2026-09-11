@@ -1,7 +1,10 @@
+import pytest
+
 from models.career_evidence import CareerEvidence
 
 from services.career_evidence_aggregator import (
     aggregate_market_evidence,
+    confidence_from_observations,
 )
 
 
@@ -274,3 +277,42 @@ def test_non_market_evidence_is_ignored():
         )
         == []
     )
+
+
+def test_duplicate_source_does_not_inflate_evidence_count_or_confidence():
+    records = [
+        _record(
+            evidence_id=evidence_id,
+            job_id="1",
+            signal_type="best_match_blocker",
+            statement="SQL",
+            recommendation="potential",
+            current_fit=70,
+        )
+        for evidence_id in ("duplicate-b", "duplicate-a")
+    ]
+
+    signal = aggregate_market_evidence(records)[0]
+
+    assert signal.evidence_refs == ["duplicate-a"]
+    assert signal.evidence_count == 1
+    assert signal.independent_sources == 1
+    assert signal.confidence == "low"
+
+
+@pytest.mark.parametrize(
+    ("sources", "sample_size", "expected"),
+    [
+        (0, 0, "low"),
+        (1, 1, "low"),
+        (2, 8, "medium"),
+        (2, 9, "low"),
+        (4, 8, "high"),
+        (4, 9, "medium"),
+    ],
+)
+def test_confidence_boundaries(sources, sample_size, expected):
+    assert confidence_from_observations(
+        independent_sources=sources,
+        sample_size=sample_size,
+    ) == expected

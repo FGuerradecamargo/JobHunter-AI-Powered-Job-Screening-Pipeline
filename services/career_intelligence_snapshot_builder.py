@@ -14,6 +14,7 @@ from models.current_market_position import CurrentMarketPosition
 from models.gap_and_leverage import GapAndLeverageAssessment
 from models.improvement_plan import ImprovementPlan
 from services.career_memory_source_builder import build_source_signature
+from services.role_family_normalizer import normalize_role_family
 
 
 CAREER_INTELLIGENCE_SCHEMA_VERSION = "career-intelligence-v1"
@@ -26,7 +27,7 @@ def _normalize(value) -> str:
 def _sorted_labels(values) -> list[str]:
     labels = {}
     for value in values or []:
-        label = _normalize(value)
+        label = normalize_role_family(value)
         if label:
             labels.setdefault(label.casefold(), label)
     return sorted(labels.values(), key=str.casefold)
@@ -158,4 +159,3 @@ def build_career_intelligence_snapshot(
         improvement_priorities=list(improvement_plan.priorities),
         checkpoint_summary=summary,
     )
-
