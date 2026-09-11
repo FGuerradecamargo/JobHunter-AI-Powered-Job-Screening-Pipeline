@@ -489,6 +489,27 @@ def test_existing_account_can_be_explicitly_linked(
             == user.email
         )
 
+        audit_event = connection.execute(
+            """
+            SELECT *
+            FROM security_audit_events
+            WHERE event_type = ?
+            """,
+            ("account.identity.linked",),
+        ).fetchone()
+
+        assert audit_event is not None
+        assert (
+            audit_event["authenticated_user_id"]
+            == user.id
+        )
+        assert audit_event["active_user_id"] == user.id
+        assert audit_event["target_id"] == user.id
+        assert (
+            audit_event["metadata_json"]
+            == '{"provider": "google"}'
+        )
+
     finally:
         connection.close()
 

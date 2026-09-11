@@ -16,9 +16,14 @@ from services.google_identity_service import (
     GoogleIdentityResolution,
     GoogleIdentityService,
 )
+from services.security_audit_repository import (
+    SecurityAuditRepository,
+)
 from services.user_identity_repository import (
     UserIdentityRepository,
 )
+
+
 class GoogleAccountService:
     def __init__(self) -> None:
         self.identity_repository = (
@@ -56,12 +61,25 @@ class GoogleAccountService:
                 "does not match the Google identity."
             )
 
-        self.identity_repository.link(
-            user_id=authenticated_user.id,
-            provider=GoogleIdentityService.PROVIDER,
-            subject=resolution.subject,
-            provider_email=resolution.email,
-        )
+        with get_connection() as connection:
+            self.identity_repository.link_with_connection(
+                connection,
+                user_id=authenticated_user.id,
+                provider=GoogleIdentityService.PROVIDER,
+                subject=resolution.subject,
+                provider_email=resolution.email,
+            )
+
+            SecurityAuditRepository().record_with_connection(
+                connection,
+                event_type="account.identity.linked",
+                outcome="success",
+                authenticated_user_id=authenticated_user.id,
+                active_user_id=authenticated_user.id,
+                target_type="user",
+                target_id=authenticated_user.id,
+                metadata={"provider": "google"},
+            )
 
         return authenticated_user
 

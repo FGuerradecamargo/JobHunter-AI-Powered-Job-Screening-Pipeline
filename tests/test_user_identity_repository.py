@@ -121,6 +121,44 @@ def test_link_and_resolve_external_identity(
     )
 
 
+def test_link_with_existing_connection(
+    monkeypatch,
+    tmp_path,
+):
+    database_file = _prepare_database(
+        monkeypatch,
+        tmp_path,
+    )
+    repository = UserIdentityRepository()
+
+    connection = _open_database(database_file)
+
+    try:
+        with connection:
+            repository.link_with_connection(
+                connection,
+                user_id="workpilot-user",
+                provider="google",
+                subject="google-subject-transaction",
+                provider_email="user@example.com",
+            )
+
+        row = connection.execute(
+            """
+            SELECT user_id
+            FROM user_identities
+            WHERE subject = ?
+            """,
+            ("google-subject-transaction",),
+        ).fetchone()
+
+        assert row is not None
+        assert row["user_id"] == "workpilot-user"
+
+    finally:
+        connection.close()
+
+
 def test_record_authentication_updates_identity_metadata(
     monkeypatch,
     tmp_path,

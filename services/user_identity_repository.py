@@ -115,38 +115,63 @@ class UserIdentityRepository:
             provider_email or ""
         ).strip().lower() or None
 
+        with get_connection() as connection:
+            self.link_with_connection(
+                connection,
+                user_id=normalized_user_id,
+                provider=normalized_provider,
+                subject=normalized_subject,
+                provider_email=normalized_email,
+            )
+
+    def link_with_connection(
+        self,
+        connection,
+        *,
+        user_id: str,
+        provider: str,
+        subject: str,
+        provider_email: str | None = None,
+    ) -> None:
+        normalized_user_id = str(user_id or "").strip()
+
+        if not normalized_user_id:
+            raise ValueError("User ID is required.")
+
+        normalized_provider = self._normalize_provider(provider)
+        normalized_subject = self._normalize_subject(subject)
+        normalized_email = str(
+            provider_email or ""
+        ).strip().lower() or None
         now = utc_now()
 
-        with get_connection() as connection:
-            create_user_identity_schema(
-                connection
-            )
+        create_user_identity_schema(connection)
 
-            connection.execute(
-                """
-                INSERT INTO user_identities (
-                    id,
-                    user_id,
-                    provider,
-                    subject,
-                    provider_email,
-                    created_at,
-                    updated_at,
-                    last_authenticated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    uuid4().hex,
-                    normalized_user_id,
-                    normalized_provider,
-                    normalized_subject,
-                    normalized_email,
-                    now,
-                    now,
-                    now,
-                ),
+        connection.execute(
+            """
+            INSERT INTO user_identities (
+                id,
+                user_id,
+                provider,
+                subject,
+                provider_email,
+                created_at,
+                updated_at,
+                last_authenticated_at
             )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                uuid4().hex,
+                normalized_user_id,
+                normalized_provider,
+                normalized_subject,
+                normalized_email,
+                now,
+                now,
+                now,
+            ),
+        )
 
     def record_authentication(
         self,
