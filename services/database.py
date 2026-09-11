@@ -570,6 +570,66 @@ def create_user_identity_schema(
     )
 
 
+def create_security_audit_schema(
+    connection,
+) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS security_audit_events (
+            id TEXT PRIMARY KEY,
+            event_type TEXT NOT NULL,
+            outcome TEXT NOT NULL
+                CHECK (
+                    outcome IN (
+                        'success',
+                        'denied',
+                        'error'
+                    )
+                ),
+            authenticated_user_id TEXT NOT NULL,
+            active_user_id TEXT NOT NULL,
+            target_type TEXT NOT NULL DEFAULT '',
+            target_id TEXT NOT NULL DEFAULT '',
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_security_audit_authenticated_time
+        ON security_audit_events(
+            authenticated_user_id,
+            created_at
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_security_audit_active_time
+        ON security_audit_events(
+            active_user_id,
+            created_at
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_security_audit_type_time
+        ON security_audit_events(
+            event_type,
+            created_at
+        )
+        """
+    )
+
+
 def initialize_postgres_database() -> None:
     with get_connection() as connection:
         connection.execute(
@@ -753,6 +813,10 @@ def initialize_postgres_database() -> None:
         )
 
         create_user_identity_schema(
+            connection
+        )
+
+        create_security_audit_schema(
             connection
         )
 
@@ -1598,6 +1662,10 @@ def initialize_sqlite_database() -> None:
         )
 
         create_user_identity_schema(
+            connection
+        )
+
+        create_security_audit_schema(
             connection
         )
 
