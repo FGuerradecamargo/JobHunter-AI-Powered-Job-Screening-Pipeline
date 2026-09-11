@@ -24,6 +24,9 @@ from services.gmail_sync_service import GmailSyncService
 from services.gmail_connection_repository import (
     GmailConnectionRepository,
 )
+from services.gmail_access_audit_service import (
+    GmailAccessAuditService,
+)
 from services.gmail_oauth_service import GmailOAuthService
 from services.oauth_state_repository import (
     OAuthStateRepository,
@@ -72,6 +75,7 @@ st.caption(
 
 
 gmail_repository = GmailConnectionRepository()
+gmail_access_audit = GmailAccessAuditService()
 oauth_state_repository = OAuthStateRepository()
 oauth_service = GmailOAuthService()
 job_source_repository = JobSourceRepository()
@@ -134,6 +138,14 @@ def handle_oauth_callback() -> None:
     )
 
     if oauth_error:
+        gmail_access_audit.record_authorization_failed(
+            authenticated_user=authenticated_user,
+            active_user_id=active_user.id,
+            stage="provider_callback",
+        )
+
+        st.query_params.clear()
+
         message = (
             "Google authorization was cancelled "
             "or failed."
@@ -164,6 +176,14 @@ def handle_oauth_callback() -> None:
     )
 
     if authorization_state is None:
+        gmail_access_audit.record_authorization_failed(
+            authenticated_user=authenticated_user,
+            active_user_id=active_user.id,
+            stage="state_validation",
+        )
+
+        st.query_params.clear()
+
         st.error(
             "The authorization request is invalid, "
             "expired, or has already been used."
@@ -207,11 +227,27 @@ def handle_oauth_callback() -> None:
         )
 
     except Exception as error:
+        gmail_access_audit.record_authorization_failed(
+            authenticated_user=authenticated_user,
+            active_user_id=(
+                authorization_state.user_id
+            ),
+            target_user_id=(
+                authorization_state.user_id
+            ),
+            stage="token_exchange_or_persistence",
+        )
+
         st.error(
             "Could not complete Gmail connection."
         )
         logger.exception("Could not complete Gmail connection.")
         return
+
+    gmail_access_audit.record_connected(
+        authenticated_user=authenticated_user,
+        target_user_id=authorization_state.user_id,
+    )
 
     st.query_params.clear()
 
@@ -296,6 +332,11 @@ if (
         ),
     )
 
+    gmail_access_audit.record_authorization_started(
+        authenticated_user=authenticated_user,
+        target_user=selected_user,
+    )
+
     st.session_state[
         "gmail_authorization_url"
     ] = (
@@ -330,6 +371,11 @@ if gmail_connected:
     ):
         gmail_repository.disconnect(
             selected_user.id
+        )
+
+        gmail_access_audit.record_disconnected(
+            authenticated_user=authenticated_user,
+            target_user=selected_user,
         )
 
         st.session_state[
