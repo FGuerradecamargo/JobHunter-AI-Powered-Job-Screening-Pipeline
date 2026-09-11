@@ -55,10 +55,10 @@ class CandidateRepository:
                     updated_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?
                 )
 
                 ON CONFLICT(id) DO UPDATE SET
@@ -180,7 +180,7 @@ class CandidateRepository:
                 """
                 SELECT *
                 FROM candidates
-                WHERE id = %s
+                WHERE id = ?
                 """,
                 (candidate_id,),
             ).fetchone()
@@ -215,7 +215,7 @@ class CandidateRepository:
             cursor = connection.execute(
                 """
                 DELETE FROM candidates
-                WHERE id = %s
+                WHERE id = ?
                 """,
                 (candidate_id,),
             )
@@ -231,7 +231,7 @@ class CandidateRepository:
                 """
                 SELECT 1
                 FROM candidates
-                WHERE id = %s
+                WHERE id = ?
                 """,
                 (candidate_id,),
             ).fetchone()

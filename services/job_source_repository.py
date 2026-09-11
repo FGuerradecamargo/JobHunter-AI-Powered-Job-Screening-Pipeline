@@ -28,11 +28,11 @@ class JobSourceRepository:
                         last_seen_at
                     )
                     VALUES (
-                        %s,
+                        ?,
                         NULL,
-                        %s,
-                        %s,
-                        %s
+                        ?,
+                        ?,
+                        ?
                     )
                     ON CONFLICT (
                         job_id,
@@ -60,11 +60,11 @@ class JobSourceRepository:
                         last_seen_at
                     )
                     VALUES (
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        %s
+                        ?,
+                        ?,
+                        ?,
+                        ?,
+                        ?
                     )
                     ON CONFLICT (
                         job_id,
@@ -152,13 +152,13 @@ class JobSourceRepository:
                     last_seen_at
                 )
                 VALUES (
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?
                 )
 
                 ON CONFLICT (
@@ -192,7 +192,7 @@ class JobSourceRepository:
                 """
                 SELECT job_id
                 FROM job_sources
-                WHERE user_id = %s
+                WHERE user_id = ?
                 ORDER BY discovered_at DESC
                 """,
                 (user_id,),
@@ -215,7 +215,7 @@ class JobSourceRepository:
                     source_type,
                     discovered_at
                 FROM job_sources
-                WHERE job_id = %s
+                WHERE job_id = ?
                 ORDER BY discovered_at ASC
                 """,
                 (job_id,),

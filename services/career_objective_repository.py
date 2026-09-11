@@ -29,9 +29,9 @@ class CareerObjectiveRepository:
                     """
                     UPDATE candidate_career_objectives
                     SET active = 0,
-                        updated_at = %s
-                    WHERE candidate_id = %s
-                      AND id <> %s
+                        updated_at = ?
+                    WHERE candidate_id = ?
+                      AND id <> ?
                       AND active = 1
                     """,
                     (
@@ -54,8 +54,8 @@ class CareerObjectiveRepository:
                     updated_at
                 )
                 VALUES (
-                    %s, %s, %s, %s,
-                    %s, %s, %s, %s
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?
                 )
 
                 ON CONFLICT(id) DO UPDATE SET
@@ -97,7 +97,7 @@ class CareerObjectiveRepository:
                 """
                 SELECT *
                 FROM candidate_career_objectives
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                   AND active = 1
                 ORDER BY updated_at DESC
                 LIMIT 1
@@ -119,7 +119,7 @@ class CareerObjectiveRepository:
                 """
                 SELECT *
                 FROM candidate_career_objectives
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 ORDER BY created_at ASC
                 """,
                 (candidate_id,),
@@ -141,8 +141,8 @@ class CareerObjectiveRepository:
                 """
                 UPDATE candidate_career_objectives
                 SET active = 0,
-                    updated_at = %s
-                WHERE candidate_id = %s
+                    updated_at = ?
+                WHERE candidate_id = ?
                 """,
                 (
                     now,

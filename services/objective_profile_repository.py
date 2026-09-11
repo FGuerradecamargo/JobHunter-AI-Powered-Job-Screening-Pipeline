@@ -28,8 +28,8 @@ class ObjectiveProfileRepository:
                 SELECT created_at
                 FROM candidate_objective_profiles
                 WHERE
-                    objective_id = %s
-                    AND candidate_id = %s
+                    objective_id = ?
+                    AND candidate_id = ?
                 """,
                 (
                     profile.objective_id,
@@ -53,7 +53,7 @@ class ObjectiveProfileRepository:
                     updated_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s
+                    ?, ?, ?, ?, ?
                 )
 
                 ON CONFLICT(objective_id) DO UPDATE SET
@@ -91,8 +91,8 @@ class ObjectiveProfileRepository:
                 SELECT profile_json
                 FROM candidate_objective_profiles
                 WHERE
-                    objective_id = %s
-                    AND candidate_id = %s
+                    objective_id = ?
+                    AND candidate_id = ?
                 """,
                 (
                     objective_id,
@@ -132,7 +132,7 @@ class ObjectiveProfileRepository:
                 FROM candidate_objective_profiles op
                 JOIN candidate_career_objectives co
                   ON co.id = op.objective_id
-                WHERE op.candidate_id = %s
+                WHERE op.candidate_id = ?
                   AND co.active = 1
                 ORDER BY co.updated_at DESC
                 LIMIT 1

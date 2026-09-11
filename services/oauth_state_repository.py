@@ -60,7 +60,7 @@ class OAuthStateRepository:
                     consumed_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s, NULL
+                    ?, ?, ?, ?, ?, NULL
                 )
                 """,
                 (
@@ -93,7 +93,7 @@ class OAuthStateRepository:
                     created_at,
                     consumed_at
                 FROM oauth_authorization_states
-                WHERE state = %s
+                WHERE state = ?
                 """,
                 (state,),
             ).fetchone()
@@ -131,8 +131,8 @@ class OAuthStateRepository:
             connection.execute(
                 """
                 UPDATE oauth_authorization_states
-                SET consumed_at = %s
-                WHERE state = %s
+                SET consumed_at = ?
+                WHERE state = ?
                 """,
                 (
                     now.isoformat(),
@@ -165,7 +165,7 @@ class OAuthStateRepository:
                 """
                 DELETE FROM oauth_authorization_states
                 WHERE
-                    created_at < %s
+                    created_at < ?
                     OR consumed_at IS NOT NULL
                 """,
                 (cutoff,),

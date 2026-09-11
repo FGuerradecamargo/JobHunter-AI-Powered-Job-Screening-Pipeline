@@ -90,7 +90,7 @@ class JobImportService:
                         UPDATE jobs
                         SET archived_at = NULL
                         WHERE
-                            id = %s
+                            id = ?
                             AND archived_at IS NOT NULL
                         """,
                         (job.id,),

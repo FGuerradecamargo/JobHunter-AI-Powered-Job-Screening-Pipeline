@@ -88,7 +88,7 @@ def test_objective_profile_upsert_cannot_transfer_candidate(
     select_sql, select_params = connection.calls[0]
     upsert_sql, _ = connection.calls[1]
 
-    assert "objective_id = %s AND candidate_id = %s" in select_sql
+    assert "objective_id = ? AND candidate_id = ?" in select_sql
     assert select_params == (
         "objective-a",
         "candidate-b",
@@ -113,7 +113,7 @@ def test_objective_profile_read_is_candidate_scoped(
 
     sql, params = connection.calls[0]
 
-    assert "objective_id = %s AND candidate_id = %s" in sql
+    assert "objective_id = ? AND candidate_id = ?" in sql
     assert params == (
         "objective-a",
         "candidate-b",

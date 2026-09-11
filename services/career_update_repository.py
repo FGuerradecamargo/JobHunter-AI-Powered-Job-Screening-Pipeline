@@ -30,7 +30,7 @@ class CareerUpdateRepository:
                     created_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s
+                    ?, ?, ?, ?, ?
                 )
 
                 ON CONFLICT(id) DO UPDATE SET
@@ -64,7 +64,7 @@ class CareerUpdateRepository:
                 """
                 SELECT *
                 FROM candidate_career_updates
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 ORDER BY created_at ASC
                 """,
                 (candidate_id,),
@@ -99,8 +99,8 @@ class CareerUpdateRepository:
                 """
                 DELETE FROM candidate_career_updates
                 WHERE
-                    id = %s
-                    AND candidate_id = %s
+                    id = ?
+                    AND candidate_id = ?
                 """,
                 (
                     update_id,

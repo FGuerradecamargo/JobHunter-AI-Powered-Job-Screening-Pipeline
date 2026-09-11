@@ -66,7 +66,7 @@ def test_update_scopes_experience_to_candidate(
 
     sql, params = connection.calls[0]
 
-    assert "id = %s AND candidate_id = %s" in sql
+    assert "id = ? AND candidate_id = ?" in sql
     assert params[-2:] == (
         "experience-a",
         "candidate-a",
@@ -103,7 +103,7 @@ def test_delete_scopes_experience_to_candidate(
 
     sql, params = connection.calls[0]
 
-    assert "id = %s AND candidate_id = %s" in sql
+    assert "id = ? AND candidate_id = ?" in sql
     assert params == (
         "experience-a",
         "candidate-a",

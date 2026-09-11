@@ -37,8 +37,8 @@ class CandidateOnboardingRepository:
                     updated_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?
                 )
 
                 ON CONFLICT(candidate_id) DO UPDATE SET
@@ -82,7 +82,7 @@ class CandidateOnboardingRepository:
                 """
                 SELECT *
                 FROM candidate_onboarding
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 """,
                 (candidate_id,),
             ).fetchone()
@@ -146,8 +146,8 @@ class CandidateOnboardingRepository:
                     updated_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?
                 )
                 """,
                 (
@@ -174,7 +174,7 @@ class CandidateOnboardingRepository:
                 """
                 SELECT *
                 FROM candidate_work_experiences
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 ORDER BY start_date DESC
                 """,
                 (candidate_id,),
@@ -206,15 +206,15 @@ class CandidateOnboardingRepository:
                 """
                 UPDATE candidate_work_experiences
                 SET
-                    company = %s,
-                    start_date = %s,
-                    end_date = %s,
-                    career_story = %s,
-                    day_to_day_narrative = %s,
-                    updated_at = %s
+                    company = ?,
+                    start_date = ?,
+                    end_date = ?,
+                    career_story = ?,
+                    day_to_day_narrative = ?,
+                    updated_at = ?
                 WHERE
-                    id = %s
-                    AND candidate_id = %s
+                    id = ?
+                    AND candidate_id = ?
                 """,
                 (
                     experience.company.strip(),
@@ -243,8 +243,8 @@ class CandidateOnboardingRepository:
                 """
                 DELETE FROM candidate_work_experiences
                 WHERE
-                    id = %s
-                    AND candidate_id = %s
+                    id = ?
+                    AND candidate_id = ?
                 """,
                 (
                     experience_id,

@@ -181,7 +181,7 @@ def test_career_update_delete_is_candidate_scoped(
 
     sql, params = connection.calls[0]
 
-    assert "id = %s AND candidate_id = %s" in sql
+    assert "id = ? AND candidate_id = ?" in sql
     assert params == (
         "update-a",
         "candidate-b",

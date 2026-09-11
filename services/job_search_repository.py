@@ -18,7 +18,7 @@ class JobSearchRepository:
 
         if categories:
             placeholders = ",".join(
-                "%s"
+                "?"
                 for _ in categories
             )
 
@@ -47,7 +47,7 @@ class JobSearchRepository:
             {category_filter}
 
             ORDER BY created_at DESC
-            LIMIT %s
+            LIMIT ?
         """
 
         with get_connection() as connection:
@@ -70,7 +70,7 @@ class JobSearchRepository:
 
         if categories:
             placeholders = ",".join(
-                "%s"
+                "?"
                 for _ in categories
             )
 
@@ -98,13 +98,13 @@ class JobSearchRepository:
                 ON job_sources.job_id = jobs.id
 
             WHERE
-                job_sources.user_id = %s
+                job_sources.user_id = ?
                 AND jobs.archived_at IS NULL
 
                 {category_filter}
 
             ORDER BY jobs.created_at DESC
-            LIMIT %s
+            LIMIT ?
         """
 
         with get_connection() as connection:
@@ -166,7 +166,7 @@ class JobSearchRepository:
 
             LEFT JOIN candidate_job_analyses
                 ON candidate_job_analyses.job_id = jobs.id
-                AND candidate_job_analyses.candidate_id = %s
+                AND candidate_job_analyses.candidate_id = ?
 
             LEFT JOIN job_discovery_signals
                 ON job_discovery_signals.job_id = jobs.id
@@ -327,7 +327,7 @@ class JobSearchRepository:
 
             LEFT JOIN candidate_job_analyses
                 ON candidate_job_analyses.job_id = jobs.id
-                AND candidate_job_analyses.candidate_id = %s
+                AND candidate_job_analyses.candidate_id = ?
 
             WHERE
                 jobs.archived_at IS NULL
