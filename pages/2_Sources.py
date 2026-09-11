@@ -156,7 +156,10 @@ def handle_oauth_callback() -> None:
 
     authorization_state = (
         oauth_state_repository.consume(
-            returned_state
+            returned_state,
+            initiated_by_user_id=(
+                authenticated_user.id
+            ),
         )
     )
 
@@ -285,6 +288,9 @@ if (
             authorization_request.state
         ),
         user_id=selected_user.id,
+        initiated_by_user_id=(
+            authenticated_user.id
+        ),
         code_verifier=(
             authorization_request.code_verifier
         ),

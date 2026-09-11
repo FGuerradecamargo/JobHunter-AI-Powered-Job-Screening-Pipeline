@@ -1034,16 +1034,47 @@ def initialize_postgres_database() -> None:
             CREATE TABLE IF NOT EXISTS oauth_authorization_states (
                 state TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
+                initiated_by_user_id TEXT NOT NULL,
                 code_verifier TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 consumed_at TEXT,
 
                 FOREIGN KEY (user_id)
                     REFERENCES users(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (initiated_by_user_id)
+                    REFERENCES users(id)
                     ON DELETE CASCADE
             )
             """
         )
+
+        oauth_state_columns = connection.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE
+                table_schema = current_schema()
+                AND table_name = 'oauth_authorization_states'
+            """
+        ).fetchall()
+
+        oauth_state_column_names = {
+            column["column_name"]
+            for column in oauth_state_columns
+        }
+
+        if (
+            "initiated_by_user_id"
+            not in oauth_state_column_names
+        ):
+            connection.execute(
+                """
+                ALTER TABLE oauth_authorization_states
+                ADD COLUMN initiated_by_user_id TEXT
+                """
+            )
 
         connection.execute(
             """
@@ -2106,11 +2137,16 @@ def initialize_sqlite_database() -> None:
             CREATE TABLE IF NOT EXISTS oauth_authorization_states (
                 state TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
+                initiated_by_user_id TEXT NOT NULL,
                 code_verifier TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 consumed_at TEXT,
 
                 FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (initiated_by_user_id)
                     REFERENCES users(id)
                     ON DELETE CASCADE
             )
@@ -2183,6 +2219,14 @@ def initialize_sqlite_database() -> None:
                 """
                 ALTER TABLE oauth_authorization_states
                 ADD COLUMN code_verifier TEXT
+                """
+            )
+
+        if "initiated_by_user_id" not in column_names:
+            connection.execute(
+                """
+                ALTER TABLE oauth_authorization_states
+                ADD COLUMN initiated_by_user_id TEXT
                 """
             )
 

@@ -10,6 +10,7 @@ from services.database import get_connection
 @dataclass(frozen=True)
 class OAuthAuthorizationState:
     user_id: str
+    initiated_by_user_id: str
     code_verifier: str
 
 
@@ -20,6 +21,7 @@ class OAuthStateRepository:
         self,
         state: str,
         user_id: str,
+        initiated_by_user_id: str,
         code_verifier: str,
     ) -> None:
         if not state:
@@ -30,6 +32,11 @@ class OAuthStateRepository:
         if not user_id:
             raise ValueError(
                 "User ID is required."
+            )
+
+        if not initiated_by_user_id:
+            raise ValueError(
+                "Initiating user ID is required."
             )
 
         if not code_verifier:
@@ -47,17 +54,19 @@ class OAuthStateRepository:
                 INSERT INTO oauth_authorization_states (
                     state,
                     user_id,
+                    initiated_by_user_id,
                     code_verifier,
                     created_at,
                     consumed_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, NULL
+                    %s, %s, %s, %s, %s, NULL
                 )
                 """,
                 (
                     state,
                     user_id,
+                    initiated_by_user_id,
                     code_verifier,
                     now,
                 ),
@@ -66,7 +75,13 @@ class OAuthStateRepository:
     def consume(
         self,
         state: str,
+        initiated_by_user_id: str,
     ) -> Optional[OAuthAuthorizationState]:
+        if not initiated_by_user_id:
+            raise ValueError(
+                "Initiating user ID is required."
+            )
+
         with get_connection() as connection:
             row = connection.execute(
                 """
@@ -74,6 +89,7 @@ class OAuthStateRepository:
                     state,
                     code_verifier,
                     user_id,
+                    initiated_by_user_id,
                     created_at,
                     consumed_at
                 FROM oauth_authorization_states
@@ -86,6 +102,12 @@ class OAuthStateRepository:
                 return None
 
             if row["consumed_at"] is not None:
+                return None
+
+            if (
+                row["initiated_by_user_id"]
+                != initiated_by_user_id
+            ):
                 return None
 
             created_at = datetime.fromisoformat(
@@ -120,6 +142,9 @@ class OAuthStateRepository:
 
         return OAuthAuthorizationState(
             user_id=row["user_id"],
+            initiated_by_user_id=(
+                row["initiated_by_user_id"]
+            ),
             code_verifier=row["code_verifier"],
         )
 
