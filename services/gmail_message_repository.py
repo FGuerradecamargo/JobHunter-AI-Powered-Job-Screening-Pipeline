@@ -55,9 +55,9 @@ class GmailMessageRepository:
                     created_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s,
-                    NULL, 'pending', NULL, %s
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    NULL, 'pending', NULL, ?
                 )
                 ON CONFLICT (
                     user_id,
@@ -102,10 +102,10 @@ class GmailMessageRepository:
                     processing_status
                 FROM gmail_messages
                 WHERE
-                    user_id = %s
+                    user_id = ?
                     AND processing_status = 'pending'
                 ORDER BY received_at ASC
-                LIMIT %s
+                LIMIT ?
                 """,
                 (
                     user_id,
@@ -129,8 +129,8 @@ class GmailMessageRepository:
                 SELECT 1
                 FROM gmail_messages
                 WHERE
-                    user_id = %s
-                    AND gmail_message_id = %s
+                    user_id = ?
+                    AND gmail_message_id = ?
                 """,
                 (
                     user_id,
@@ -155,11 +155,11 @@ class GmailMessageRepository:
                 UPDATE gmail_messages
                 SET
                     processing_status = 'processed',
-                    processed_at = %s,
+                    processed_at = ?,
                     error_message = NULL
                 WHERE
-                    user_id = %s
-                    AND gmail_message_id = %s
+                    user_id = ?
+                    AND gmail_message_id = ?
                 """,
                 (
                     now,
@@ -189,11 +189,11 @@ class GmailMessageRepository:
                 UPDATE gmail_messages
                 SET
                     processing_status = 'failed',
-                    processed_at = %s,
-                    error_message = %s
+                    processed_at = ?,
+                    error_message = ?
                 WHERE
-                    user_id = %s
-                    AND gmail_message_id = %s
+                    user_id = ?
+                    AND gmail_message_id = ?
                 """,
                 (
                     now,
@@ -225,7 +225,7 @@ class GmailMessageRepository:
                     processing_status,
                     COUNT(*) AS total
                 FROM gmail_messages
-                WHERE user_id = %s
+                WHERE user_id = ?
                 GROUP BY processing_status
                 """,
                 (user_id,),

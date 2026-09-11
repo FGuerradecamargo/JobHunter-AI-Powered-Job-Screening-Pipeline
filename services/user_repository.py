@@ -66,13 +66,13 @@ class UserRepository:
                     updated_at
                 )
                 VALUES (
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?
                 )
                 """,
                 (
@@ -108,7 +108,7 @@ class UserRepository:
                     candidate_id,
                     access_level
                 FROM users
-                WHERE id = %s
+                WHERE id = ?
                 """,
                 (user_id,),
             ).fetchone()
@@ -135,7 +135,7 @@ class UserRepository:
                     candidate_id,
                     access_level
                 FROM users
-                WHERE email = %s
+                WHERE email = ?
                 """,
                 (normalized_email,),
             ).fetchone()
@@ -158,7 +158,7 @@ class UserRepository:
                     candidate_id,
                     access_level
                 FROM users
-                WHERE candidate_id = %s
+                WHERE candidate_id = ?
                 """,
                 (candidate_id,),
             ).fetchone()
@@ -181,9 +181,9 @@ class UserRepository:
                 """
                 UPDATE users
                 SET
-                    candidate_id = %s,
-                    updated_at = %s
-                WHERE id = %s
+                    candidate_id = ?,
+                    updated_at = ?
+                WHERE id = ?
                 """,
                 (
                     candidate_id,
@@ -224,9 +224,9 @@ class UserRepository:
                 """
                 UPDATE users
                 SET
-                    access_level = %s,
-                    updated_at = %s
-                WHERE id = %s
+                    access_level = ?,
+                    updated_at = ?
+                WHERE id = ?
                 """,
                 (
                     normalized_access_level,
