@@ -20,6 +20,7 @@ from services.prepared_application_ui import (
     is_prepare_application_eligible,
     prepared_application_error_message,
 )
+from services.prepared_cv_exporter import export_cached_prepared_cv_docx
 from services.candidate_repository import CandidateRepository
 from services.career_objective_repository import CareerObjectiveRepository
 from services.career_update_repository import CareerUpdateRepository
@@ -1612,6 +1613,22 @@ def render_job(
                         st.subheader("Additional Relevant Information")
                         for item in prepared_view.additional_information:
                             st.write(f"- {item}")
+                prepared_export = export_cached_prepared_cv_docx(
+                    st.session_state,
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    candidate_name=candidate.name,
+                    company=company,
+                    role=title,
+                )
+                st.download_button(
+                    "Download prepared CV",
+                    data=prepared_export.data,
+                    file_name=prepared_export.filename,
+                    mime=prepared_export.mime_type,
+                    key=f"download_prepared_cv_{candidate_id}_{job_id}",
+                    use_container_width=True,
+                )
             elif prepared_result is not None:
                 st.error(prepared_application_error_message(prepared_result))
 

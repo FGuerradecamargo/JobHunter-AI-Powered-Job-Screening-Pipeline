@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from models.tailored_cv_contract import (
     TailoredCVGenerationRequest,
@@ -6,6 +6,7 @@ from models.tailored_cv_contract import (
 )
 
 
+@runtime_checkable
 class TailoredCVGeneratorClient(Protocol):
     def generate(
         self,
