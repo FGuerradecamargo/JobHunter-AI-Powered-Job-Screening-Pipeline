@@ -14,6 +14,12 @@ from services.session_auth import (
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context
+from services.prepared_application_ui import (
+    build_prepared_cv_view,
+    handle_prepare_application_action,
+    is_prepare_application_eligible,
+    prepared_application_error_message,
+)
 from services.candidate_repository import CandidateRepository
 from services.career_objective_repository import CareerObjectiveRepository
 from services.career_update_repository import CareerUpdateRepository
@@ -1358,7 +1364,7 @@ def render_tailored_cv(
     if not tailored_cv:
         return
 
-    with st.expander("Tailored CV"):
+    with st.expander("Historical Tailored CV"):
         headline = tailored_cv.get(
             "headline",
             "",
@@ -1551,11 +1557,65 @@ def render_job(
             title=title,
         )
 
-        st.divider()
+        job_id = str(job["id"])
+        eligible_for_preparation = is_prepare_application_eligible(analysis)
+        if eligible_for_preparation:
+            preparation_service = st.session_state.get(
+                "_prepare_application_service"
+            )
+            prepare_requested = st.button(
+                "Prepare Application",
+                key=f"prepare_application_{candidate_id}_{job_id}",
+                type="primary",
+                use_container_width=True,
+                disabled=preparation_service is None,
+            )
+            prepared_result = handle_prepare_application_action(
+                st.session_state,
+                candidate_id=candidate_id,
+                job_id=job_id,
+                analysis=analysis,
+                action_requested=prepare_requested,
+                preparation_service=preparation_service,
+            )
+            prepared_view = (
+                build_prepared_cv_view(prepared_result)
+                if prepared_result is not None
+                else None
+            )
+            if prepared_view is not None:
+                st.success(prepared_view.status_text)
+                with st.expander("Prepared CV", expanded=True):
+                    if prepared_view.headline:
+                        st.markdown(f"### {prepared_view.headline}")
+                    if prepared_view.professional_summary:
+                        st.subheader("Professional Summary")
+                        for item in prepared_view.professional_summary:
+                            st.write(item)
+                    if prepared_view.key_skills:
+                        st.subheader("Key Skills")
+                        for item in prepared_view.key_skills:
+                            st.write(f"- {item}")
+                    if prepared_view.experiences:
+                        st.subheader("Professional Experience")
+                        for experience in prepared_view.experiences:
+                            heading = " - ".join(
+                                item
+                                for item in (experience.role, experience.company)
+                                if item
+                            )
+                            if heading:
+                                st.markdown(f"**{heading}**")
+                            for bullet in experience.bullets:
+                                st.write(f"- {bullet}")
+                    if prepared_view.additional_information:
+                        st.subheader("Additional Relevant Information")
+                        for item in prepared_view.additional_information:
+                            st.write(f"- {item}")
+            elif prepared_result is not None:
+                st.error(prepared_application_error_message(prepared_result))
 
-        job_id = str(
-            job["id"]
-        )
+        st.divider()
 
         st.markdown(
             "**Your notes**"
