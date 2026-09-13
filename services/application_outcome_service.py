@@ -89,7 +89,7 @@ class ApplicationOutcomeService:
             return self._failed(candidate_id, job_id, "application_not_applied")
 
         current = self.repository.get(candidate_id, job_id)
-        current_state = self._state(current)
+        current_state = self.current_state(current, application["status"])
         if not self._allowed(current_state, target):
             return self._failed(candidate_id, job_id, "invalid_transition", current)
 
@@ -113,9 +113,17 @@ class ApplicationOutcomeService:
         return self._result("updated", self.repository.save(desired))
 
     @staticmethod
-    def _state(outcome: ApplicationOutcome | None) -> str:
+    def current_state(
+        outcome: ApplicationOutcome | None,
+        application_status: str = "applied",
+    ) -> str:
         if outcome is None:
-            return "applied"
+            return {
+                "in_process": INTERVIEW,
+                "rejected_before_interview": "rejected",
+                "rejected_after_interview": "rejected",
+                "offer": OFFER,
+            }.get(application_status, "applied")
         if outcome.final_status:
             return outcome.final_status
         return outcome.interview_stage or "applied"

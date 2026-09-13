@@ -8,14 +8,18 @@ from services.session_auth import (
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context
+from services.application_outcome_repository import ApplicationOutcomeRepository
+from services.application_outcome_service import ApplicationOutcomeService
+from services.application_outcome_ui import (
+    dispatch_application_outcome_action,
+    load_application_outcome_view,
+    outcome_result_message,
+)
 from services.database import (
     count_candidate_jobs_by_status,
-    get_candidate_application_outcome,
     initialize_database,
     list_candidate_jobs,
-    save_candidate_application_outcome,
     update_candidate_job_notes,
-    update_candidate_job_status,
 )
 
 
@@ -166,20 +170,6 @@ def render_text_section(
         st.caption(empty_message)
 
 
-def change_status(
-    candidate_id: str,
-    job_id: str,
-    new_status: str,
-) -> None:
-    update_candidate_job_status(
-        candidate_id=candidate_id,
-        job_id=job_id,
-        status=new_status,
-    )
-
-    st.rerun()
-
-
 def save_notes(
     candidate_id: str,
     job_id: str,
@@ -194,308 +184,107 @@ def save_notes(
     st.toast("Notes saved.")
 
 
-def render_status_buttons(
-    candidate_id: str,
-    job_id: str,
-    current_status: str,
-) -> None:
-    st.subheader("Application status")
-
-    if current_status == "system_rejected":
-        if st.button(
-            "Move to In review",
-            key=f"in_review_{candidate_id}_{job_id}",
-            use_container_width=True,
-        ):
-            change_status(
-                candidate_id,
-                job_id,
-                "in_review",
-            )
-
-        return
-
-    if current_status == "in_review":
-        columns = st.columns(2)
-
-        with columns[0]:
-            if st.button(
-                "Do not apply",
-                key=f"user_rejected_{candidate_id}_{job_id}",
-                use_container_width=True,
-            ):
-                change_status(
-                    candidate_id,
-                    job_id,
-                    "user_rejected",
-                )
-
-        with columns[1]:
-            if st.button(
-                "Mark as Applied",
-                key=f"applied_{candidate_id}_{job_id}",
-                type="primary",
-                use_container_width=True,
-            ):
-                change_status(
-                    candidate_id,
-                    job_id,
-                    "applied",
-                )
-
-        return
-
-    if current_status == "user_rejected":
-        if st.button(
-            "Move back to In review",
-            key=f"restore_review_{candidate_id}_{job_id}",
-            use_container_width=True,
-        ):
-            change_status(
-                candidate_id,
-                job_id,
-                "in_review",
-            )
-
-        return
-
-    if current_status == "applied":
-        columns = st.columns(2)
-
-        with columns[0]:
-            if st.button(
-                "Rejected before interview",
-                key=f"rejected_before_{candidate_id}_{job_id}",
-                use_container_width=True,
-            ):
-                change_status(
-                    candidate_id,
-                    job_id,
-                    "rejected_before_interview",
-                )
-
-        with columns[1]:
-            if st.button(
-                "Moved to interview process",
-                key=f"in_process_{candidate_id}_{job_id}",
-                type="primary",
-                use_container_width=True,
-            ):
-                change_status(
-                    candidate_id,
-                    job_id,
-                    "in_process",
-                )
-
-        return
-
-    if current_status == "in_process":
-        columns = st.columns(2)
-
-        with columns[0]:
-            if st.button(
-                "Rejected in process",
-                key=f"rejected_after_{candidate_id}_{job_id}",
-                use_container_width=True,
-            ):
-                change_status(
-                    candidate_id,
-                    job_id,
-                    "rejected_after_interview",
-                )
-
-        with columns[1]:
-            if st.button(
-                "Mark as Offer",
-                key=f"offer_{candidate_id}_{job_id}",
-                type="primary",
-                use_container_width=True,
-            ):
-                change_status(
-                    candidate_id,
-                    job_id,
-                    "offer",
-                )
-
-        return
-
-    if current_status in {
-        "rejected_before_interview",
-        "rejected_after_interview",
-        "offer",
-    }:
-        if st.button(
-            "Move back to In process",
-            key=f"restore_process_{candidate_id}_{job_id}",
-            use_container_width=True,
-        ):
-            change_status(
-                candidate_id,
-                job_id,
-                "in_process",
-            )
-
-
 def render_application_outcome(
     candidate_id: str,
     job_id: str,
     status: str,
 ) -> None:
-    if status not in {
-        "in_process",
-        "rejected_before_interview",
-        "rejected_after_interview",
-        "offer",
-    }:
+    repository = ApplicationOutcomeRepository()
+    service = ApplicationOutcomeService(repository=repository)
+    view = load_application_outcome_view(
+        candidate_id=candidate_id,
+        job_id=job_id,
+        lifecycle_status=status,
+        repository=repository,
+    )
+    if view is None:
         return
 
-    outcome = (
-        get_candidate_application_outcome(
-            candidate_id=candidate_id,
-            job_id=job_id,
-        )
-        or {}
-    )
-
     st.divider()
-    st.subheader("Application Outcome")
+    st.subheader("Application status")
+    st.markdown(f"**{view.status_label}**")
 
-    interview_stage = st.text_input(
-        "Interview stage",
-        value=outcome.get(
-            "interview_stage",
-            "",
-        ),
-        placeholder=(
-            "Example: recruiter screen, "
-            "technical interview, final round"
-        ),
-        key=f"outcome_stage_{candidate_id}_{job_id}",
+    if not view.actions:
+        st.caption("This application has a final outcome.")
+        return
+
+    action_by_label = {item.label: item.value for item in view.actions}
+    selected_label = st.selectbox(
+        "Next step",
+        options=list(action_by_label),
+        key=f"outcome_action_{candidate_id}_{job_id}",
     )
+    selected_action = action_by_label[selected_label]
+    existing = view.outcome
 
     rejection_reason = ""
-
-    if status in {
-        "rejected_before_interview",
-        "rejected_after_interview",
-    }:
+    recruiter_feedback = ""
+    if selected_action == "rejected":
         rejection_reason = st.text_area(
             "Rejection reason",
-            value=outcome.get(
-                "rejection_reason",
-                "",
-            ),
-            placeholder=(
-                "What reason did the company give, "
-                "if any?"
-            ),
-            key=(
-                f"outcome_rejection_"
-                f"{candidate_id}_{job_id}"
-            ),
+            value=existing.rejection_reason if existing else "",
+            key=f"outcome_rejection_{candidate_id}_{job_id}",
+            placeholder="Optional",
         )
-
-    recruiter_feedback = st.text_area(
-        "Recruiter / company feedback",
-        value=outcome.get(
-            "recruiter_feedback",
-            "",
-        ),
-        placeholder=(
-            "Paste or summarize any feedback "
-            "you received."
-        ),
-        key=(
-            f"outcome_feedback_"
-            f"{candidate_id}_{job_id}"
-        ),
-    )
+        recruiter_feedback = st.text_area(
+            "Recruiter / company feedback",
+            value=existing.recruiter_feedback if existing else "",
+            key=f"outcome_feedback_{candidate_id}_{job_id}",
+            placeholder="Optional",
+        )
 
     candidate_notes = st.text_area(
         "Your notes",
-        value=outcome.get(
-            "candidate_notes",
-            "",
-        ),
-        placeholder=(
-            "What happened? What stood out?"
-        ),
-        key=(
-            f"outcome_notes_"
-            f"{candidate_id}_{job_id}"
-        ),
-    )
-
-    lessons_learned = st.text_area(
-        "Lessons learned",
-        value=outcome.get(
-            "lessons_learned",
-            "",
-        ),
-        placeholder=(
-            "Anything you want the system to "
-            "remember for future applications."
-        ),
-        key=(
-            f"outcome_lessons_"
-            f"{candidate_id}_{job_id}"
-        ),
+        value=existing.candidate_notes if existing else "",
+        placeholder="Optional",
+        key=f"outcome_notes_{candidate_id}_{job_id}",
     )
 
     offer_salary = ""
     offer_currency = ""
-
-    if status == "offer":
+    if selected_action == "offer":
         offer_columns = st.columns(2)
-
         with offer_columns[0]:
             offer_salary = st.text_input(
                 "Offer salary",
-                value=outcome.get(
-                    "offer_salary",
-                    "",
-                ),
-                key=(
-                    f"outcome_salary_"
-                    f"{candidate_id}_{job_id}"
-                ),
+                value=existing.offer_salary if existing else "",
+                key=f"outcome_salary_{candidate_id}_{job_id}",
+                placeholder="Optional",
             )
-
         with offer_columns[1]:
             offer_currency = st.text_input(
                 "Currency",
-                value=outcome.get(
-                    "offer_currency",
-                    "",
-                ),
-                placeholder="EUR",
-                key=(
-                    f"outcome_currency_"
-                    f"{candidate_id}_{job_id}"
-                ),
+                value=existing.offer_currency if existing else "",
+                placeholder="Optional",
+                key=f"outcome_currency_{candidate_id}_{job_id}",
             )
 
-    if st.button(
-        "Save outcome",
-        key=f"save_outcome_{candidate_id}_{job_id}",
+    confirmed = st.button(
+        "Confirm update",
+        key=f"confirm_outcome_{candidate_id}_{job_id}",
+        type="primary",
         use_container_width=True,
-    ):
-        save_candidate_application_outcome(
-            candidate_id=candidate_id,
-            job_id=job_id,
-            final_status=status,
-            interview_stage=interview_stage,
-            rejection_reason=rejection_reason,
-            recruiter_feedback=recruiter_feedback,
-            candidate_notes=candidate_notes,
-            offer_salary=offer_salary,
-            offer_currency=offer_currency,
-            lessons_learned=lessons_learned,
-        )
-
-        st.toast(
-            "Application outcome saved."
-        )
+    )
+    result = dispatch_application_outcome_action(
+        confirmed=confirmed,
+        action=selected_action,
+        candidate_id=candidate_id,
+        job_id=job_id,
+        lifecycle_status=status,
+        service=service,
+        rejection_reason=rejection_reason,
+        recruiter_feedback=recruiter_feedback,
+        candidate_notes=candidate_notes,
+        offer_salary=offer_salary,
+        offer_currency=offer_currency,
+    )
+    if result is not None:
+        message = outcome_result_message(result)
+        if result.succeeded:
+            st.toast(message)
+            st.rerun()
+        else:
+            st.error(message)
 
 
 def render_job(
@@ -701,12 +490,6 @@ def render_job(
                     )
 
         st.divider()
-
-        render_status_buttons(
-            candidate_id=candidate_id,
-            job_id=job_id,
-            current_status=status,
-        )
 
         render_application_outcome(
             candidate_id=candidate_id,
