@@ -21,6 +21,11 @@ from services.prepared_application_ui import (
     prepared_application_error_message,
 )
 from services.prepared_cv_exporter import export_cached_prepared_cv_docx
+from services.application_lifecycle_service import ApplicationLifecycleService
+from services.application_lifecycle_ui import (
+    handle_mark_applied_action,
+    handle_user_rejected_action,
+)
 from services.candidate_repository import CandidateRepository
 from services.career_objective_repository import CareerObjectiveRepository
 from services.career_update_repository import CareerUpdateRepository
@@ -45,7 +50,6 @@ from services.database import (
     list_candidate_jobs,
     list_inactive_approved_candidate_jobs,
     update_candidate_job_notes,
-    update_candidate_job_status,
 )
 
 
@@ -72,6 +76,7 @@ render_logout_button()
 repository = JobSearchRepository()
 candidate_repository = CandidateRepository()
 analysis_service = CandidateJobAnalysisService()
+application_lifecycle_service = ApplicationLifecycleService()
 
 
 
@@ -1674,32 +1679,35 @@ def render_job(
         decision_columns = st.columns(2)
 
         with decision_columns[0]:
-            if st.button(
+            reject_requested = st.button(
                 "Do not apply",
                 key=f"analysis_reject_{candidate_id}_{job_id}",
                 use_container_width=True,
-            ):
-                update_candidate_job_status(
-                    candidate_id=candidate_id,
-                    job_id=job_id,
-                    status="user_rejected",
-                )
-
+            )
+            reject_result = handle_user_rejected_action(
+                action_requested=reject_requested,
+                candidate_id=candidate_id,
+                job_id=job_id,
+                lifecycle_service=application_lifecycle_service,
+            )
+            if reject_result is not None and reject_result.succeeded:
                 st.rerun()
 
         with decision_columns[1]:
-            if st.button(
+            apply_requested = st.button(
                 "Mark as Applied",
                 key=f"analysis_apply_{candidate_id}_{job_id}",
                 type="primary",
                 use_container_width=True,
-            ):
-                update_candidate_job_status(
-                    candidate_id=candidate_id,
-                    job_id=job_id,
-                    status="applied",
-                )
-
+            )
+            apply_result = handle_mark_applied_action(
+                action_requested=apply_requested,
+                candidate_id=candidate_id,
+                job_id=job_id,
+                lifecycle_service=application_lifecycle_service,
+            )
+            if apply_result is not None and apply_result.succeeded:
+                st.toast("Opportunity marked as applied.")
                 st.rerun()
 
         url = job.get(
