@@ -303,8 +303,23 @@ def build_outcome_evidence(
             outcome.get("final_status")
         )
 
-        if not job_id or not final_status:
+        interview_stage = _normalize(
+            outcome.get("interview_stage")
+        )
+
+        if not job_id or not (final_status or interview_stage):
             continue
+
+        statement = final_status or interview_stage
+        signal_type = (
+            "final_status" if final_status else "interview_stage"
+        )
+        candidate_actions = {"accepted", "declined", "withdrawn"}
+        outcome_actor = (
+            "candidate"
+            if final_status.casefold() in candidate_actions
+            else "employer"
+        )
 
         observed_at = _normalize(
             outcome.get("outcome_date")
@@ -314,22 +329,24 @@ def build_outcome_evidence(
             evidence_type=(
                 "application_outcome"
             ),
-            signal_type="final_status",
+            signal_type=signal_type,
             source_ref=(
                 f"application_outcome:"
                 f"{job_id}:"
                 f"{observed_at}:"
-                f"{final_status.casefold()}"
+                f"{statement.casefold()}"
             ),
-            statement=final_status,
+            statement=statement,
             observed_at=observed_at,
             authority="outcome",
             metadata={
                 "job_id": job_id,
                 "interview_stage": (
-                    outcome.get(
-                        "interview_stage"
-                    )
+                    interview_stage
+                ),
+                "outcome_actor": outcome_actor,
+                "is_employer_rejection": (
+                    final_status.casefold() == "rejected"
                 ),
                 "rejection_reason": (
                     outcome.get(
