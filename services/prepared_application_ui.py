@@ -10,6 +10,20 @@ from services.application_contract_builder import (
 PREPARED_APPLICATION_STATE_PREFIX = "prepared_application"
 
 
+def _has_valid_prepared_scope(result: PrepareApplicationResult) -> bool:
+    if result.status != "prepared":
+        return True
+    return bool(
+        result.generation_status in {"validated", "validated_after_repair"}
+        and result.cv is not None
+        and result.cv.candidate_id == result.candidate_id
+        and result.cv.job_id == result.job_id
+        and result.application_context_signature
+        and result.cv.application_context_signature
+        == result.application_context_signature
+    )
+
+
 @dataclass(frozen=True)
 class PreparedCVExperienceView:
     role: str
@@ -58,6 +72,8 @@ def get_prepared_application(
     if not isinstance(value, PrepareApplicationResult):
         return None
     if value.candidate_id != candidate_id or value.job_id != job_id:
+        return None
+    if not _has_valid_prepared_scope(value):
         return None
     return value
 
@@ -108,6 +124,13 @@ def handle_prepare_application_action(
             job_id=job_id,
             error_code="scope_mismatch",
         )
+    if not _has_valid_prepared_scope(result):
+        return PrepareApplicationResult(
+            status="failed",
+            candidate_id=candidate_id,
+            job_id=job_id,
+            error_code="invalid_preparation_result",
+        )
 
     session_state[
         prepared_application_state_key(candidate_id, job_id)
@@ -116,7 +139,7 @@ def handle_prepare_application_action(
 
 
 def build_prepared_cv_view(result: PrepareApplicationResult) -> PreparedCVView | None:
-    if result.status != "prepared" or result.cv is None:
+    if result.status != "prepared" or not _has_valid_prepared_scope(result):
         return None
     cv = result.cv
     return PreparedCVView(

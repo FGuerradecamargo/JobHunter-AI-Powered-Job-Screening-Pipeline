@@ -36,8 +36,8 @@ class TailoredCVGenerationService:
         *,
         max_repair_attempts: int = 1,
     ) -> None:
-        if max_repair_attempts < 0:
-            raise ValueError("max_repair_attempts must not be negative.")
+        if max_repair_attempts not in {0, 1}:
+            raise ValueError("max_repair_attempts must be zero or one.")
         self.generator_client = generator_client
         self.max_repair_attempts = max_repair_attempts
 

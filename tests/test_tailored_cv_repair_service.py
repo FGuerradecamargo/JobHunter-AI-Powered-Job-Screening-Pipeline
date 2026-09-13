@@ -216,8 +216,6 @@ def test_repair_cannot_change_identity(field, value, code):
     result, client = _run(
         _invalid_unknown(),
         repaired,
-        _valid_output(),
-        max_repair_attempts=2,
     )
 
     assert result.status == "validation_failed"
@@ -284,17 +282,9 @@ def test_default_maximum_is_one_repair_attempt():
     assert len(client.requests) == 2
 
 
-def test_configured_maximum_is_strictly_enforced():
-    result, client = _run(
-        _invalid_unknown(),
-        _invalid_unknown(),
-        _invalid_unknown(),
-        max_repair_attempts=2,
-    )
-
-    assert result.status == "validation_failed"
-    assert result.attempt_count == 3
-    assert len(client.requests) == 3
+def test_more_than_one_repair_attempt_is_rejected():
+    with pytest.raises(ValueError, match="zero or one"):
+        _run(_invalid_unknown(), max_repair_attempts=2)
 
 
 def test_zero_repairs_preserves_initial_validation_failure():
@@ -320,7 +310,7 @@ def test_generator_exception_during_repair_fails_safely():
 
 
 def test_malformed_repair_output_fails_without_another_attempt():
-    result, client = _run(_invalid_unknown(), "not-json", max_repair_attempts=3)
+    result, client = _run(_invalid_unknown(), "not-json")
 
     assert result.status == "repair_failed"
     assert result.error_code == "invalid_repair_output"
@@ -400,7 +390,7 @@ def test_repair_request_signature_is_deterministic_and_input_sensitive():
 def test_negative_repair_limit_is_rejected_before_client_use():
     client = SequenceGeneratorClient()
 
-    with pytest.raises(ValueError, match="must not be negative"):
+    with pytest.raises(ValueError, match="zero or one"):
         TailoredCVGenerationService(client, max_repair_attempts=-1)
 
     assert client.requests == []

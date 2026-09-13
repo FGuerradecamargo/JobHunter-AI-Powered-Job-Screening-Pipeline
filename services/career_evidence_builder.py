@@ -287,6 +287,7 @@ def build_outcome_evidence(
     outcomes: list[dict[str, Any]],
 ) -> list[CareerEvidence]:
     evidence: list[CareerEvidence] = []
+    seen_sources: set[str] = set()
 
     for outcome in outcomes or []:
         if not isinstance(
@@ -382,6 +383,9 @@ def build_outcome_evidence(
         )
 
         if record is not None:
+            if record.source_ref in seen_sources:
+                continue
+            seen_sources.add(record.source_ref)
             evidence.append(record)
 
     return evidence

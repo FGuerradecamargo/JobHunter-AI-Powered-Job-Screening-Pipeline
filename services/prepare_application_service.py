@@ -163,6 +163,23 @@ class PrepareApplicationService:
                 generation_status=generation.status,
             )
 
+        if (
+            generation.cv.candidate_id != candidate_id
+            or generation.cv.job_id != job_id
+            or generation.cv.application_context_signature
+            != context.source_signature
+        ):
+            return PrepareApplicationResult(
+                status="generation_failed",
+                candidate_id=candidate_id,
+                job_id=job_id,
+                analysis_id=analysis_id,
+                application_context_signature=context.source_signature,
+                error_code="validated_cv_scope_mismatch",
+                error_message="Validated application material has an invalid scope.",
+                generation_status=generation.status,
+            )
+
         return PrepareApplicationResult(
             status="prepared",
             candidate_id=candidate_id,
