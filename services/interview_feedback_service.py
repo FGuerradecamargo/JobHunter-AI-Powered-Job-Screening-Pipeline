@@ -36,4 +36,9 @@ class InterviewFeedbackService:
             difficult_topics=list(difficult_topics or []),
             next_stage_instructions=str(next_stage_instructions or "").strip(),
         )
-        return self.repository.save(feedback)
+        saved = self.repository.save(feedback)
+        if saved.candidate_id != candidate_id or saved.job_id != job_id:
+            raise PermissionError("Saved interview feedback belongs to another scope.")
+        if saved.interview_stage != context.interview_stage:
+            raise PermissionError("Saved interview feedback has a stale stage scope.")
+        return saved

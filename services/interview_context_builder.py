@@ -29,6 +29,12 @@ def build_interview_context(
 ) -> InterviewContext:
     if not contract.eligible:
         raise ValueError("Interview Prep Contract is not eligible.")
+    if (
+        not _display(contract.analysis_id)
+        or not _display(contract.application_context_signature)
+        or not _display(contract.source_signature)
+    ):
+        raise ValueError("Interview Prep Contract signatures are incomplete.")
     if details is not None and details.candidate_id != contract.candidate_id:
         raise PermissionError("Interview details belong to another candidate.")
     if details is not None and details.job_id != contract.job_id:

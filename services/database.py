@@ -630,6 +630,20 @@ def create_security_audit_schema(
     )
 
 
+_SERVER_ONLY_INTERVIEW_TABLES = frozenset(
+    {"candidate_interview_details", "candidate_interview_feedback"}
+)
+
+
+def _enable_server_only_row_level_security(connection, table_name: str) -> None:
+    """Deny direct PostgREST access while retaining backend connection access."""
+    if not is_postgres():
+        return
+    if table_name not in _SERVER_ONLY_INTERVIEW_TABLES:
+        raise ValueError("Table is not approved for server-only RLS.")
+    connection.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
+
+
 def create_interview_details_schema(connection) -> None:
     connection.execute(
         """
@@ -650,6 +664,9 @@ def create_interview_details_schema(connection) -> None:
             FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
         )
         """
+    )
+    _enable_server_only_row_level_security(
+        connection, "candidate_interview_details"
     )
 
 
@@ -672,6 +689,9 @@ def create_interview_feedback_schema(connection) -> None:
             FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
         )
         """
+    )
+    _enable_server_only_row_level_security(
+        connection, "candidate_interview_feedback"
     )
 
 

@@ -7,6 +7,18 @@ from models.interview_context import InterviewDetails
 from services.database import get_connection, utc_now
 
 
+class InterviewDetailsDataError(ValueError):
+    pass
+
+
+def _string_list(value, field_name: str) -> list[str]:
+    if not isinstance(value, list):
+        raise InterviewDetailsDataError(f"{field_name} must be a JSON list.")
+    if any(not isinstance(item, str) for item in value):
+        raise InterviewDetailsDataError(f"{field_name} must contain only text.")
+    return value
+
+
 class InterviewDetailsRepository:
     def get(self, candidate_id: str, job_id: str) -> InterviewDetails | None:
         with get_connection() as connection:
@@ -20,9 +32,15 @@ class InterviewDetailsRepository:
         if row is None:
             return None
         values = dict(row)
-        values["explicit_topics"] = json.loads(
-            values.pop("explicit_topics_json") or "[]"
-        )
+        try:
+            values["explicit_topics"] = _string_list(
+                json.loads(values.pop("explicit_topics_json") or "[]"),
+                "explicit_topics",
+            )
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise InterviewDetailsDataError(
+                "Stored interview topics are malformed."
+            ) from exc
         return InterviewDetails(**values)
 
     def save(self, details: InterviewDetails) -> InterviewDetails:
@@ -30,6 +48,7 @@ class InterviewDetailsRepository:
             raise ValueError("candidate_id and job_id must be non-empty.")
         if details.duration_minutes is not None and details.duration_minutes <= 0:
             raise ValueError("duration_minutes must be positive when supplied.")
+        _string_list(details.explicit_topics, "explicit_topics")
 
         now = utc_now()
         values = asdict(details)

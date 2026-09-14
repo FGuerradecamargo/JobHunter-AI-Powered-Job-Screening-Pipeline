@@ -7,6 +7,18 @@ from models.interview_feedback import InterviewFeedback
 from services.database import get_connection, utc_now
 
 
+class InterviewFeedbackDataError(ValueError):
+    pass
+
+
+def _string_list(value, field_name: str) -> list[str]:
+    if not isinstance(value, list):
+        raise InterviewFeedbackDataError(f"{field_name} must be a JSON list.")
+    if any(not isinstance(item, str) for item in value):
+        raise InterviewFeedbackDataError(f"{field_name} must contain only text.")
+    return value
+
+
 class InterviewFeedbackRepository:
     def get(self, candidate_id: str, job_id: str) -> InterviewFeedback | None:
         with get_connection() as connection:
@@ -20,12 +32,19 @@ class InterviewFeedbackRepository:
         if row is None:
             return None
         values = dict(row)
-        values["discussed_topics"] = json.loads(
-            values.pop("discussed_topics_json") or "[]"
-        )
-        values["difficult_topics"] = json.loads(
-            values.pop("difficult_topics_json") or "[]"
-        )
+        try:
+            values["discussed_topics"] = _string_list(
+                json.loads(values.pop("discussed_topics_json") or "[]"),
+                "discussed_topics",
+            )
+            values["difficult_topics"] = _string_list(
+                json.loads(values.pop("difficult_topics_json") or "[]"),
+                "difficult_topics",
+            )
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise InterviewFeedbackDataError(
+                "Stored interview feedback topics are malformed."
+            ) from exc
         return InterviewFeedback(**values)
 
     def save(self, feedback: InterviewFeedback) -> InterviewFeedback:
@@ -33,6 +52,8 @@ class InterviewFeedbackRepository:
             raise ValueError("candidate_id and job_id must be non-empty.")
         if feedback.interview_stage not in {"interview", "final_interview"}:
             raise ValueError("Feedback requires an active interview stage.")
+        _string_list(feedback.discussed_topics, "discussed_topics")
+        _string_list(feedback.difficult_topics, "difficult_topics")
 
         values = asdict(feedback)
         now = utc_now()

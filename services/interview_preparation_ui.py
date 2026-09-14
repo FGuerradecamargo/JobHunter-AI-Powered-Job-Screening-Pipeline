@@ -149,6 +149,16 @@ def load_interview_preparation_view(
             or (feedback is not None and feedback.job_id != job_id)
         ):
             raise PermissionError("Job scope mismatch.")
+        if (
+            preparation.analysis_id != context.analysis_id
+            or preparation.interview_context_signature != context.source_signature
+            or preparation.interview_stage != context.interview_stage
+        ):
+            raise PermissionError("Interview preparation source mismatch.")
+        if feedback is not None and feedback.interview_stage not in {
+            "interview", "final_interview"
+        }:
+            raise PermissionError("Interview feedback stage mismatch.")
     except ValueError:
         return InterviewPreparationUIResult(visible=False)
     except Exception:

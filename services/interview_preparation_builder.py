@@ -24,6 +24,15 @@ def _key(value) -> str:
     return _text(value).casefold()
 
 
+def _unique_text(values) -> list[str]:
+    by_key = {}
+    for value in values:
+        display = _text(value)
+        if display:
+            by_key.setdefault(display.casefold(), display)
+    return [by_key[key] for key in sorted(by_key)]
+
+
 def _canonical(value):
     if isinstance(value, dict):
         return {str(k): _canonical(v) for k, v in sorted(value.items())}
@@ -168,7 +177,13 @@ def build_interview_preparation(
     context: InterviewContext,
     feedback: InterviewFeedback | None = None,
 ) -> InterviewPreparation:
-    if not context.candidate_id or not context.job_id or not context.source_signature:
+    if (
+        not context.candidate_id
+        or not context.job_id
+        or not context.analysis_id
+        or not context.interview_prep_contract_signature
+        or not context.source_signature
+    ):
         raise ValueError("Interview Context is incomplete.")
     if context.interview_stage not in {"interview", "final_interview"}:
         raise ValueError("Interview Context is not in an active interview stage.")
@@ -184,11 +199,11 @@ def build_interview_preparation(
     evidence_by_text = _evidence_index(context)
     areas = [
         _area_for_topic(topic, "explicit_interview_topic", context, evidence_by_text)
-        for topic in sorted({_text(v) for v in context.explicit_topics if _text(v)}, key=str.casefold)
+        for topic in _unique_text(context.explicit_topics)
     ]
     areas.extend(
         _area_for_topic(topic, "core_requirement", context, evidence_by_text)
-        for topic in sorted({_text(v) for v in context.core_requirements if _text(v)}, key=str.casefold)
+        for topic in _unique_text(context.core_requirements)
     )
 
     valid_refs = {item.evidence_ref for item in context.authorized_evidence}
@@ -254,14 +269,8 @@ def build_interview_preparation(
                     ),
                 )
             )
-        discussed_topics = sorted(
-            {_text(value) for value in feedback.discussed_topics if _text(value)},
-            key=str.casefold,
-        )
-        review_topics = sorted(
-            {_text(value) for value in feedback.difficult_topics if _text(value)},
-            key=str.casefold,
-        )
+        discussed_topics = _unique_text(feedback.discussed_topics)
+        review_topics = _unique_text(feedback.difficult_topics)
         if feedback.next_stage_instructions.strip():
             next_stage_instructions = [feedback.next_stage_instructions.strip()]
     signature_payload = _canonical(
