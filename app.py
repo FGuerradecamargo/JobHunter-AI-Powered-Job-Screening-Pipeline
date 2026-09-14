@@ -15,6 +15,14 @@ from services.application_outcome_ui import (
     load_application_outcome_view,
     outcome_result_message,
 )
+from models.interview_context import InterviewDetails
+from services.interview_context_service import InterviewContextService
+from services.interview_details_repository import InterviewDetailsRepository
+from services.interview_preparation_service import InterviewPreparationService
+from services.interview_preparation_ui import (
+    handle_interview_details_save,
+    load_interview_preparation_view,
+)
 from services.database import (
     count_candidate_jobs_by_status,
     initialize_database,
@@ -287,6 +295,164 @@ def render_application_outcome(
             st.error(message)
 
 
+def render_interview_preparation(
+    candidate_id: str,
+    job_id: str,
+    status: str,
+) -> None:
+    details_repository = InterviewDetailsRepository()
+    context_service = InterviewContextService(
+        details_repository=details_repository,
+    )
+    preparation_service = InterviewPreparationService(
+        context_service=context_service,
+    )
+    result = load_interview_preparation_view(
+        candidate_id=candidate_id,
+        job_id=job_id,
+        lifecycle_status=status,
+        context_service=context_service,
+        preparation_service=preparation_service,
+        details_repository=details_repository,
+    )
+    if result.error_message:
+        st.error(result.error_message)
+        return
+    if not result.visible or result.view is None or result.details is None:
+        return
+
+    view = result.view
+    details = result.details
+    st.divider()
+    st.subheader(view.title)
+    identity = " · ".join(value for value in (view.role, view.company) if value)
+    if identity:
+        st.markdown(f"**{identity}**")
+    metadata = [
+        value
+        for value in (
+            view.stage,
+            view.interview_type,
+            view.interview_format,
+            view.interviewer,
+            view.duration,
+            view.scheduled_at,
+        )
+        if value
+    ]
+    if metadata:
+        st.caption(" · ".join(metadata))
+    if view.summary_guidance:
+        st.info(view.summary_guidance)
+
+    if view.interview_instructions:
+        st.markdown("**Interview instructions**")
+        for instruction in view.interview_instructions:
+            st.write(instruction)
+
+    for area in view.preparation_areas:
+        st.markdown(f"#### {area.topic}")
+        st.caption(area.priority_label)
+        if area.source_label:
+            st.markdown(f"**{area.source_label}**")
+        if area.what_to_demonstrate:
+            st.markdown("**What to demonstrate**")
+            st.write(area.what_to_demonstrate)
+        if area.example_direction:
+            st.markdown("**Look for a real example where**")
+            st.write(area.example_direction)
+        if area.emphasis:
+            st.markdown("**Emphasize**")
+            st.write(area.emphasis)
+        if area.caution:
+            st.markdown("**Be careful**")
+            st.warning(area.caution)
+
+    if view.rehearsal_prompts:
+        st.markdown("**Think through**")
+        for prompt in view.rehearsal_prompts:
+            st.write(f"- {prompt}")
+    if view.questions_to_ask_the_company:
+        st.markdown("**Questions to ask the company**")
+        for question in view.questions_to_ask_the_company:
+            st.write(f"- {question}")
+
+    edit_details = st.toggle(
+        "Edit interview details",
+        key=f"edit_interview_details_{candidate_id}_{job_id}",
+    )
+    if edit_details:
+        with st.form(f"interview_details_{candidate_id}_{job_id}"):
+            interview_type = st.text_input(
+                "Interview type",
+                value=details.interview_type,
+            )
+            interview_format = st.text_input(
+                "Format",
+                value=details.interview_format,
+            )
+            interviewer = st.text_input(
+                "Interviewer",
+                value=details.interviewer,
+            )
+            duration_minutes = st.number_input(
+                "Duration in minutes",
+                min_value=0,
+                step=5,
+                value=details.duration_minutes or 0,
+            )
+            scheduled_at = st.text_input(
+                "Scheduled time",
+                value=details.scheduled_at,
+            )
+            instructions = st.text_area(
+                "Instructions from the recruiter",
+                value=details.instructions,
+            )
+            explicit_topics = st.text_area(
+                "Topics explicitly mentioned",
+                value="\n".join(details.explicit_topics),
+                placeholder="One topic per line",
+            )
+            save_requested = st.form_submit_button(
+                "Save interview details",
+                type="primary",
+            )
+
+        if save_requested:
+            updated = InterviewDetails(
+                candidate_id=candidate_id,
+                job_id=job_id,
+                interview_type=interview_type,
+                interview_format=interview_format,
+                interviewer=interviewer,
+                duration_minutes=(int(duration_minutes) or None),
+                scheduled_at=scheduled_at,
+                instructions=instructions,
+                explicit_topics=[
+                    value.strip()
+                    for value in explicit_topics.splitlines()
+                    if value.strip()
+                ],
+            )
+            save_result = handle_interview_details_save(
+                st.session_state,
+                candidate_id=candidate_id,
+                job_id=job_id,
+                lifecycle_status=status,
+                save_requested=True,
+                details=updated,
+                details_repository=details_repository,
+                context_service=context_service,
+                preparation_service=preparation_service,
+            )
+            if save_result.saved:
+                st.toast("Interview details saved.")
+                st.rerun()
+            else:
+                st.error(save_result.error_message)
+
+
 def render_job(
     candidate_id: str,
     item: dict,
@@ -399,95 +565,11 @@ def render_job(
             status_label=status_label,
         )
 
-        if status == "in_process":
-            interview_prep = analysis.get(
-                "interview_prep"
-            )
-
-            if interview_prep:
-                st.divider()
-                st.subheader(
-                    "Interview Preparation"
-                )
-
-                what_the_company_needs = (
-                    interview_prep.get(
-                        "what_the_company_needs",
-                        "",
-                    )
-                )
-
-                if what_the_company_needs:
-                    st.markdown(
-                        "**What the company needs**"
-                    )
-                    st.write(
-                        what_the_company_needs
-                    )
-
-                what_you_should_demonstrate = (
-                    interview_prep.get(
-                        "what_you_should_demonstrate",
-                        [],
-                    )
-                )
-
-                if what_you_should_demonstrate:
-                    render_list(
-                        "What you should demonstrate",
-                        what_you_should_demonstrate,
-                    )
-
-                strongest_evidence = (
-                    interview_prep.get(
-                        "strongest_evidence",
-                        [],
-                    )
-                )
-
-                if strongest_evidence:
-                    render_list(
-                        "Your strongest evidence",
-                        strongest_evidence,
-                    )
-
-                points_to_be_careful_with = (
-                    interview_prep.get(
-                        "points_to_be_careful_with",
-                        [],
-                    )
-                )
-
-                if points_to_be_careful_with:
-                    render_list(
-                        "Points to be careful with",
-                        points_to_be_careful_with,
-                    )
-
-                likely_interview_topics = (
-                    interview_prep.get(
-                        "likely_interview_topics",
-                        [],
-                    )
-                )
-
-                if likely_interview_topics:
-                    render_list(
-                        "Likely interview topics",
-                        likely_interview_topics,
-                    )
-
-                positioning = interview_prep.get(
-                    "positioning",
-                    "",
-                )
-
-                if positioning:
-                    render_text_section(
-                        "Your positioning",
-                        positioning,
-                        "No positioning guidance available.",
-                    )
+        render_interview_preparation(
+            candidate_id=candidate_id,
+            job_id=job_id,
+            status=status,
+        )
 
         st.divider()
 
