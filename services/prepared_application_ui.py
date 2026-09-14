@@ -94,6 +94,8 @@ def handle_prepare_application_action(
     )
     if not action_requested:
         return current
+    if current is not None and current.status == "prepared":
+        return current
     if not is_prepare_application_eligible(analysis):
         return PrepareApplicationResult(
             status="ineligible",
@@ -171,4 +173,8 @@ def prepared_application_error_message(
         return "The generated material did not pass validation."
     if result.error_code == "preparation_unavailable":
         return "Application preparation is currently unavailable."
+    if result.error_code == "generation_in_progress":
+        return "This tailored CV is already being generated. Please wait."
+    if result.error_code == "generation_claim_failed":
+        return "Application preparation is temporarily unavailable."
     return "We could not prepare this application."

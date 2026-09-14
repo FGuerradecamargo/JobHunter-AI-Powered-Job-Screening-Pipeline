@@ -365,3 +365,87 @@ def test_invalid_request_does_not_enter_pipeline():
 
     assert result.error_code == "invalid_request"
     assert contract_service.calls == []
+
+
+class FakeClaimRepository:
+    def __init__(self, acquired=True, error=None):
+        self.acquired = acquired
+        self.error = error
+        self.acquisitions = []
+        self.releases = []
+
+    def acquire(self, **values):
+        self.acquisitions.append(values)
+        if self.error:
+            raise self.error
+        return self.acquired
+
+    def release(self, **values):
+        self.releases.append(values)
+        return True
+
+
+def test_persistent_claim_wraps_exactly_one_generation_call():
+    claims = FakeClaimRepository()
+    generation = FakeGenerationService()
+    service = PrepareApplicationService(
+        contract_service=FakeContractService(),
+        context_service=FakeContextService(),
+        generation_service=generation,
+        claim_repository=claims,
+    )
+    result = service.prepare("candidate-a", "job-1")
+    assert result.status == "prepared"
+    assert len(generation.calls) == 1
+    assert len(claims.acquisitions) == 1
+    assert len(claims.releases) == 1
+    assert claims.acquisitions[0]["application_context_signature"] == (
+        _context().source_signature
+    )
+    assert claims.releases[0]["claim_token"] == (
+        claims.acquisitions[0]["claim_token"]
+    )
+
+
+def test_active_claim_prevents_transport():
+    claims = FakeClaimRepository(acquired=False)
+    generation = FakeGenerationService()
+    service = PrepareApplicationService(
+        contract_service=FakeContractService(),
+        context_service=FakeContextService(),
+        generation_service=generation,
+        claim_repository=claims,
+    )
+    result = service.prepare("candidate-a", "job-1")
+    assert result.error_code == "generation_in_progress"
+    assert generation.calls == []
+    assert claims.releases == []
+
+
+def test_claim_failure_prevents_transport_and_returns_safe_failure():
+    claims = FakeClaimRepository(error=RuntimeError("private database detail"))
+    generation = FakeGenerationService()
+    service = PrepareApplicationService(
+        contract_service=FakeContractService(),
+        context_service=FakeContextService(),
+        generation_service=generation,
+        claim_repository=claims,
+    )
+    result = service.prepare("candidate-a", "job-1")
+    assert result.error_code == "generation_claim_failed"
+    assert "private database detail" not in result.error_message
+    assert generation.calls == []
+
+
+def test_transport_failure_releases_owned_claim():
+    claims = FakeClaimRepository()
+    generation = FakeGenerationService(error=RuntimeError("transport failed"))
+    service = PrepareApplicationService(
+        contract_service=FakeContractService(),
+        context_service=FakeContextService(),
+        generation_service=generation,
+        claim_repository=claims,
+    )
+    result = service.prepare("candidate-a", "job-1")
+    assert result.error_code == "generation_service_error"
+    assert len(claims.releases) == 1

@@ -43,6 +43,9 @@ from services.market_position_service import (
 )
 
 from services.ai_usage_budget import AIUsageBudget
+from services.prepare_application_factory import (
+    build_production_prepare_application_service,
+)
 
 from services.database import (
     activate_candidate_opportunities,
@@ -75,8 +78,27 @@ render_logout_button()
 
 repository = JobSearchRepository()
 candidate_repository = CandidateRepository()
-analysis_service = CandidateJobAnalysisService()
 application_lifecycle_service = ApplicationLifecycleService()
+
+try:
+    analysis_service = CandidateJobAnalysisService()
+    analysis_configuration_error = ""
+except Exception:
+    analysis_service = None
+    analysis_configuration_error = (
+        "Opportunity analysis is currently unavailable."
+    )
+
+try:
+    production_preparation_service = (
+        build_production_prepare_application_service()
+    )
+    preparation_configuration_error = ""
+except Exception:
+    production_preparation_service = None
+    preparation_configuration_error = (
+        "Tailored CV generation is currently unavailable."
+    )
 
 
 
@@ -599,11 +621,15 @@ st.button(
     ),
     type="primary",
     use_container_width=True,
-    disabled=st.session_state[
-        "scan_in_progress"
-    ],
+    disabled=(
+        st.session_state["scan_in_progress"]
+        or analysis_service is None
+    ),
     on_click=request_opportunity_scan,
 )
+
+if analysis_configuration_error:
+    st.caption(analysis_configuration_error)
 
 
 if st.session_state["scan_in_progress"]:
@@ -1567,8 +1593,14 @@ def render_job(
         eligible_for_preparation = is_prepare_application_eligible(analysis)
         if eligible_for_preparation:
             preparation_service = st.session_state.get(
-                "_prepare_application_service"
+                "_prepare_application_service",
+                production_preparation_service,
             )
+            st.caption(
+                "Generates a tailored CV for this opportunity using AI."
+            )
+            if preparation_configuration_error:
+                st.caption(preparation_configuration_error)
             prepare_requested = st.button(
                 "Prepare Application",
                 key=f"prepare_application_{candidate_id}_{job_id}",

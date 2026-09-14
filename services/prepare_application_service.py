@@ -1,5 +1,9 @@
 from models.prepare_application import PrepareApplicationResult
 from services.application_contract_service import ApplicationAnalysisNotFoundError
+from uuid import uuid4
+
+
+PREPARATION_GENERATION_CLAIM_TTL_SECONDS = 900
 
 
 class PrepareApplicationService:
@@ -9,10 +13,12 @@ class PrepareApplicationService:
         contract_service,
         context_service,
         generation_service,
+        claim_repository=None,
     ) -> None:
         self.contract_service = contract_service
         self.context_service = context_service
         self.generation_service = generation_service
+        self.claim_repository = claim_repository
 
     def prepare(self, candidate_id: str, job_id: str) -> PrepareApplicationResult:
         candidate_id = str(candidate_id or "").strip()
@@ -122,18 +128,62 @@ class PrepareApplicationService:
                 error_message="Application context scope is invalid.",
             )
 
+        claim_token = "preparation_generation_claim_" + uuid4().hex
+        claim_acquired = False
+        if self.claim_repository is not None:
+            try:
+                claim_acquired = self.claim_repository.acquire(
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    application_context_signature=context.source_signature,
+                    claim_token=claim_token,
+                    ttl_seconds=PREPARATION_GENERATION_CLAIM_TTL_SECONDS,
+                )
+            except Exception:
+                return PrepareApplicationResult(
+                    status="generation_failed",
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    analysis_id=analysis_id,
+                    application_context_signature=context.source_signature,
+                    error_code="generation_claim_failed",
+                    error_message="Application generation could not be reserved safely.",
+                )
+            if not claim_acquired:
+                return PrepareApplicationResult(
+                    status="generation_failed",
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    analysis_id=analysis_id,
+                    application_context_signature=context.source_signature,
+                    error_code="generation_in_progress",
+                    error_message="Application generation is already in progress.",
+                )
+
         try:
-            generation = self.generation_service.generate(context)
-        except Exception:
-            return PrepareApplicationResult(
-                status="generation_failed",
-                candidate_id=candidate_id,
-                job_id=job_id,
-                analysis_id=analysis_id,
-                application_context_signature=context.source_signature,
-                error_code="generation_service_error",
-                error_message="Application material generation failed safely.",
-            )
+            try:
+                generation = self.generation_service.generate(context)
+            except Exception:
+                return PrepareApplicationResult(
+                    status="generation_failed",
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    analysis_id=analysis_id,
+                    application_context_signature=context.source_signature,
+                    error_code="generation_service_error",
+                    error_message="Application material generation failed safely.",
+                )
+        finally:
+            if claim_acquired:
+                try:
+                    self.claim_repository.release(
+                        candidate_id=candidate_id,
+                        job_id=job_id,
+                        application_context_signature=context.source_signature,
+                        claim_token=claim_token,
+                    )
+                except Exception:
+                    pass
 
         if generation.status not in {"validated", "validated_after_repair"}:
             return PrepareApplicationResult(

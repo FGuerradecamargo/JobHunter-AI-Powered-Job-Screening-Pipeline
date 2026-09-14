@@ -159,6 +159,29 @@ def test_rerender_reads_cached_result_without_regeneration():
     assert service.calls == [("candidate-a", "job-1")]
 
 
+def test_second_explicit_click_reuses_valid_session_result():
+    state = {}
+    service = FakePreparationService()
+    first = handle_prepare_application_action(
+        state,
+        candidate_id="candidate-a",
+        job_id="job-1",
+        analysis={"recommendation": "best_match"},
+        action_requested=True,
+        preparation_service=service,
+    )
+    second = handle_prepare_application_action(
+        state,
+        candidate_id="candidate-a",
+        job_id="job-1",
+        analysis={"recommendation": "best_match"},
+        action_requested=True,
+        preparation_service=service,
+    )
+    assert second == first
+    assert service.calls == [("candidate-a", "job-1")]
+
+
 def test_candidate_a_result_is_not_visible_to_candidate_b():
     state = {
         prepared_application_state_key("candidate-a", "job-1"): _prepared()

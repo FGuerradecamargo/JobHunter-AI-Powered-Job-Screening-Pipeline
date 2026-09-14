@@ -631,7 +631,11 @@ def create_security_audit_schema(
 
 
 _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
-    {"candidate_interview_details", "candidate_interview_feedback"}
+    {
+        "candidate_interview_details",
+        "candidate_interview_feedback",
+        "candidate_preparation_generation_claims",
+    }
 )
 
 
@@ -692,6 +696,29 @@ def create_interview_feedback_schema(connection) -> None:
     )
     _enable_server_only_row_level_security(
         connection, "candidate_interview_feedback"
+    )
+
+
+def create_preparation_generation_claim_schema(connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS candidate_preparation_generation_claims (
+            candidate_id TEXT NOT NULL,
+            job_id TEXT NOT NULL,
+            application_context_signature TEXT NOT NULL,
+            claim_token TEXT NOT NULL,
+            claimed_at TEXT NOT NULL,
+            claim_expires_at TEXT NOT NULL,
+            PRIMARY KEY (
+                candidate_id, job_id, application_context_signature
+            ),
+            FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE,
+            FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+        )
+        """
+    )
+    _enable_server_only_row_level_security(
+        connection, "candidate_preparation_generation_claims"
     )
 
 
@@ -887,6 +914,7 @@ def initialize_postgres_database() -> None:
 
         create_interview_details_schema(connection)
         create_interview_feedback_schema(connection)
+        create_preparation_generation_claim_schema(connection)
 
         connection.execute(
             """
@@ -1739,6 +1767,7 @@ def initialize_sqlite_database() -> None:
 
         create_interview_details_schema(connection)
         create_interview_feedback_schema(connection)
+        create_preparation_generation_claim_schema(connection)
 
         connection.execute(
             """
