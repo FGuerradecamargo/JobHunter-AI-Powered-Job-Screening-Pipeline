@@ -653,6 +653,28 @@ def create_interview_details_schema(connection) -> None:
     )
 
 
+def create_interview_feedback_schema(connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS candidate_interview_feedback (
+            candidate_id TEXT NOT NULL,
+            job_id TEXT NOT NULL,
+            interview_stage TEXT NOT NULL,
+            recruiter_feedback TEXT NOT NULL DEFAULT '',
+            candidate_notes TEXT NOT NULL DEFAULT '',
+            discussed_topics_json TEXT NOT NULL DEFAULT '[]',
+            difficult_topics_json TEXT NOT NULL DEFAULT '[]',
+            next_stage_instructions TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (candidate_id, job_id),
+            FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE,
+            FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+
 def initialize_postgres_database() -> None:
     with get_connection() as connection:
         connection.execute(
@@ -844,6 +866,7 @@ def initialize_postgres_database() -> None:
         )
 
         create_interview_details_schema(connection)
+        create_interview_feedback_schema(connection)
 
         connection.execute(
             """
@@ -1695,6 +1718,7 @@ def initialize_sqlite_database() -> None:
         )
 
         create_interview_details_schema(connection)
+        create_interview_feedback_schema(connection)
 
         connection.execute(
             """

@@ -4,7 +4,12 @@ from dataclasses import asdict
 import re
 
 from models.interview_context import InterviewContext
-from models.interview_preparation import InterviewPreparation, PreparationArea
+from models.interview_feedback import InterviewFeedback
+from models.interview_preparation import (
+    InterviewFeedbackGuidance,
+    InterviewPreparation,
+    PreparationArea,
+)
 from services.career_memory_source_builder import build_source_signature
 
 
@@ -159,11 +164,22 @@ def _interview_instructions(context: InterviewContext) -> list[str]:
     return instructions
 
 
-def build_interview_preparation(context: InterviewContext) -> InterviewPreparation:
+def build_interview_preparation(
+    context: InterviewContext,
+    feedback: InterviewFeedback | None = None,
+) -> InterviewPreparation:
     if not context.candidate_id or not context.job_id or not context.source_signature:
         raise ValueError("Interview Context is incomplete.")
     if context.interview_stage not in {"interview", "final_interview"}:
         raise ValueError("Interview Context is not in an active interview stage.")
+    if feedback is not None and feedback.candidate_id != context.candidate_id:
+        raise PermissionError("Interview feedback belongs to another candidate.")
+    if feedback is not None and feedback.job_id != context.job_id:
+        raise PermissionError("Interview feedback belongs to another job.")
+    if feedback is not None and feedback.interview_stage not in {
+        "interview", "final_interview"
+    }:
+        raise PermissionError("Interview feedback has an invalid stage scope.")
 
     evidence_by_text = _evidence_index(context)
     areas = [
@@ -211,6 +227,43 @@ def build_interview_preparation(context: InterviewContext) -> InterviewPreparati
         for area in areas
         if area.source_type in {"core_requirement", "explicit_interview_topic"}
     ]
+    explicit_feedback = []
+    discussed_topics = []
+    review_topics = []
+    next_stage_instructions = []
+    if feedback is not None:
+        if feedback.recruiter_feedback.strip():
+            explicit_feedback.append(
+                InterviewFeedbackGuidance(
+                    source_type="recruiter_feedback",
+                    text=feedback.recruiter_feedback.strip(),
+                    guidance=(
+                        "Address this explicit recruiter feedback using only real, "
+                        "authorized examples; do not treat it as a causal conclusion."
+                    ),
+                )
+            )
+        if feedback.candidate_notes.strip():
+            explicit_feedback.append(
+                InterviewFeedbackGuidance(
+                    source_type="candidate_self_report",
+                    text=feedback.candidate_notes.strip(),
+                    guidance=(
+                        "Use this self-report to guide review, without treating it as "
+                        "a verified professional fact."
+                    ),
+                )
+            )
+        discussed_topics = sorted(
+            {_text(value) for value in feedback.discussed_topics if _text(value)},
+            key=str.casefold,
+        )
+        review_topics = sorted(
+            {_text(value) for value in feedback.difficult_topics if _text(value)},
+            key=str.casefold,
+        )
+        if feedback.next_stage_instructions.strip():
+            next_stage_instructions = [feedback.next_stage_instructions.strip()]
     signature_payload = _canonical(
         {
             "schema_version": INTERVIEW_PREPARATION_SCHEMA_VERSION,
@@ -226,6 +279,18 @@ def build_interview_preparation(context: InterviewContext) -> InterviewPreparati
                 "themes": [asdict(item) for item in context.positioning_themes],
                 "development_gaps": context.development_gaps,
                 "structural_gaps": context.structural_gaps,
+                "feedback": (
+                    {
+                        "stage": feedback.interview_stage,
+                        "recruiter_feedback": feedback.recruiter_feedback,
+                        "candidate_notes": feedback.candidate_notes,
+                        "discussed_topics": feedback.discussed_topics,
+                        "difficult_topics": feedback.difficult_topics,
+                        "next_stage_instructions": feedback.next_stage_instructions,
+                    }
+                    if feedback is not None
+                    else None
+                ),
             },
         }
     )
@@ -240,6 +305,10 @@ def build_interview_preparation(context: InterviewContext) -> InterviewPreparati
         interview_instructions=_interview_instructions(context),
         questions_to_ask_the_company=questions,
         rehearsal_prompts=rehearsals,
+        explicit_feedback=explicit_feedback,
+        previously_discussed_topics=discussed_topics,
+        review_topics=review_topics,
+        next_stage_instructions=next_stage_instructions,
         source_signature=build_source_signature(signature_payload),
         schema_version=INTERVIEW_PREPARATION_SCHEMA_VERSION,
     )

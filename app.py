@@ -18,9 +18,12 @@ from services.application_outcome_ui import (
 from models.interview_context import InterviewDetails
 from services.interview_context_service import InterviewContextService
 from services.interview_details_repository import InterviewDetailsRepository
+from services.interview_feedback_repository import InterviewFeedbackRepository
+from services.interview_feedback_service import InterviewFeedbackService
 from services.interview_preparation_service import InterviewPreparationService
 from services.interview_preparation_ui import (
     handle_interview_details_save,
+    handle_interview_feedback_save,
     load_interview_preparation_view,
 )
 from services.database import (
@@ -301,11 +304,17 @@ def render_interview_preparation(
     status: str,
 ) -> None:
     details_repository = InterviewDetailsRepository()
+    feedback_repository = InterviewFeedbackRepository()
     context_service = InterviewContextService(
         details_repository=details_repository,
     )
     preparation_service = InterviewPreparationService(
         context_service=context_service,
+        feedback_repository=feedback_repository,
+    )
+    feedback_service = InterviewFeedbackService(
+        context_service=context_service,
+        repository=feedback_repository,
     )
     result = load_interview_preparation_view(
         candidate_id=candidate_id,
@@ -314,6 +323,7 @@ def render_interview_preparation(
         context_service=context_service,
         preparation_service=preparation_service,
         details_repository=details_repository,
+        feedback_repository=feedback_repository,
     )
     if result.error_message:
         st.error(result.error_message)
@@ -323,6 +333,7 @@ def render_interview_preparation(
 
     view = result.view
     details = result.details
+    feedback = result.feedback
     st.divider()
     st.subheader(view.title)
     identity = " · ".join(value for value in (view.role, view.company) if value)
@@ -349,6 +360,25 @@ def render_interview_preparation(
         st.markdown("**Interview instructions**")
         for instruction in view.interview_instructions:
             st.write(instruction)
+
+    if view.recruiter_feedback:
+        st.markdown("**Explicit recruiter feedback to address**")
+        for item in view.recruiter_feedback:
+            st.write(item)
+    if view.candidate_self_reports:
+        st.markdown("**Your notes from the previous interview**")
+        for item in view.candidate_self_reports:
+            st.write(item)
+    if view.previously_discussed_topics:
+        st.markdown("**Previously discussed**")
+        st.write(" · ".join(view.previously_discussed_topics))
+    if view.review_topics:
+        st.markdown("**Review before the next stage**")
+        st.write(" · ".join(view.review_topics))
+    if view.next_stage_instructions:
+        st.markdown("**Instructions for the next stage**")
+        for item in view.next_stage_instructions:
+            st.write(item)
 
     for area in view.preparation_areas:
         st.markdown(f"#### {area.topic}")
@@ -445,9 +475,74 @@ def render_interview_preparation(
                 details_repository=details_repository,
                 context_service=context_service,
                 preparation_service=preparation_service,
+                feedback_repository=feedback_repository,
             )
             if save_result.saved:
                 st.toast("Interview details saved.")
+                st.rerun()
+            else:
+                st.error(save_result.error_message)
+
+    edit_feedback = st.toggle(
+        "Add interview feedback",
+        key=f"edit_interview_feedback_{candidate_id}_{job_id}",
+    )
+    if edit_feedback and feedback is not None:
+        with st.form(f"interview_feedback_{candidate_id}_{job_id}"):
+            recruiter_feedback = st.text_area(
+                "Recruiter feedback",
+                value=feedback.recruiter_feedback,
+            )
+            candidate_notes = st.text_area(
+                "Your notes about what happened",
+                value=feedback.candidate_notes,
+            )
+            discussed_topics = st.text_area(
+                "Topics discussed",
+                value="\n".join(feedback.discussed_topics),
+                placeholder="One topic per line",
+            )
+            difficult_topics = st.text_area(
+                "Topics to review",
+                value="\n".join(feedback.difficult_topics),
+                placeholder="One topic per line",
+            )
+            next_stage_instructions = st.text_area(
+                "Instructions for the next stage",
+                value=feedback.next_stage_instructions,
+            )
+            save_feedback_requested = st.form_submit_button(
+                "Save interview feedback",
+                type="primary",
+            )
+        if save_feedback_requested:
+            save_result = handle_interview_feedback_save(
+                st.session_state,
+                candidate_id=candidate_id,
+                job_id=job_id,
+                lifecycle_status=status,
+                save_requested=True,
+                recruiter_feedback=recruiter_feedback,
+                candidate_notes=candidate_notes,
+                discussed_topics=[
+                    value.strip()
+                    for value in discussed_topics.splitlines()
+                    if value.strip()
+                ],
+                difficult_topics=[
+                    value.strip()
+                    for value in difficult_topics.splitlines()
+                    if value.strip()
+                ],
+                next_stage_instructions=next_stage_instructions,
+                feedback_service=feedback_service,
+                feedback_repository=feedback_repository,
+                context_service=context_service,
+                preparation_service=preparation_service,
+                details_repository=details_repository,
+            )
+            if save_result.saved:
+                st.toast("Interview feedback saved.")
                 st.rerun()
             else:
                 st.error(save_result.error_message)
