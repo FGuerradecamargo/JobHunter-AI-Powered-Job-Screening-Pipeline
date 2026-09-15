@@ -1,5 +1,5 @@
 import logging
-from uuid import uuid4
+from services.opportunity_search_run import OpportunitySearchRun
 
 logger = logging.getLogger(__name__)
 
@@ -338,9 +338,6 @@ OPPORTUNITY_TARGETS = {
     "Deep - 15 opportunities": 15,
 }
 
-INTERNAL_SCREENING_BATCH = 10
-
-
 def empty_scan_result() -> dict:
     return {
         "selected": 0,
@@ -561,33 +558,50 @@ def merge_activation_result(
     )
 
 
-if "scan_in_progress" not in st.session_state:
-    st.session_state["scan_in_progress"] = False
+search_scope = (
+    authenticated_user.id, active_user.id, candidate_id, candidate_signature,
+)
+search_run = st.session_state.get("opportunity_search_run")
+if search_run is not None and search_run.scope != search_scope:
+    # A changed actor, candidate or profile must not continue an older search.
+    st.session_state.pop("opportunity_search_run", None)
+    search_run = None
+    for key in (
+        "last_scan_result", "last_scan_total", "last_links_created",
+        "last_scan_target", "last_pool_remaining",
+    ):
+        st.session_state.pop(key, None)
 
-if "scan_requested" not in st.session_state:
-    st.session_state["scan_requested"] = False
+st.session_state["scan_in_progress"] = (
+    search_run is not None and search_run.status == "running"
+)
+search_execution_ready = not st.get_option("runner.fastReruns")
+if not search_execution_ready:
+    if search_run is not None:
+        search_run.stop(search_scope, search_run.scan_id)
+    st.warning("Search is temporarily unavailable. Please try again later.")
 
 
 def request_opportunity_scan() -> None:
     st.session_state["scan_requested"] = True
-    st.session_state["scan_in_progress"] = True
 
 
-pool_available = (
-    repository
-    .count_jobs_to_analyze_for_candidate(
-        candidate_id=candidate_id,
-        analysis_version=ANALYSIS_VERSION,
-        candidate_signature=candidate_signature,
-    )
+def stop_opportunity_scan(scope: tuple, scan_id: str) -> None:
+    run = st.session_state.get("opportunity_search_run")
+    if run is not None:
+        run.stop(scope, scan_id)
+
+
+pool_available = repository.count_jobs_to_analyze_for_candidate(
+    candidate_id=candidate_id,
+    analysis_version=ANALYSIS_VERSION,
+    candidate_signature=candidate_signature,
 )
 
 st.html(
     f"""
     <div class="wp-pool-card">
-        <div class="wp-pool-number">
-            {pool_available:,}
-        </div>
+        <div class="wp-pool-number">{pool_available:,}</div>
         <div class="wp-pool-label">
             opportunities currently available for screening
         </div>
@@ -597,329 +611,123 @@ st.html(
 
 target_label = st.selectbox(
     "How many opportunities would you like me to find?",
-    list(
-        OPPORTUNITY_TARGETS.keys()
-    ),
+    list(OPPORTUNITY_TARGETS.keys()),
     index=1,
-    disabled=st.session_state[
-        "scan_in_progress"
-    ],
+    disabled=st.session_state["scan_in_progress"],
 )
-
-target_opportunities = (
-    OPPORTUNITY_TARGETS[
-        target_label
-    ]
-)
-
+target_opportunities = OPPORTUNITY_TARGETS[target_label]
 
 st.button(
-    (
-        "Searching for opportunities..."
-        if st.session_state["scan_in_progress"]
-        else "Find opportunities for me"
-    ),
+    "Searching for opportunities..."
+    if st.session_state["scan_in_progress"]
+    else "Find opportunities for me",
     type="primary",
     use_container_width=True,
-    disabled=(
-        st.session_state["scan_in_progress"]
-        or analysis_service is None
-    ),
+    disabled=(st.session_state["scan_in_progress"] or analysis_service is None
+              or not search_execution_ready),
     on_click=request_opportunity_scan,
 )
-
 if analysis_configuration_error:
     st.caption(analysis_configuration_error)
 
-
-if st.session_state["scan_in_progress"]:
-    st.info(
-        "I'm working through the available jobs now. "
-        "This can take a few minutes, especially when there are "
-        "many roles to screen. Please keep this page open and "
-        "don't refresh it while the search is running. "
-        "If you fancy one, this is a good time to grab a coffee "
-        "or a cup of tea - I'll keep working here."
+if (st.session_state.pop("scan_requested", False)
+        and not st.session_state["scan_in_progress"]
+        and search_execution_ready and analysis_service is not None):
+    search_run = OpportunitySearchRun(
+        authenticated_user_id=authenticated_user.id,
+        active_user_id=active_user.id,
+        candidate_id=candidate_id,
+        context_signature=candidate_signature,
+        target=target_opportunities,
+        aggregate=empty_scan_result(),
+        budget=AIUsageBudget.unlimited(),
     )
-
-
-if st.session_state.pop(
-    "scan_requested",
-    False,
-):
-    aggregate = empty_scan_result()
-
-    # One user-requested search owns one immutable scan ID.
-    #
-    # The search may screen several internal waves before
-    # reaching its Quick / Standard / Deep opportunity target,
-    # but all trace rows belong to this same logical scan.
-    scan_id = (
-        "candidate_job_scan_"
-        + uuid4().hex
-    )
-
-    # Unlimited for now.
-    #
-    # Later this comes from the user's subscription
-    # allowance and/or extra analysis credits.
-    ai_budget = (
-        AIUsageBudget.unlimited()
-    )
-
-    links_created = 0
-
-    try:
-        with st.status(
-            "Finding the right opportunities for you...",
-            expanded=True,
-        ) as search_status:
-            progress_display = st.empty()
-
-            progress_display.markdown(
-                """
-                **Starting your search**
-
-                Preparing the first group of opportunities...
-                """
-            )
-
-            # First use worthwhile analyses that were already
-            # paid for in an earlier scan but not yet activated.
-            initially_needed = max(
-                0,
-                target_opportunities
-                - aggregate["opportunities_found"],
-            )
-
-            initial_activation = (
-                activate_ready_opportunities(
-                    candidate_id=candidate_id,
-                    limit=initially_needed,
-                )
-            )
-
-            merge_activation_result(
-                aggregate,
-                initial_activation,
-            )
-
-            while (
-                aggregate["opportunities_found"]
-                < target_opportunities
-            ):
-                jobs = (
-                    repository
-                    .list_jobs_to_analyze_for_candidate(
-                        candidate_id=candidate_id,
-                        analysis_version=ANALYSIS_VERSION,
-                        candidate_signature=candidate_signature,
-                        limit=INTERNAL_SCREENING_BATCH,
-                        target_families=(
-                            candidate.target_role_families
-                        ),
-                        bridge_families=(
-                            candidate.bridge_role_families
-                        ),
-                        competitive_families=(
-                            candidate.competitive_role_families
-                        ),
-                    )
-                )
-
-                if not jobs:
-                    break
-
-                reviewed_so_far = aggregate.get(
-                    "selected",
-                    0,
-                )
-
-                opportunities_so_far = aggregate.get(
-                    "opportunities_found",
-                    0,
-                )
-
-                search_status.update(
-                    label=(
-                        f"Reviewing the market — "
-                        f"{reviewed_so_far} jobs reviewed, "
-                        f"{opportunities_so_far} opportunities found"
-                    ),
-                    state="running",
-                    expanded=True,
-                )
-
-                progress_display.markdown(
-                    f"""
-                    **{reviewed_so_far} jobs reviewed**
-
-                    **{opportunities_so_far} opportunities found**
-
-                    Analysing the next {len(jobs)} jobs...
-                    """
-                )
-
-                selected_job_ids = [
-                    str(job["id"])
-                    for job in jobs
-                ]
-
-                for job in jobs:
-                    created = (
-                        ensure_candidate_job_analysis(
-                            candidate_id=candidate_id,
-                            job_id=job["id"],
-                        )
-                    )
-
-                    if created:
-                        links_created += 1
-
-                batch_result = (
-                    analysis_service.analyze_pending(
-                        candidate_id=candidate_id,
-                        limit=len(selected_job_ids),
-                        ai_budget=ai_budget,
-                        job_ids=selected_job_ids,
-                        scan_id=scan_id,
-                    )
-                )
-
-                merge_scan_result(
-                    aggregate,
-                    batch_result,
-                )
-
-                remaining_to_activate = max(
-                    0,
-                    target_opportunities
-                    - aggregate[
-                        "opportunities_found"
-                    ],
-                )
-
-                new_activation = (
-                    activate_ready_opportunities(
-                        candidate_id=candidate_id,
-                        limit=remaining_to_activate,
-                    )
-                )
-
-                merge_activation_result(
-                    aggregate,
-                    new_activation,
-                )
-
-                reviewed_so_far = aggregate.get(
-                    "selected",
-                    0,
-                )
-
-                deeper_analysis = aggregate.get(
-                    "ai_analyses_created",
-                    0,
-                )
-
-                opportunities_so_far = aggregate.get(
-                    "opportunities_found",
-                    0,
-                )
-
-                progress_display.markdown(
-                    f"""
-                    **{reviewed_so_far} jobs reviewed**
-
-                    {deeper_analysis} received deeper analysis
-
-                    **{opportunities_so_far} opportunities found**
-                    """
-                )
-
-                if (
-                    batch_result.get(
-                        "usage_limit_reached",
-                        False,
-                    )
-                    or batch_result.get(
-                        "provider_quota_exhausted",
-                        False,
-                    )
-                ):
-                    break
-
-                # Avoid an endless loop if nothing in the
-                # selected batch can be persisted/analyzed.
-                if (
-                    batch_result.get(
-                        "analyzed",
-                        0,
-                    ) == 0
-                ):
-                    break
-
-        aggregate[
-            "target_reached"
-        ] = (
-            aggregate[
-                "opportunities_found"
-            ]
-            >= target_opportunities
-        )
-
-        search_status.update(
-            label=(
-                f"Search complete — "
-                f"{aggregate['opportunities_found']} "
-                f"opportunities found"
-            ),
-            state="complete",
-            expanded=False,
-        )
-
-        pool_remaining = (
-            repository
-            .count_jobs_to_analyze_for_candidate(
-                candidate_id=candidate_id,
-                analysis_version=ANALYSIS_VERSION,
-                candidate_signature=candidate_signature,
-            )
-        )
-
-        st.session_state[
-            "last_scan_result"
-        ] = aggregate
-
-        st.session_state[
-            "last_scan_total"
-        ] = aggregate[
-            "selected"
-        ]
-
-        st.session_state[
-            "last_links_created"
-        ] = links_created
-
-        st.session_state[
-            "last_scan_target"
-        ] = target_opportunities
-
-        st.session_state[
-            "last_pool_remaining"
-        ] = pool_remaining
-
-    except Exception:
-        st.session_state[
-            "scan_in_progress"
-        ] = False
-
-        raise
-
-    st.session_state[
-        "scan_in_progress"
-    ] = False
-
+    st.session_state["opportunity_search_run"] = search_run
     st.rerun()
+
+
+def advance_opportunity_search() -> bool:
+    # No Streamlit output inside this unit: finish persistence before yielding.
+    aggregate = search_run.aggregate
+    if not search_run.initialized:
+        merge_activation_result(
+            aggregate,
+            activate_ready_opportunities(candidate_id, search_run.target),
+        )
+        search_run.initialized = True
+        return aggregate["opportunities_found"] < search_run.target
+
+    jobs = repository.list_jobs_to_analyze_for_candidate(
+        candidate_id=candidate_id,
+        analysis_version=ANALYSIS_VERSION,
+        candidate_signature=candidate_signature,
+        limit=1,
+        target_families=candidate.target_role_families,
+        bridge_families=candidate.bridge_role_families,
+        competitive_families=candidate.competitive_role_families,
+    )
+    if not jobs:
+        return False
+    job_id = str(jobs[0]["id"])
+    if ensure_candidate_job_analysis(candidate_id=candidate_id, job_id=job_id):
+        search_run.links_created += 1
+    batch_result = analysis_service.analyze_pending(
+        candidate_id=candidate_id,
+        limit=1,
+        ai_budget=search_run.budget,
+        job_ids=[job_id],
+        scan_id=search_run.scan_id,
+    )
+    merge_scan_result(aggregate, batch_result)
+    merge_activation_result(
+        aggregate,
+        activate_ready_opportunities(
+            candidate_id,
+            max(0, search_run.target - aggregate["opportunities_found"]),
+        ),
+    )
+    if batch_result.get("failed", 0) and not batch_result.get("analyzed", 0):
+        search_run.status = "failed"
+    return (
+        aggregate["opportunities_found"] < search_run.target
+        and not batch_result.get("usage_limit_reached", False)
+        and not batch_result.get("provider_quota_exhausted", False)
+        and batch_result.get("analyzed", 0) > 0
+    )
+
+
+if search_run is not None:
+    if search_run.status == "running":
+        st.button(
+            "Stop search",
+            key="stop_opportunity_search",
+            on_click=stop_opportunity_scan,
+            args=(search_scope, search_run.scan_id),
+        )
+        st.info(
+            f"{search_run.aggregate['selected']} jobs reviewed. "
+            f"{search_run.aggregate['opportunities_found']} opportunities kept."
+        )
+
+    aggregate = search_run.aggregate
+    aggregate["target_reached"] = aggregate["opportunities_found"] >= search_run.target
+    st.session_state["last_scan_result"] = aggregate
+    st.session_state["last_scan_total"] = aggregate["selected"]
+    st.session_state["last_links_created"] = search_run.links_created
+    st.session_state["last_scan_target"] = search_run.target
+    st.session_state["last_pool_remaining"] = repository.count_jobs_to_analyze_for_candidate(
+        candidate_id=candidate_id,
+        analysis_version=ANALYSIS_VERSION,
+        candidate_signature=candidate_signature,
+    )
+    st.session_state["scan_in_progress"] = search_run.status == "running"
+    if search_run.status == "stopped":
+        st.info(f"Search stopped. {aggregate['opportunities_found']} opportunities kept.")
+    elif search_run.status == "failed":
+        st.warning(
+            "Search could not finish. Already saved opportunities are kept. "
+            "You can start a new search."
+        )
 
 
 scan_result = st.session_state.get(
@@ -1843,3 +1651,10 @@ elif scan_result:
         'the WorkPilot recommendation threshold.'
         '</div>'
     )
+
+
+# Render partial opportunities and the Stop control before starting one unit.
+# No blocking search loop: Streamlit processes queued callbacks on the rerun.
+if search_run is not None and search_run.status == "running":
+    search_run.advance(search_scope, advance_opportunity_search)
+    st.rerun()

@@ -256,7 +256,7 @@ def handle_oauth_callback() -> None:
         f"{result.gmail_address}"
     )
 
-    st.rerun()
+    st.switch_page("pages/2_Sources.py")
 
 
 handle_oauth_callback()

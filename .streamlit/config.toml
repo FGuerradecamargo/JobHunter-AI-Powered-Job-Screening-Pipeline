@@ -1,0 +1,3 @@
+[runner]
+# Queue interactions until the current search unit reaches a safe UI boundary.
+fastReruns = false

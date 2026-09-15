@@ -586,6 +586,7 @@ else:
                 st.Page(
                     "pages/2_Sources.py",
                     title="Sources",
+                    url_path="Sources",
                     icon=":material/hub:",
                 ),
                 st.Page(

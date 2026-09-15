@@ -105,6 +105,12 @@ def _parse_utc_datetime(value: str) -> datetime:
 
 
 def _clear_local_session() -> None:
+    for key in (
+        "opportunity_search_run", "scan_requested", "scan_in_progress",
+        "last_scan_result", "last_scan_total", "last_links_created",
+        "last_scan_target", "last_pool_remaining",
+    ):
+        st.session_state.pop(key, None)
     cookies[SESSION_COOKIE] = ""
     cookies.save()
     st.session_state.pop("current_user", None)
