@@ -1,0 +1,1179 @@
+{
+  "credentials_present": {
+    "ADZUNA_APP_ID": true,
+    "ADZUNA_APP_KEY": true,
+    "JOOBLE_API_KEY": true
+  },
+  "providers_first": [
+    {
+      "provider": "adzuna",
+      "market": "ie",
+      "query": "customer support",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.938,
+      "observed_at": "2026-09-15T19:50:45.740233+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "adzuna",
+      "market": "ie",
+      "query": "fraud risk",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.859,
+      "observed_at": "2026-09-15T19:50:46.595706+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "adzuna",
+      "market": "ie",
+      "query": "payments operations",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.86,
+      "observed_at": "2026-09-15T19:50:47.450478+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "adzuna",
+      "market": "ie",
+      "query": "analyst compliance",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 1.0,
+      "observed_at": "2026-09-15T19:50:48.458501+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "adzuna",
+      "market": "gb",
+      "query": "operations",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 1.031,
+      "observed_at": "2026-09-15T19:50:49.491117+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "adzuna",
+      "market": "gb",
+      "query": "customer success",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.859,
+      "observed_at": "2026-09-15T19:50:50.354938+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "adzuna",
+      "market": "gb",
+      "query": "compliance AML",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.875,
+      "observed_at": "2026-09-15T19:50:51.222357+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "adzuna",
+      "market": "gb",
+      "query": "remote support",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.875,
+      "observed_at": "2026-09-15T19:50:52.100203+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "jooble",
+      "market": "ie",
+      "query": "customer support",
+      "requests": 1,
+      "raw_records": 12,
+      "valid_jobs": 12,
+      "skipped": 0,
+      "unique_provider_ids": 12,
+      "duplicate_records": 0,
+      "error_code": null,
+      "duration_seconds": 0.969,
+      "observed_at": "2026-09-15T19:50:53.060335+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "jooble",
+      "market": "ie",
+      "query": "fraud risk",
+      "requests": 1,
+      "raw_records": 20,
+      "valid_jobs": 20,
+      "skipped": 0,
+      "unique_provider_ids": 20,
+      "duplicate_records": 0,
+      "error_code": null,
+      "duration_seconds": 0.531,
+      "observed_at": "2026-09-15T19:50:53.597265+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "jooble",
+      "market": "ie",
+      "query": "payments operations",
+      "requests": 1,
+      "raw_records": 20,
+      "valid_jobs": 20,
+      "skipped": 0,
+      "unique_provider_ids": 20,
+      "duplicate_records": 0,
+      "error_code": null,
+      "duration_seconds": 0.547,
+      "observed_at": "2026-09-15T19:50:54.151217+00:00",
+      "coverage_complete": false
+    },
+    {
+      "provider": "jooble",
+      "market": "ie",
+      "query": "analyst compliance",
+      "requests": 1,
+      "raw_records": 7,
+      "valid_jobs": 7,
+      "skipped": 0,
+      "unique_provider_ids": 7,
+      "duplicate_records": 0,
+      "error_code": null,
+      "duration_seconds": 0.594,
+      "observed_at": "2026-09-15T19:50:54.736760+00:00",
+      "coverage_complete": false
+    }
+  ],
+  "providers_repeat": [
+    {
+      "provider": "adzuna",
+      "market": "ie",
+      "query": "customer support",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.922,
+      "observed_at": "2026-09-15T19:50:56.607743+00:00",
+      "coverage_complete": false,
+      "retained_ids": 0,
+      "previous_ids": 0
+    },
+    {
+      "provider": "adzuna",
+      "market": "gb",
+      "query": "remote support",
+      "requests": 1,
+      "raw_records": 0,
+      "valid_jobs": 0,
+      "skipped": null,
+      "unique_provider_ids": 0,
+      "duplicate_records": 0,
+      "error_code": "http_401",
+      "duration_seconds": 0.859,
+      "observed_at": "2026-09-15T19:50:57.469030+00:00",
+      "coverage_complete": false,
+      "retained_ids": 0,
+      "previous_ids": 0
+    },
+    {
+      "provider": "jooble",
+      "market": "ie",
+      "query": "customer support",
+      "requests": 1,
+      "raw_records": 12,
+      "valid_jobs": 12,
+      "skipped": 0,
+      "unique_provider_ids": 12,
+      "duplicate_records": 0,
+      "error_code": null,
+      "duration_seconds": 0.828,
+      "observed_at": "2026-09-15T19:50:58.300447+00:00",
+      "coverage_complete": false,
+      "retained_ids": 12,
+      "previous_ids": 12
+    },
+    {
+      "provider": "jooble",
+      "market": "ie",
+      "query": "analyst compliance",
+      "requests": 1,
+      "raw_records": 7,
+      "valid_jobs": 7,
+      "skipped": 0,
+      "unique_provider_ids": 7,
+      "duplicate_records": 0,
+      "error_code": null,
+      "duration_seconds": 0.516,
+      "observed_at": "2026-09-15T19:50:58.818087+00:00",
+      "coverage_complete": false,
+      "retained_ids": 7,
+      "previous_ids": 7
+    }
+  ],
+  "requests": {
+    "adzuna": {
+      "attempted": 10,
+      "successful": 0
+    },
+    "jooble": {
+      "attempted": 6,
+      "successful": 6
+    }
+  },
+  "jooble_region": "ie",
+  "scheduler_initial_replay": [
+    {
+      "source_identity": "adzuna",
+      "attempted": true,
+      "claimed": true,
+      "status": "failed",
+      "coverage_complete": false,
+      "jobs_fetched": 0,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 8,
+      "error_code": "query_failed",
+      "duration_seconds": 0.0,
+      "next_eligible_at": "2026-09-15T20:20:54.761547+00:00"
+    },
+    {
+      "source_identity": "jooble",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": false,
+      "jobs_fetched": 59,
+      "jobs_created": 40,
+      "jobs_updated": 7,
+      "jobs_unchanged": 12,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.891,
+      "next_eligible_at": "2026-09-16T19:50:54.761547+00:00"
+    }
+  ],
+  "scheduler_immediate_replay": [
+    {
+      "source_identity": "adzuna",
+      "status": "skipped_not_due",
+      "attempted": false
+    },
+    {
+      "source_identity": "jooble",
+      "status": "skipped_not_due",
+      "attempted": false
+    }
+  ],
+  "scheduler_repeat_replay": [
+    {
+      "source_identity": "adzuna",
+      "attempted": true,
+      "claimed": true,
+      "status": "failed",
+      "coverage_complete": false,
+      "jobs_fetched": 0,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 2,
+      "error_code": "query_failed",
+      "duration_seconds": 0.0,
+      "next_eligible_at": "2026-09-16T21:20:54.761547+00:00"
+    },
+    {
+      "source_identity": "jooble",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": false,
+      "jobs_fetched": 19,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 19,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.25,
+      "next_eligible_at": "2026-09-17T20:50:54.761547+00:00"
+    }
+  ],
+  "scheduler_clock": "repeat replay advances 25 hours; collection timestamps are actual UTC",
+  "pool_size": 40,
+  "initial_pool_size": 40,
+  "canonical_ids_preserved": true,
+  "provenance_count": 40,
+  "provider_pool_counts": {
+    "adzuna": 0,
+    "jooble": 40
+  },
+  "cross_provider_shared_jobs": 0,
+  "likely_duplicate_extra_rows": 0,
+  "freshness_rows_advanced": 18,
+  "profiles": [
+    {
+      "profile": {
+        "name": "IE customer operations/support",
+        "market": "IE",
+        "terms": [
+          "customer support",
+          "customer service",
+          "customer operations",
+          "support specialist"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 2,
+      "plausible_location_mode": 2,
+      "deterministic_survivors": 2,
+      "assessment": "weak",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [
+        {
+          "title": "Remote- Customer Support Specialist",
+          "company": "Nexora Talent",
+          "location": "Ireland"
+        },
+        {
+          "title": "Customer Service Representative",
+          "company": "Dynamics ATS",
+          "location": "Ireland"
+        }
+      ],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "IE customer operations/support",
+            "market": "IE",
+            "terms": [
+              "customer support",
+              "customer service",
+              "customer operations",
+              "support specialist"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "IE customer operations/support",
+            "market": "IE",
+            "terms": [
+              "customer support",
+              "customer service",
+              "customer operations",
+              "support specialist"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 2,
+          "plausible_location_mode": 2,
+          "deterministic_survivors": 2,
+          "assessment": "weak",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": [
+            {
+              "title": "Remote- Customer Support Specialist",
+              "company": "Nexora Talent",
+              "location": "Ireland"
+            },
+            {
+              "title": "Customer Service Representative",
+              "company": "Dynamics ATS",
+              "location": "Ireland"
+            }
+          ]
+        }
+      },
+      "rejected_examples": []
+    },
+    {
+      "profile": {
+        "name": "IE fraud/risk/trust",
+        "market": "IE",
+        "terms": [
+          "fraud",
+          "risk",
+          "trust",
+          "financial crime"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 2,
+      "plausible_location_mode": 2,
+      "deterministic_survivors": 1,
+      "assessment": "weak",
+      "rejection_reasons": {
+        "Role seniority is clearly above the candidate's plausible current range.": 1
+      },
+      "human_attention_verified": null,
+      "examples": [
+        {
+          "title": "Financial Crime Advisory Consultant",
+          "company": "NTT DATA, Inc.",
+          "location": "Ireland"
+        }
+      ],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "IE fraud/risk/trust",
+            "market": "IE",
+            "terms": [
+              "fraud",
+              "risk",
+              "trust",
+              "financial crime"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "IE fraud/risk/trust",
+            "market": "IE",
+            "terms": [
+              "fraud",
+              "risk",
+              "trust",
+              "financial crime"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 2,
+          "plausible_location_mode": 2,
+          "deterministic_survivors": 1,
+          "assessment": "weak",
+          "rejection_reasons": {
+            "Role seniority is clearly above the candidate's plausible current range.": 1
+          },
+          "human_attention_verified": null,
+          "examples": [
+            {
+              "title": "Financial Crime Advisory Consultant",
+              "company": "NTT DATA, Inc.",
+              "location": "Ireland"
+            }
+          ]
+        }
+      },
+      "rejected_examples": [
+        {
+          "title": "Director, Technology Risk",
+          "location": "Ireland",
+          "reasons": {
+            "Role seniority is clearly above the candidate's plausible current range.": 1
+          }
+        }
+      ]
+    },
+    {
+      "profile": {
+        "name": "IE fintech/payment operations",
+        "market": "IE",
+        "terms": [
+          "payment",
+          "operations",
+          "settlement",
+          "reconciliation"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 1,
+      "plausible_location_mode": 1,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {
+        "Role is outside the candidate's intended or bridge professional direction.": 1,
+        "Role seniority is clearly above the candidate's plausible current range.": 1
+      },
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "IE fintech/payment operations",
+            "market": "IE",
+            "terms": [
+              "payment",
+              "operations",
+              "settlement",
+              "reconciliation"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "IE fintech/payment operations",
+            "market": "IE",
+            "terms": [
+              "payment",
+              "operations",
+              "settlement",
+              "reconciliation"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 1,
+          "plausible_location_mode": 1,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1,
+            "Role seniority is clearly above the candidate's plausible current range.": 1
+          },
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": [
+        {
+          "title": "Business Operations Director",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1,
+            "Role seniority is clearly above the candidate's plausible current range.": 1
+          }
+        }
+      ]
+    },
+    {
+      "profile": {
+        "name": "IE analyst",
+        "market": "IE",
+        "terms": [
+          "analyst"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 7,
+      "plausible_location_mode": 7,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {
+        "Role is outside the candidate's intended or bridge professional direction.": 7
+      },
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "IE analyst",
+            "market": "IE",
+            "terms": [
+              "analyst"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "IE analyst",
+            "market": "IE",
+            "terms": [
+              "analyst"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 7,
+          "plausible_location_mode": 7,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 7
+          },
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": [
+        {
+          "title": "Contract Analyst II",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "Business Analyst - Trade Finance / Contingent Liabilities",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "Senior Business Data Analyst - Transact system",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "Techno Functional Business Analyst",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "PMO Analyst",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        }
+      ]
+    },
+    {
+      "profile": {
+        "name": "UK operations management",
+        "market": "UK",
+        "terms": [
+          "operations manager",
+          "team lead",
+          "complaints manager",
+          "operations lead"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 0,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "UK operations management",
+            "market": "UK",
+            "terms": [
+              "operations manager",
+              "team lead",
+              "complaints manager",
+              "operations lead"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "UK operations management",
+            "market": "UK",
+            "terms": [
+              "operations manager",
+              "team lead",
+              "complaints manager",
+              "operations lead"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": []
+    },
+    {
+      "profile": {
+        "name": "UK customer success",
+        "market": "UK",
+        "terms": [
+          "customer success",
+          "account manager",
+          "customer experience"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 0,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "UK customer success",
+            "market": "UK",
+            "terms": [
+              "customer success",
+              "account manager",
+              "customer experience"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "UK customer success",
+            "market": "UK",
+            "terms": [
+              "customer success",
+              "account manager",
+              "customer experience"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": []
+    },
+    {
+      "profile": {
+        "name": "UK compliance/AML",
+        "market": "UK",
+        "terms": [
+          "compliance",
+          "aml",
+          "financial crime",
+          "kyc"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 2,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "UK compliance/AML",
+            "market": "UK",
+            "terms": [
+              "compliance",
+              "aml",
+              "financial crime",
+              "kyc"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "UK compliance/AML",
+            "market": "UK",
+            "terms": [
+              "compliance",
+              "aml",
+              "financial crime",
+              "kyc"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 2,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": []
+    },
+    {
+      "profile": {
+        "name": "UK remote support",
+        "market": "UK",
+        "terms": [
+          "customer support",
+          "customer service",
+          "support specialist"
+        ],
+        "remote_only": true,
+        "preference": "remote required"
+      },
+      "pool_size": 40,
+      "title_plausible": 2,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "UK remote support",
+            "market": "UK",
+            "terms": [
+              "customer support",
+              "customer service",
+              "support specialist"
+            ],
+            "remote_only": true,
+            "preference": "remote required"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "UK remote support",
+            "market": "UK",
+            "terms": [
+              "customer support",
+              "customer service",
+              "support specialist"
+            ],
+            "remote_only": true,
+            "preference": "remote required"
+          },
+          "pool_size": 40,
+          "title_plausible": 2,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": []
+    },
+    {
+      "profile": {
+        "name": "Europe remote fintech/risk",
+        "market": "EU",
+        "terms": [
+          "risk",
+          "fraud",
+          "payment",
+          "operations",
+          "compliance"
+        ],
+        "remote_only": true,
+        "preference": "remote required"
+      },
+      "pool_size": 40,
+      "title_plausible": 3,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "Europe remote fintech/risk",
+            "market": "EU",
+            "terms": [
+              "risk",
+              "fraud",
+              "payment",
+              "operations",
+              "compliance"
+            ],
+            "remote_only": true,
+            "preference": "remote required"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "Europe remote fintech/risk",
+            "market": "EU",
+            "terms": [
+              "risk",
+              "fraud",
+              "payment",
+              "operations",
+              "compliance"
+            ],
+            "remote_only": true,
+            "preference": "remote required"
+          },
+          "pool_size": 40,
+          "title_plausible": 3,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": []
+    },
+    {
+      "profile": {
+        "name": "Europe customer success/analyst",
+        "market": "EU",
+        "terms": [
+          "customer success",
+          "analyst",
+          "account manager"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 40,
+      "title_plausible": 7,
+      "plausible_location_mode": 7,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {
+        "Role is outside the candidate's intended or bridge professional direction.": 7
+      },
+      "human_attention_verified": null,
+      "examples": [],
+      "by_provider": {
+        "adzuna": {
+          "profile": {
+            "name": "Europe customer success/analyst",
+            "market": "EU",
+            "terms": [
+              "customer success",
+              "analyst",
+              "account manager"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 0,
+          "title_plausible": 0,
+          "plausible_location_mode": 0,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {},
+          "human_attention_verified": null,
+          "examples": []
+        },
+        "jooble": {
+          "profile": {
+            "name": "Europe customer success/analyst",
+            "market": "EU",
+            "terms": [
+              "customer success",
+              "analyst",
+              "account manager"
+            ],
+            "remote_only": false,
+            "preference": "hybrid preferred; onsite considered"
+          },
+          "pool_size": 40,
+          "title_plausible": 7,
+          "plausible_location_mode": 7,
+          "deterministic_survivors": 0,
+          "assessment": "insufficient",
+          "rejection_reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 7
+          },
+          "human_attention_verified": null,
+          "examples": []
+        }
+      },
+      "rejected_examples": [
+        {
+          "title": "Contract Analyst II",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "Business Analyst - Trade Finance / Contingent Liabilities",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "Senior Business Data Analyst - Transact system",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "Techno Functional Business Analyst",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        },
+        {
+          "title": "PMO Analyst",
+          "location": "Ireland",
+          "reasons": {
+            "Role is outside the candidate's intended or bridge professional direction.": 1
+          }
+        }
+      ]
+    }
+  ],
+  "employer_baseline": "Historical metrics only; no full replay retained, no combined-pool claim",
+  "ai_calls": 0,
+  "gmail_calls": 0
+}
