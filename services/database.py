@@ -636,6 +636,9 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "candidate_interview_details",
         "candidate_interview_feedback",
         "candidate_preparation_generation_claims",
+        "companies",
+        "candidate_monitored_companies",
+        "company_job_sources",
     }
 )
 
@@ -647,6 +650,51 @@ def _enable_server_only_row_level_security(connection, table_name: str) -> None:
     if table_name not in _SERVER_ONLY_INTERVIEW_TABLES:
         raise ValueError("Table is not approved for server-only RLS.")
     connection.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
+
+
+def create_company_registry_schema(connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS companies (
+            id TEXT PRIMARY KEY,
+            canonical_name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL UNIQUE,
+            domain TEXT,
+            careers_url TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS candidate_monitored_companies (
+            candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+            company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (candidate_id, company_id)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS company_job_sources (
+            id TEXT PRIMARY KEY,
+            company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            source_type TEXT NOT NULL,
+            source_key TEXT NOT NULL,
+            careers_url TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (company_id, source_type, source_key)
+        )
+        """
+    )
+    for table in ("companies", "candidate_monitored_companies", "company_job_sources"):
+        _enable_server_only_row_level_security(connection, table)
 
 
 def create_interview_details_schema(connection) -> None:
@@ -915,6 +963,7 @@ def initialize_postgres_database() -> None:
             connection
         )
 
+        create_company_registry_schema(connection)
         create_interview_details_schema(connection)
         create_interview_feedback_schema(connection)
         create_preparation_generation_claim_schema(connection)
@@ -1771,6 +1820,7 @@ def initialize_sqlite_database() -> None:
             connection
         )
 
+        create_company_registry_schema(connection)
         create_interview_details_schema(connection)
         create_interview_feedback_schema(connection)
         create_preparation_generation_claim_schema(connection)
