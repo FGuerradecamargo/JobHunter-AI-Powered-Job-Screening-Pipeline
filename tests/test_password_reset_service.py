@@ -262,9 +262,10 @@ def test_successful_reset_changes_password_revokes_sessions_and_is_one_time(
                 token,
                 user_id,
                 expires_at,
-                created_at
+                created_at,
+                last_activity_at
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -272,11 +273,13 @@ def test_successful_reset_changes_password_revokes_sessions_and_is_one_time(
                     "local-user",
                     "2099-01-01T00:00:00+00:00",
                     "2026-09-01T00:00:00+00:00",
+                    "2026-09-01T00:00:00+00:00",
                 ),
                 (
                     "session-hash-2",
                     "local-user",
                     "2099-01-01T00:00:00+00:00",
+                    "2026-09-01T00:00:00+00:00",
                     "2026-09-01T00:00:00+00:00",
                 ),
             ],
@@ -454,14 +457,16 @@ def test_reset_transaction_rolls_back_everything_on_failure(
                 token,
                 user_id,
                 expires_at,
-                created_at
+                created_at,
+                last_activity_at
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 "rollback-session",
                 "local-user",
                 "2099-01-01T00:00:00+00:00",
+                "2026-09-01T00:00:00+00:00",
                 "2026-09-01T00:00:00+00:00",
             ),
         )

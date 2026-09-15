@@ -31,12 +31,25 @@ auth_service = AuthService()
 
 authenticated_user = get_authenticated_user()
 
+authentication_notice = st.session_state.pop(
+    "authentication_notice",
+    None,
+)
+if authentication_notice:
+    st.info(authentication_notice)
+
 
 # ---------------------------------------------------------
 # GOOGLE OIDC
 # ---------------------------------------------------------
 
 if authenticated_user is None:
+    if st.user.is_logged_in and st.session_state.get("reauthentication_required"):
+        st.info("Please sign in again to continue.")
+        if st.button("Restart Google sign-in", key="restart_expired_google_session"):
+            st.logout()
+        st.stop()
+
     if st.user.is_logged_in:
         google_claims = {
             "sub": st.user.get(
@@ -427,3 +440,9 @@ with signup_tab:
 
                 except ValueError as exc:
                     st.error(str(exc))
+
+                except Exception:
+                    st.error(
+                        "We could not create your account. "
+                        "Please try again."
+                    )

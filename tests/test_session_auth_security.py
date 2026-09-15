@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -39,13 +40,18 @@ class FakeCursor:
         self,
         *,
         row=None,
+        rows=None,
         rowcount=0,
     ):
         self._row = row
+        self._rows = rows or []
         self.rowcount = rowcount
 
     def fetchone(self):
         return self._row
+
+    def fetchall(self):
+        return self._rows
 
 
 class FakeConnection:
@@ -67,6 +73,23 @@ class FakeConnection:
         ):
             return FakeCursor()
 
+        if normalized == "PRAGMA table_info(user_sessions)":
+            return FakeCursor(rows=[
+                (0, "token"),
+                (1, "user_id"),
+                (2, "expires_at"),
+                (3, "created_at"),
+                (4, "last_activity_at"),
+            ])
+
+        if normalized.startswith(
+            "UPDATE user_sessions SET last_activity_at = created_at"
+        ):
+            for stored in self.sessions.values():
+                if not stored.get("last_activity_at"):
+                    stored["last_activity_at"] = stored["created_at"]
+            return FakeCursor()
+
         if normalized.startswith(
             "INSERT INTO user_sessions"
         ):
@@ -75,12 +98,14 @@ class FakeConnection:
                 user_id,
                 expires_at,
                 created_at,
+                last_activity_at,
             ) = params
 
             self.sessions[token_hash] = {
                 "user_id": user_id,
                 "expires_at": expires_at,
                 "created_at": created_at,
+                "last_activity_at": last_activity_at,
             }
 
             return FakeCursor(
@@ -163,8 +188,19 @@ class FakeConnection:
                     "expires_at": (
                         stored["expires_at"]
                     ),
+                    "created_at": stored["created_at"],
+                    "last_activity_at": stored["last_activity_at"],
                 }
             )
+
+        if normalized.startswith(
+            "UPDATE user_sessions SET last_activity_at = ?"
+        ):
+            activity_at, token_hash = params
+            stored = self.sessions.get(token_hash)
+            if stored is not None:
+                stored["last_activity_at"] = activity_at
+            return FakeCursor(rowcount=int(stored is not None))
 
         raise AssertionError(
             f"Unexpected SQL: {normalized}"
@@ -254,6 +290,30 @@ def test_session_token_hash_is_not_raw():
     )
 
 
+def test_expiration_clears_admin_access_and_requires_reauthentication(session_runtime):
+    state = session_runtime.streamlit.session_state
+    state["admin_access_granted"] = True
+    state["admin_viewing_as_target"] = "other-user"
+    session_auth._expire_local_session()
+    assert "admin_access_granted" not in state
+    assert "admin_viewing_as_target" not in state
+    assert state["reauthentication_required"] is True
+
+
+def test_failed_session_commit_does_not_publish_cookie(monkeypatch, session_runtime):
+    @contextmanager
+    def failed_connection():
+        yield session_runtime.connection
+        raise RuntimeError("simulated commit rejection")
+
+    monkeypatch.setattr(session_auth, "ensure_session_table", lambda: None)
+    monkeypatch.setattr(session_auth, "get_connection", failed_connection)
+    with pytest.raises(RuntimeError):
+        session_auth.login_user(session_runtime.user)
+    assert not session_runtime.cookies.get(session_auth.SESSION_COOKIE)
+    assert "current_user" not in session_runtime.streamlit.session_state
+
+
 def test_empty_session_token_is_rejected():
     with pytest.raises(
         ValueError,
@@ -322,6 +382,210 @@ def test_login_lookup_and_logout_use_only_hash(
         ]
         == ""
     )
+
+
+def _login_at(
+    monkeypatch,
+    runtime,
+    now,
+):
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: now,
+    )
+    session_auth.login_user(runtime.user)
+    raw_token = runtime.cookies[
+        session_auth.SESSION_COOKIE
+    ]
+    return session_auth._hash_session_token(raw_token)
+
+
+def test_session_is_valid_at_59_minutes_idle(
+    monkeypatch,
+    session_runtime,
+):
+    started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    token_hash = _login_at(
+        monkeypatch,
+        session_runtime,
+        started_at,
+    )
+    checked_at = started_at + timedelta(minutes=59)
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: checked_at,
+    )
+
+    assert session_auth.get_authenticated_user() is session_runtime.user
+    assert (
+        session_runtime.connection.sessions[token_hash]["last_activity_at"]
+        == checked_at.isoformat()
+    )
+
+
+def test_session_is_valid_at_exactly_60_minutes_idle(
+    monkeypatch,
+    session_runtime,
+):
+    started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _login_at(monkeypatch, session_runtime, started_at)
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: started_at + timedelta(minutes=60),
+    )
+
+    assert session_auth.get_authenticated_user() is session_runtime.user
+
+
+def test_idle_expired_session_is_revoked_and_cannot_be_revived(
+    monkeypatch,
+    session_runtime,
+):
+    started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    token_hash = _login_at(
+        monkeypatch,
+        session_runtime,
+        started_at,
+    )
+    stale_cookie = session_runtime.cookies[session_auth.SESSION_COOKIE]
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: started_at + timedelta(minutes=60, seconds=1),
+    )
+
+    assert session_auth.get_authenticated_user() is None
+    assert token_hash not in session_runtime.connection.sessions
+    assert session_runtime.cookies[session_auth.SESSION_COOKIE] == ""
+    assert "current_user" not in session_runtime.streamlit.session_state
+    assert (
+        session_runtime.streamlit.session_state["authentication_notice"]
+        == session_auth.SESSION_EXPIRED_NOTICE
+    )
+
+    session_runtime.cookies[session_auth.SESSION_COOKIE] = stale_cookie
+    assert session_auth.get_authenticated_user() is None
+    assert session_runtime.cookies[session_auth.SESSION_COOKIE] == ""
+
+
+def test_activity_does_not_extend_absolute_expiration(
+    monkeypatch,
+    session_runtime,
+):
+    started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    token_hash = _login_at(
+        monkeypatch,
+        session_runtime,
+        started_at,
+    )
+    original_expiry = session_runtime.connection.sessions[
+        token_hash
+    ]["expires_at"]
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: started_at + timedelta(minutes=30),
+    )
+
+    assert session_auth.get_authenticated_user() is session_runtime.user
+    assert (
+        session_runtime.connection.sessions[token_hash]["expires_at"]
+        == original_expiry
+    )
+
+
+def test_absolute_expiry_wins_with_recent_activity(
+    monkeypatch,
+    session_runtime,
+):
+    started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    token_hash = _login_at(
+        monkeypatch,
+        session_runtime,
+        started_at,
+    )
+    absolute_expiry = started_at + timedelta(days=session_auth.SESSION_DAYS)
+    session_runtime.connection.sessions[token_hash]["last_activity_at"] = (
+        absolute_expiry - timedelta(minutes=1)
+    ).isoformat()
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: absolute_expiry,
+    )
+
+    assert session_auth.get_authenticated_user() is None
+    assert token_hash not in session_runtime.connection.sessions
+
+
+def test_activity_in_one_tab_keeps_same_token_valid(
+    monkeypatch,
+    session_runtime,
+):
+    started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _login_at(monkeypatch, session_runtime, started_at)
+
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: started_at + timedelta(minutes=59),
+    )
+    assert session_auth.get_authenticated_user() is session_runtime.user
+
+    monkeypatch.setattr(
+        session_auth,
+        "_utc_now_datetime",
+        lambda: started_at + timedelta(minutes=118),
+    )
+    assert session_auth.get_authenticated_user() is session_runtime.user
+
+
+def test_legacy_session_activity_migrates_from_created_at(
+    monkeypatch,
+    tmp_path,
+):
+    import sqlite3
+    from services import session_store
+
+    database_file = tmp_path / "legacy-session.db"
+    created_at = "2026-01-01T00:00:00+00:00"
+    with sqlite3.connect(database_file) as connection:
+        connection.execute(
+            "CREATE TABLE users (id TEXT PRIMARY KEY)"
+        )
+        connection.execute(
+            """
+            CREATE TABLE user_sessions (
+                token TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO users (id) VALUES (?)",
+            ("user-1",),
+        )
+        connection.execute(
+            "INSERT INTO user_sessions VALUES (?, ?, ?, ?)",
+            (
+                "token-hash",
+                "user-1",
+                "2026-01-08T00:00:00+00:00",
+                created_at,
+            ),
+        )
+        monkeypatch.setattr(session_store, "is_postgres", lambda: False)
+        session_store.ensure_session_table_with_connection(connection)
+        row = connection.execute(
+            "SELECT last_activity_at FROM user_sessions"
+        ).fetchone()
+
+    assert row[0] == created_at
 
 
 def test_hardcoded_beta_cookie_key_is_absent():

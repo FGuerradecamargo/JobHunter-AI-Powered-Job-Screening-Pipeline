@@ -171,6 +171,70 @@ class CandidateRepository:
                 ),
             )
 
+    @staticmethod
+    def create_with_connection(
+        connection,
+        candidate: Candidate,
+    ) -> None:
+        now = utc_now()
+
+        connection.execute(
+            """
+            INSERT INTO candidates (
+                id, name, "current_role", current_level,
+                professional_summary, target_roles_json,
+                spoken_languages_json, skills_json,
+                strengths_json, development_areas_json,
+                professional_experiences_json,
+                proven_capabilities_json,
+                transferable_capabilities_json,
+                developing_capabilities_json,
+                technical_tools_json, domain_experience_json,
+                competitive_role_families_json,
+                bridge_role_families_json,
+                target_role_families_json,
+                preferences_json, constraints_json,
+                priorities_json, created_at, updated_at
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            """,
+            (
+                candidate.id,
+                candidate.name,
+                candidate.current_role,
+                candidate.current_level,
+                candidate.professional_summary,
+                json.dumps(candidate.target_roles, ensure_ascii=False),
+                json.dumps(candidate.spoken_languages, ensure_ascii=False),
+                json.dumps(candidate.skills, ensure_ascii=False),
+                json.dumps(candidate.strengths, ensure_ascii=False),
+                json.dumps(candidate.development_areas, ensure_ascii=False),
+                json.dumps(
+                    [asdict(item) for item in candidate.professional_experiences],
+                    ensure_ascii=False,
+                ),
+                json.dumps(candidate.proven_capabilities, ensure_ascii=False),
+                json.dumps(candidate.transferable_capabilities, ensure_ascii=False),
+                json.dumps(candidate.developing_capabilities, ensure_ascii=False),
+                json.dumps(candidate.technical_tools, ensure_ascii=False),
+                json.dumps(candidate.domain_experience, ensure_ascii=False),
+                json.dumps(candidate.competitive_role_families, ensure_ascii=False),
+                json.dumps(candidate.bridge_role_families, ensure_ascii=False),
+                json.dumps(candidate.target_role_families, ensure_ascii=False),
+                json.dumps(asdict(candidate.preferences), ensure_ascii=False),
+                json.dumps(asdict(candidate.constraints), ensure_ascii=False),
+                json.dumps(
+                    [asdict(item) for item in candidate.priorities],
+                    ensure_ascii=False,
+                ),
+                now,
+                now,
+            ),
+        )
+
     def get(
         self,
         candidate_id: str,

@@ -724,6 +724,8 @@ def create_preparation_generation_claim_schema(connection) -> None:
 
 def initialize_postgres_database() -> None:
     with get_connection() as connection:
+        # Serialize schema changes across application processes.
+        connection.execute("SELECT pg_advisory_xact_lock(731302)")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS candidates (
@@ -1573,6 +1575,7 @@ class PostgresConnectionAdapter:
 
 def initialize_sqlite_database() -> None:
     with get_connection() as connection:
+        connection.execute("BEGIN IMMEDIATE")
         # ==================================================
         # Base tables
         # ==================================================

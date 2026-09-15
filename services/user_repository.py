@@ -12,6 +12,62 @@ from services.database import (
 
 
 class UserRepository:
+    @staticmethod
+    def create_with_connection(
+        connection,
+        *,
+        email: str,
+        display_name: str,
+        candidate_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        access_level: str = "user",
+        password_hash: Optional[str] = None,
+        email_verified_at: Optional[str] = None,
+    ) -> AppUser:
+        normalized_email = email.strip().lower()
+        normalized_name = display_name.strip()
+        normalized_access_level = access_level.strip().lower()
+
+        if not normalized_email:
+            raise ValueError("Email is required.")
+        if not normalized_name:
+            raise ValueError("Display name is required.")
+        if normalized_access_level not in {"admin", "manager", "user"}:
+            raise ValueError(f"Invalid access level: {access_level}")
+
+        resolved_user_id = user_id or uuid4().hex
+        now = datetime.now(timezone.utc).isoformat()
+
+        connection.execute(
+            """
+            INSERT INTO users (
+                id, email, display_name, candidate_id,
+                access_level, password_hash, email_verified_at,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                resolved_user_id,
+                normalized_email,
+                normalized_name,
+                candidate_id,
+                normalized_access_level,
+                password_hash,
+                email_verified_at,
+                now,
+                now,
+            ),
+        )
+
+        return AppUser(
+            id=resolved_user_id,
+            email=normalized_email,
+            display_name=normalized_name,
+            candidate_id=candidate_id,
+            access_level=normalized_access_level,
+        )
+
     def create(
         self,
         email: str,
@@ -45,54 +101,15 @@ class UserRepository:
                 f"Invalid access level: {access_level}"
             )
 
-        resolved_user_id = (
-            user_id or uuid4().hex
-        )
-
-        now = datetime.now(
-            timezone.utc
-        ).isoformat()
-
         with get_connection() as connection:
-            connection.execute(
-                """
-                INSERT INTO users (
-                    id,
-                    email,
-                    display_name,
-                    candidate_id,
-                    access_level,
-                    created_at,
-                    updated_at
-                )
-                VALUES (
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?
-                )
-                """,
-                (
-                    resolved_user_id,
-                    normalized_email,
-                    normalized_name,
-                    candidate_id,
-                    normalized_access_level,
-                    now,
-                    now,
-                ),
+            return self.create_with_connection(
+                connection,
+                email=normalized_email,
+                display_name=normalized_name,
+                candidate_id=candidate_id,
+                user_id=user_id,
+                access_level=normalized_access_level,
             )
-
-        return AppUser(
-            id=resolved_user_id,
-            email=normalized_email,
-            display_name=normalized_name,
-            candidate_id=candidate_id,
-            access_level=normalized_access_level,
-        )
 
     def get_by_id(
         self,

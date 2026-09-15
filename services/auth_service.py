@@ -354,31 +354,18 @@ class AuthService:
             professional_summary="",
         )
 
-        self.candidate_repository.save(candidate)
-
-        user = self.user_repository.create(
-            email=normalized_email,
-            display_name=normalized_name,
-            candidate_id=candidate_id,
-            access_level="user",
-        )
-
         with get_connection() as connection:
-            connection.execute(
-                """
-                UPDATE users
-                SET
-                    password_hash = ?,
-                    updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    password_hash,
-                    utc_now(),
-                    user.id,
-                ),
+            self.candidate_repository.create_with_connection(
+                connection,
+                candidate,
+            )
+            user = self.user_repository.create_with_connection(
+                connection,
+                email=normalized_email,
+                display_name=normalized_name,
+                candidate_id=candidate_id,
+                access_level="user",
+                password_hash=password_hash,
             )
 
-        return self.user_repository.get_by_id(
-            user.id
-        )
+        return user
