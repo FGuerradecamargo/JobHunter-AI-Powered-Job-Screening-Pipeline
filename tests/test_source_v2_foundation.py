@@ -228,6 +228,36 @@ def test_provider_identifiers_are_namespaced(db):
     assert import_job(job("7", ""), "beta")["created"] == 1
 
 
+def test_launch_overlap_tracking_query_stays_separate(db):
+    import_job(job())
+    other = job("beta:7", job().url + "?utm_source=other")
+    assert import_job(other, "beta")["created"] == 1
+
+
+def test_launch_overlap_changed_provider_id_reuses_exact_job(db):
+    import_job(job())
+    assert import_job(job("alpha:replacement"))["unchanged"] == 1
+    with database.get_connection() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 1
+
+
+def test_launch_overlap_ambiguous_canonical_matches_do_not_merge(db):
+    import_job(job())
+    import_job(job("beta:7", "https://jobs.example/vacancies/7"), "beta")
+    # Reproduce legacy duplicate rows with two equally strong matches.
+    with database.get_connection() as connection:
+        connection.execute("UPDATE jobs SET url = ?", (job().url,))
+    assert import_job(job("gamma:9"), "gamma")["created"] == 1
+    with database.get_connection() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 3
+
+
+@pytest.mark.parametrize("field,value", [("title", "Senior Engineer"), ("company", "Other"), ("location", "London")])
+def test_launch_overlap_same_url_conflicting_metadata_stays_separate(db, field, value):
+    import_job(job())
+    assert import_job(replace(job("beta:7"), **{field: value}), "beta")["created"] == 1
+
+
 def test_private_source_scope_and_global_search(db):
     from services.user_repository import UserRepository
     users = [UserRepository().create(email=f"{i}@example.test", display_name="User") for i in range(2)]

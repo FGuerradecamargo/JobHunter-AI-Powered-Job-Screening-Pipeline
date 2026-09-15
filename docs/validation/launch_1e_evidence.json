@@ -1,0 +1,724 @@
+{
+  "validation_time": "2026-09-15T13:53:11.002471+00:00",
+  "http_requests": 8,
+  "providers_first": [
+    {
+      "provider": "lever",
+      "board": "zopa",
+      "observed_at": "2026-09-15T13:52:59.383068+00:00",
+      "requests": 1,
+      "raw_postings": 34,
+      "valid_jobs": 34,
+      "skipped": 0,
+      "duplicate_records": 0,
+      "coverage_complete": true,
+      "error_code": null,
+      "duration_seconds": 2.079
+    },
+    {
+      "provider": "lever",
+      "board": "plaid",
+      "observed_at": "2026-09-15T13:53:00.354585+00:00",
+      "requests": 1,
+      "raw_postings": 0,
+      "valid_jobs": 0,
+      "skipped": 0,
+      "duplicate_records": null,
+      "coverage_complete": false,
+      "error_code": "http_status",
+      "duration_seconds": 0.968
+    },
+    {
+      "provider": "ashby",
+      "board": "paddle",
+      "observed_at": "2026-09-15T13:53:01.064456+00:00",
+      "requests": 1,
+      "raw_postings": 19,
+      "valid_jobs": 19,
+      "skipped": 0,
+      "duplicate_records": 0,
+      "coverage_complete": true,
+      "error_code": null,
+      "duration_seconds": 0.703
+    },
+    {
+      "provider": "ashby",
+      "board": "wayflyer",
+      "observed_at": "2026-09-15T13:53:01.735815+00:00",
+      "requests": 1,
+      "raw_postings": 16,
+      "valid_jobs": 16,
+      "skipped": 0,
+      "duplicate_records": 0,
+      "coverage_complete": true,
+      "error_code": null,
+      "duration_seconds": 0.672
+    }
+  ],
+  "providers_second": [
+    {
+      "provider": "lever",
+      "board": "zopa",
+      "observed_at": "2026-09-15T13:53:06.150571+00:00",
+      "requests": 1,
+      "raw_postings": 34,
+      "valid_jobs": 34,
+      "skipped": 0,
+      "duplicate_records": 0,
+      "coverage_complete": true,
+      "error_code": null,
+      "duration_seconds": 2.328,
+      "retained_ids": 34,
+      "removed_ids": 0
+    },
+    {
+      "provider": "lever",
+      "board": "plaid",
+      "observed_at": "2026-09-15T13:53:07.504278+00:00",
+      "requests": 1,
+      "raw_postings": 0,
+      "valid_jobs": 0,
+      "skipped": 0,
+      "duplicate_records": null,
+      "coverage_complete": false,
+      "error_code": "http_status",
+      "duration_seconds": 1.36,
+      "retained_ids": 0,
+      "removed_ids": null
+    },
+    {
+      "provider": "ashby",
+      "board": "paddle",
+      "observed_at": "2026-09-15T13:53:08.109307+00:00",
+      "requests": 1,
+      "raw_postings": 19,
+      "valid_jobs": 19,
+      "skipped": 0,
+      "duplicate_records": 0,
+      "coverage_complete": true,
+      "error_code": null,
+      "duration_seconds": 0.593,
+      "retained_ids": 19,
+      "removed_ids": 0
+    },
+    {
+      "provider": "ashby",
+      "board": "wayflyer",
+      "observed_at": "2026-09-15T13:53:08.680660+00:00",
+      "requests": 1,
+      "raw_postings": 16,
+      "valid_jobs": 16,
+      "skipped": 0,
+      "duplicate_records": 0,
+      "coverage_complete": true,
+      "error_code": null,
+      "duration_seconds": 0.578,
+      "retained_ids": 16,
+      "removed_ids": 0
+    }
+  ],
+  "scheduler_first_replay": [
+    {
+      "source_identity": "lever:633e1a702ffe4584904c5e986c68be86",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": true,
+      "jobs_fetched": 34,
+      "jobs_created": 34,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.968,
+      "next_eligible_at": "2026-09-15T19:53:01.735815+00:00"
+    },
+    {
+      "source_identity": "lever:1988db3b4ffc469198f9c4067e33504b",
+      "attempted": true,
+      "claimed": true,
+      "status": "failed",
+      "coverage_complete": false,
+      "jobs_fetched": 0,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 1,
+      "error_code": "query_failed",
+      "duration_seconds": 0.0,
+      "next_eligible_at": "2026-09-15T14:23:01.735815+00:00"
+    },
+    {
+      "source_identity": "ashby:54c934f61e574ff495f00014d6261443",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": true,
+      "jobs_fetched": 19,
+      "jobs_created": 19,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.546,
+      "next_eligible_at": "2026-09-15T19:53:01.735815+00:00"
+    },
+    {
+      "source_identity": "ashby:10f258d25efb465b897ce0a1cbed3488",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": true,
+      "jobs_fetched": 16,
+      "jobs_created": 16,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.469,
+      "next_eligible_at": "2026-09-15T19:53:01.735815+00:00"
+    }
+  ],
+  "scheduler_immediate_replay": [
+    {
+      "source_identity": "lever:633e1a702ffe4584904c5e986c68be86",
+      "status": "skipped_not_due",
+      "attempted": false
+    },
+    {
+      "source_identity": "lever:1988db3b4ffc469198f9c4067e33504b",
+      "status": "skipped_not_due",
+      "attempted": false
+    },
+    {
+      "source_identity": "ashby:54c934f61e574ff495f00014d6261443",
+      "status": "skipped_not_due",
+      "attempted": false
+    },
+    {
+      "source_identity": "ashby:10f258d25efb465b897ce0a1cbed3488",
+      "status": "skipped_not_due",
+      "attempted": false
+    }
+  ],
+  "scheduler_second_replay": [
+    {
+      "source_identity": "lever:633e1a702ffe4584904c5e986c68be86",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": true,
+      "jobs_fetched": 34,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 34,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.719,
+      "next_eligible_at": "2026-09-16T03:53:01.735815+00:00"
+    },
+    {
+      "source_identity": "lever:1988db3b4ffc469198f9c4067e33504b",
+      "attempted": true,
+      "claimed": true,
+      "status": "failed",
+      "coverage_complete": false,
+      "jobs_fetched": 0,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 1,
+      "error_code": "query_failed",
+      "duration_seconds": 0.016,
+      "next_eligible_at": "2026-09-15T22:23:01.735815+00:00"
+    },
+    {
+      "source_identity": "ashby:54c934f61e574ff495f00014d6261443",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": true,
+      "jobs_fetched": 19,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 19,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.359,
+      "next_eligible_at": "2026-09-16T03:53:01.735815+00:00"
+    },
+    {
+      "source_identity": "ashby:10f258d25efb465b897ce0a1cbed3488",
+      "attempted": true,
+      "claimed": true,
+      "status": "success",
+      "coverage_complete": true,
+      "jobs_fetched": 16,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 16,
+      "failed_queries": 0,
+      "error_code": null,
+      "duration_seconds": 0.328,
+      "next_eligible_at": "2026-09-16T03:53:01.735815+00:00"
+    }
+  ],
+  "scheduler_clock": "second replay advances 8 hours; no sleeps",
+  "freshness_changed": true,
+  "pool_size": 69,
+  "profiles": [
+    {
+      "profile": {
+        "name": "IE customer operations/support",
+        "market": "IE",
+        "terms": [
+          "customer support",
+          "customer service",
+          "customer operations",
+          "support specialist"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 1,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "IE fraud/risk/trust",
+        "market": "IE",
+        "terms": [
+          "fraud",
+          "risk",
+          "trust",
+          "financial crime"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 6,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "IE fintech/payment operations",
+        "market": "IE",
+        "terms": [
+          "payment",
+          "operations",
+          "settlement",
+          "reconciliation"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 2,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "IE analyst",
+        "market": "IE",
+        "terms": [
+          "analyst"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 4,
+      "plausible_location_mode": 1,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {
+        "Role is outside the candidate's intended or bridge professional direction.": 1
+      },
+      "human_attention_verified": null,
+      "examples": [],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "UK operations management",
+        "market": "UK",
+        "terms": [
+          "operations manager",
+          "team lead",
+          "complaints manager",
+          "operations lead"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 4,
+      "plausible_location_mode": 3,
+      "deterministic_survivors": 3,
+      "assessment": "weak",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [
+        {
+          "title": "Complaints Manager",
+          "company": "Zopa",
+          "location": "London",
+          "url": "https://jobs.lever.co/zopa/3a4528eb-95ad-4e3e-af39-fdd0907a1ed6"
+        },
+        {
+          "title": "Marketing Operations Lead",
+          "company": "Zopa",
+          "location": "London",
+          "url": "https://jobs.lever.co/zopa/65546592-b45f-40c8-a1cd-a567ef840e73"
+        },
+        {
+          "title": "BDR Team Lead",
+          "company": "Paddle",
+          "location": "UK; Netherlands",
+          "url": "https://jobs.ashbyhq.com/paddle/723f3346-c36e-43fa-bd37-703eb42dde66"
+        }
+      ],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "UK customer success",
+        "market": "UK",
+        "terms": [
+          "customer success",
+          "account manager",
+          "customer experience"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 1,
+      "plausible_location_mode": 1,
+      "deterministic_survivors": 1,
+      "assessment": "weak",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [
+        {
+          "title": "Broker Account Manager",
+          "company": "Wayflyer",
+          "location": "London",
+          "url": "https://jobs.ashbyhq.com/wayflyer/f0052cb0-541c-4dd4-8717-1877fa4b4e35"
+        }
+      ],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "UK compliance/AML",
+        "market": "UK",
+        "terms": [
+          "compliance",
+          "aml",
+          "financial crime",
+          "kyc"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 4,
+      "plausible_location_mode": 4,
+      "deterministic_survivors": 4,
+      "assessment": "weak",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [
+        {
+          "title": "Compliance Assurance Manager (12 month FTC)",
+          "company": "Zopa",
+          "location": "London",
+          "url": "https://jobs.lever.co/zopa/e59ed42c-181b-4074-9fa3-b8a9d56176cd"
+        },
+        {
+          "title": "Financial Crime Specialist - Transaction Monitoring",
+          "company": "Zopa",
+          "location": "Manchester",
+          "url": "https://jobs.lever.co/zopa/44d4cfd9-77cf-4460-901f-021f621f0cf8"
+        },
+        {
+          "title": "Senior Compliance Manager (1st Line of Defence)",
+          "company": "Zopa",
+          "location": "London",
+          "url": "https://jobs.lever.co/zopa/150ac881-b143-4d44-84d8-ed1ac9b3d325"
+        },
+        {
+          "title": "Senior Financial Crime Strategy Manager",
+          "company": "Zopa",
+          "location": "London",
+          "url": "https://jobs.lever.co/zopa/cc0b901b-09af-4de8-8a94-67735ca03e20"
+        }
+      ],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "UK remote support",
+        "market": "UK",
+        "terms": [
+          "customer support",
+          "customer service",
+          "support specialist"
+        ],
+        "remote_only": true,
+        "preference": "remote required"
+      },
+      "pool_size": 69,
+      "title_plausible": 1,
+      "plausible_location_mode": 0,
+      "deterministic_survivors": 0,
+      "assessment": "insufficient",
+      "rejection_reasons": {},
+      "human_attention_verified": null,
+      "examples": [],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "Europe remote fintech/risk",
+        "market": "EU",
+        "terms": [
+          "risk",
+          "fraud",
+          "payment",
+          "operations",
+          "compliance"
+        ],
+        "remote_only": true,
+        "preference": "remote required"
+      },
+      "pool_size": 69,
+      "title_plausible": 8,
+      "plausible_location_mode": 2,
+      "deterministic_survivors": 1,
+      "assessment": "weak",
+      "rejection_reasons": {
+        "Role is outside the candidate's intended or bridge professional direction.": 1
+      },
+      "human_attention_verified": null,
+      "examples": [
+        {
+          "title": "Senior Credit Risk Data Scientist",
+          "company": "Wayflyer",
+          "location": "London",
+          "url": "https://jobs.ashbyhq.com/wayflyer/384acf8f-8762-4351-aa31-d957e92ce71e"
+        }
+      ],
+      "discovery_eligible": 69
+    },
+    {
+      "profile": {
+        "name": "Europe customer success/analyst",
+        "market": "EU",
+        "terms": [
+          "customer success",
+          "analyst",
+          "account manager"
+        ],
+        "remote_only": false,
+        "preference": "hybrid preferred; onsite considered"
+      },
+      "pool_size": 69,
+      "title_plausible": 5,
+      "plausible_location_mode": 4,
+      "deterministic_survivors": 1,
+      "assessment": "weak",
+      "rejection_reasons": {
+        "Role is outside the candidate's intended or bridge professional direction.": 3
+      },
+      "human_attention_verified": null,
+      "examples": [
+        {
+          "title": "Broker Account Manager",
+          "company": "Wayflyer",
+          "location": "London",
+          "url": "https://jobs.ashbyhq.com/wayflyer/f0052cb0-541c-4dd4-8717-1877fa4b4e35"
+        }
+      ],
+      "discovery_eligible": 69
+    }
+  ],
+  "source_runs": [
+    {
+      "id": "4607cadad3c6492d8d7586f00e63b29d",
+      "source_identity": "lever:633e1a702ffe4584904c5e986c68be86",
+      "source_type": "lever",
+      "company_source_id": "633e1a702ffe4584904c5e986c68be86",
+      "started_at": "2026-09-15T21:53:01.735815+00:00",
+      "finished_at": "2026-09-15T21:53:01.735815+00:00",
+      "status": "success",
+      "jobs_fetched": 34,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 34,
+      "failed_queries": 0,
+      "error_code": null,
+      "next_eligible_at": "2026-09-16T03:53:01.735815+00:00",
+      "coverage_complete": 1,
+      "duration_seconds": 0.719,
+      "created_at": "2026-09-15T21:53:01.735815+00:00"
+    },
+    {
+      "id": "076a9d38f2f149e4a559215d98f00256",
+      "source_identity": "lever:633e1a702ffe4584904c5e986c68be86",
+      "source_type": "lever",
+      "company_source_id": "633e1a702ffe4584904c5e986c68be86",
+      "started_at": "2026-09-15T13:53:01.735815+00:00",
+      "finished_at": "2026-09-15T13:53:01.735815+00:00",
+      "status": "success",
+      "jobs_fetched": 34,
+      "jobs_created": 34,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 0,
+      "error_code": null,
+      "next_eligible_at": "2026-09-15T19:53:01.735815+00:00",
+      "coverage_complete": 1,
+      "duration_seconds": 0.968,
+      "created_at": "2026-09-15T13:53:01.735815+00:00"
+    },
+    {
+      "id": "b2987a9e39304f9cb7fdc9967972d5ca",
+      "source_identity": "lever:1988db3b4ffc469198f9c4067e33504b",
+      "source_type": "lever",
+      "company_source_id": "1988db3b4ffc469198f9c4067e33504b",
+      "started_at": "2026-09-15T21:53:01.735815+00:00",
+      "finished_at": "2026-09-15T21:53:01.735815+00:00",
+      "status": "failed",
+      "jobs_fetched": 0,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 1,
+      "error_code": "query_failed",
+      "next_eligible_at": "2026-09-15T22:23:01.735815+00:00",
+      "coverage_complete": 0,
+      "duration_seconds": 0.016,
+      "created_at": "2026-09-15T21:53:01.735815+00:00"
+    },
+    {
+      "id": "5c4f6e85dd564759b735b6875eea7645",
+      "source_identity": "lever:1988db3b4ffc469198f9c4067e33504b",
+      "source_type": "lever",
+      "company_source_id": "1988db3b4ffc469198f9c4067e33504b",
+      "started_at": "2026-09-15T13:53:01.735815+00:00",
+      "finished_at": "2026-09-15T13:53:01.735815+00:00",
+      "status": "failed",
+      "jobs_fetched": 0,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 1,
+      "error_code": "query_failed",
+      "next_eligible_at": "2026-09-15T14:23:01.735815+00:00",
+      "coverage_complete": 0,
+      "duration_seconds": 0.0,
+      "created_at": "2026-09-15T13:53:01.735815+00:00"
+    },
+    {
+      "id": "76eb75d92e5d4df48635724af9cd6ca6",
+      "source_identity": "ashby:54c934f61e574ff495f00014d6261443",
+      "source_type": "ashby",
+      "company_source_id": "54c934f61e574ff495f00014d6261443",
+      "started_at": "2026-09-15T21:53:01.735815+00:00",
+      "finished_at": "2026-09-15T21:53:01.735815+00:00",
+      "status": "success",
+      "jobs_fetched": 19,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 19,
+      "failed_queries": 0,
+      "error_code": null,
+      "next_eligible_at": "2026-09-16T03:53:01.735815+00:00",
+      "coverage_complete": 1,
+      "duration_seconds": 0.359,
+      "created_at": "2026-09-15T21:53:01.735815+00:00"
+    },
+    {
+      "id": "730db1c3b19b4410ace241f2c18eba4b",
+      "source_identity": "ashby:54c934f61e574ff495f00014d6261443",
+      "source_type": "ashby",
+      "company_source_id": "54c934f61e574ff495f00014d6261443",
+      "started_at": "2026-09-15T13:53:01.735815+00:00",
+      "finished_at": "2026-09-15T13:53:01.735815+00:00",
+      "status": "success",
+      "jobs_fetched": 19,
+      "jobs_created": 19,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 0,
+      "error_code": null,
+      "next_eligible_at": "2026-09-15T19:53:01.735815+00:00",
+      "coverage_complete": 1,
+      "duration_seconds": 0.546,
+      "created_at": "2026-09-15T13:53:01.735815+00:00"
+    },
+    {
+      "id": "4ea1e49a981b40f883fe997fce6d97f7",
+      "source_identity": "ashby:10f258d25efb465b897ce0a1cbed3488",
+      "source_type": "ashby",
+      "company_source_id": "10f258d25efb465b897ce0a1cbed3488",
+      "started_at": "2026-09-15T21:53:01.735815+00:00",
+      "finished_at": "2026-09-15T21:53:01.735815+00:00",
+      "status": "success",
+      "jobs_fetched": 16,
+      "jobs_created": 0,
+      "jobs_updated": 0,
+      "jobs_unchanged": 16,
+      "failed_queries": 0,
+      "error_code": null,
+      "next_eligible_at": "2026-09-16T03:53:01.735815+00:00",
+      "coverage_complete": 1,
+      "duration_seconds": 0.328,
+      "created_at": "2026-09-15T21:53:01.735815+00:00"
+    },
+    {
+      "id": "db6ba2f26abd462e85f493770ba92cec",
+      "source_identity": "ashby:10f258d25efb465b897ce0a1cbed3488",
+      "source_type": "ashby",
+      "company_source_id": "10f258d25efb465b897ce0a1cbed3488",
+      "started_at": "2026-09-15T13:53:01.735815+00:00",
+      "finished_at": "2026-09-15T13:53:01.735815+00:00",
+      "status": "success",
+      "jobs_fetched": 16,
+      "jobs_created": 16,
+      "jobs_updated": 0,
+      "jobs_unchanged": 0,
+      "failed_queries": 0,
+      "error_code": null,
+      "next_eligible_at": "2026-09-15T19:53:01.735815+00:00",
+      "coverage_complete": 1,
+      "duration_seconds": 0.469,
+      "created_at": "2026-09-15T13:53:01.735815+00:00"
+    }
+  ],
+  "ai_calls": 0,
+  "gmail_calls": 0,
+  "postgres_live": "pending"
+}
