@@ -342,6 +342,88 @@ def test_hardcoded_beta_cookie_key_is_absent():
     )
 
 
+def test_session_cookie_key_prefers_environment(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "SESSION_COOKIE_KEY",
+        "  environment-key  ",
+    )
+    monkeypatch.setattr(
+        session_auth.st,
+        "secrets",
+        {"SESSION_COOKIE_KEY": "streamlit-key"},
+    )
+
+    assert (
+        session_auth._resolve_session_cookie_key()
+        == "environment-key"
+    )
+
+
+def test_session_cookie_key_falls_back_to_streamlit_secrets(
+    monkeypatch,
+):
+    monkeypatch.delenv(
+        "SESSION_COOKIE_KEY",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        session_auth.st,
+        "secrets",
+        {"SESSION_COOKIE_KEY": "  streamlit-key  "},
+    )
+
+    assert (
+        session_auth._resolve_session_cookie_key()
+        == "streamlit-key"
+    )
+
+
+def test_session_cookie_key_fails_closed_when_missing(
+    monkeypatch,
+):
+    monkeypatch.delenv(
+        "SESSION_COOKIE_KEY",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        session_auth.st,
+        "secrets",
+        {},
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "^SESSION_COOKIE_KEY is not configured\\.$"
+        ),
+    ):
+        session_auth._resolve_session_cookie_key()
+
+
+def test_blank_session_cookie_key_values_are_missing(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "SESSION_COOKIE_KEY",
+        "   ",
+    )
+    monkeypatch.setattr(
+        session_auth.st,
+        "secrets",
+        {"SESSION_COOKIE_KEY": "\t\n"},
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "^SESSION_COOKIE_KEY is not configured\\.$"
+        ),
+    ):
+        session_auth._resolve_session_cookie_key()
+
+
 def test_revoked_database_session_invalidates_cached_user(
     session_runtime,
 ):

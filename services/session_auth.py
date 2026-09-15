@@ -19,14 +19,34 @@ SESSION_COOKIE = "jobhunter_session"
 SESSION_DAYS = 7
 
 
-SESSION_COOKIE_KEY = os.getenv(
-    "SESSION_COOKIE_KEY"
-)
+def _resolve_session_cookie_key() -> str:
+    environment_value = str(
+        os.getenv("SESSION_COOKIE_KEY") or ""
+    ).strip()
 
-if not SESSION_COOKIE_KEY:
-    raise RuntimeError(
-        "SESSION_COOKIE_KEY is not configured."
-    )
+    if environment_value:
+        return environment_value
+
+    try:
+        streamlit_value = st.secrets.get(
+            "SESSION_COOKIE_KEY"
+        )
+    except Exception:
+        streamlit_value = None
+
+    resolved_value = str(
+        streamlit_value or ""
+    ).strip()
+
+    if not resolved_value:
+        raise RuntimeError(
+            "SESSION_COOKIE_KEY is not configured."
+        )
+
+    return resolved_value
+
+
+SESSION_COOKIE_KEY = _resolve_session_cookie_key()
 
 
 cookies = EncryptedCookieManager(
