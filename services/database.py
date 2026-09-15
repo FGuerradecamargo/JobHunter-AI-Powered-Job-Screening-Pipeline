@@ -639,6 +639,8 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "companies",
         "candidate_monitored_companies",
         "company_job_sources",
+        "source_ingestion_state",
+        "source_ingestion_runs",
     }
 )
 
@@ -695,6 +697,8 @@ def create_company_registry_schema(connection) -> None:
     )
     for table in ("companies", "candidate_monitored_companies", "company_job_sources"):
         _enable_server_only_row_level_security(connection, table)
+    from services.source_run_schema import create_source_run_schema
+    create_source_run_schema(connection)
 
 
 def create_interview_details_schema(connection) -> None:

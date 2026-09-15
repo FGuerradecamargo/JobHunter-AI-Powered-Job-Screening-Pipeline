@@ -255,7 +255,10 @@ def test_archive_and_reappearance(db):
     with database.get_connection() as connection:
         connection.execute("UPDATE job_sources SET last_seen_at = ?", ("2000-01-01",))
     archive = JobArchiveService()
-    assert archive.archive_stale_global_jobs() == 1
+    # Age alone no longer provides closure evidence (Launch 1D).
+    assert archive.archive_stale_global_jobs() == 0
+    with database.get_connection() as connection:
+        connection.execute("UPDATE jobs SET archived_at = ?", ("2000-01-02",))
     assert JobSearchRepository().list_global_jobs() == []
     import_job(job())
     assert len(JobSearchRepository().list_global_jobs()) == 1

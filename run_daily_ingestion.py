@@ -10,9 +10,8 @@ from dotenv import load_dotenv
 from migrate_global_job_ingestion import (
     migrate,
 )
-from services.daily_ingestion_service import (
-    DailyIngestionService,
-)
+from services.source_schedule_service import SourceScheduleService
+from services.job_sources.provider import default_providers
 from services.job_archive_service import (
     JobArchiveService,
 )
@@ -95,19 +94,13 @@ def main() -> None:
         print("[2/4] Global API ingestion")
 
         ingestion = (
-            DailyIngestionService().run(
-                day_index=args.day_index,
-                jooble_results_per_query=(
-                    args.jooble_results
-                ),
-                adzuna_results_per_query=(
-                    args.adzuna_results
-                ),
-            )
+            SourceScheduleService().run(day_index=args.day_index, globals=default_providers(
+                args.jooble_results, args.adzuna_results,
+            ))
         )
 
         pprint(
-            asdict(ingestion)
+            ingestion
         )
 
     if args.skip_gmail:
