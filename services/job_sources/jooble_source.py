@@ -8,6 +8,7 @@ from services.job_sources.base_job_source import JobSource
 
 
 class JoobleJobSource(JobSource):
+    source_type = "jooble"
 
     def __init__(self) -> None:
         load_dotenv()

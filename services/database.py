@@ -20,6 +20,7 @@ import os
 import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+from services.global_source_schema import ensure_global_source_schema
 
 load_dotenv()
 
@@ -1092,6 +1093,8 @@ def initialize_postgres_database() -> None:
             """
         )
 
+        ensure_global_source_schema(connection, postgres=True)
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS job_discovery_signals (
@@ -1850,6 +1853,8 @@ def initialize_sqlite_database() -> None:
             )
             """
         )
+
+        ensure_global_source_schema(connection, postgres=False)
 
         connection.execute(
             """
@@ -3293,9 +3298,10 @@ def upsert_raw_job(
                     sub_category,
                     analysis_json,
                     created_at,
-                    updated_at
+                    updated_at,
+                    description
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job_id,
@@ -3316,6 +3322,7 @@ def upsert_raw_job(
                     "{}",
                     now,
                     now,
+                    job.description,
                 ),
             )
 
@@ -3338,6 +3345,7 @@ def upsert_raw_job(
             UPDATE jobs
             SET
                 raw_text = ?,
+                description = COALESCE(?, description),
                 title = COALESCE(?, title),
                 company = COALESCE(?, company),
                 location = COALESCE(?, location),
@@ -3352,6 +3360,7 @@ def upsert_raw_job(
             """,
             (
                 new_raw_text,
+                job.description,
                 job.title,
                 job.company,
                 job.location,

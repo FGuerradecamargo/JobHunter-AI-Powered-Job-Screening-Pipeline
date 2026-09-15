@@ -15,9 +15,7 @@ def build_daily_query_plan(
     day_index: int,
     source_type: str,
 ) -> list[dict]:
-    limit = SOURCE_QUERY_LIMITS[
-        source_type
-    ]
+    limit = SOURCE_QUERY_LIMITS.get(source_type, 10)
 
     all_queries = list(
         iter_global_search_queries()

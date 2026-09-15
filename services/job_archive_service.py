@@ -25,7 +25,7 @@ class JobArchiveService:
             cursor = connection.execute(
                 """
                 UPDATE jobs
-                SET archived_at = %s
+                SET archived_at = ?
                 WHERE
                     archived_at IS NULL
                     AND id IN (
@@ -33,12 +33,10 @@ class JobArchiveService:
                         FROM job_sources js
                         GROUP BY js.job_id
                         HAVING
-                            BOOL_AND(
-                                js.user_id IS NULL
-                            )
+                            COUNT(js.user_id) = 0
                             AND MAX(
                                 js.last_seen_at
-                            ) < %s
+                            ) < ?
                     )
                 """,
                 (

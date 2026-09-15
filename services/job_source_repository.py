@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from services.database import get_connection
+from services.job_observation import is_personal_source
 
 
 class JobSourceRepository:
@@ -12,6 +13,11 @@ class JobSourceRepository:
         source_type: str,
         user_id: str | None = None,
     ) -> None:
+        source_type = str(source_type or "").strip().lower()
+        if not source_type or (user_id is not None and not str(user_id).strip()):
+            raise ValueError("Source scope is invalid.")
+        if is_personal_source(source_type) and user_id is None:
+            raise ValueError("Personal sources require a user.")
         seen_at = (
             datetime.now(timezone.utc).isoformat()
         )
@@ -206,6 +212,7 @@ class JobSourceRepository:
     def list_sources_for_job(
         self,
         job_id: str,
+        user_id: str | None = None,
     ):
         with get_connection() as connection:
             return connection.execute(
@@ -213,10 +220,12 @@ class JobSourceRepository:
                 SELECT
                     user_id,
                     source_type,
-                    discovered_at
+                    discovered_at,
+                    last_seen_at
                 FROM job_sources
                 WHERE job_id = ?
+                    AND (user_id IS NULL OR user_id = ?)
                 ORDER BY discovered_at ASC
                 """,
-                (job_id,),
+                (job_id, user_id),
             ).fetchall()

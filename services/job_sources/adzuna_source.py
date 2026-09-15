@@ -8,6 +8,7 @@ from services.job_sources.base_job_source import JobSource
 
 
 class AdzunaJobSource(JobSource):
+    source_type = "adzuna"
 
     def __init__(self, country: str = "ie") -> None:
         load_dotenv()

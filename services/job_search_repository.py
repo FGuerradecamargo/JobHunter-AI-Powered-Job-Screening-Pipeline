@@ -43,6 +43,10 @@ class JobSearchRepository:
             FROM jobs
 
             WHERE archived_at IS NULL
+                AND EXISTS (
+                    SELECT 1 FROM job_sources s
+                    WHERE s.job_id = jobs.id AND s.user_id IS NULL
+                )
 
             {category_filter}
 
@@ -174,6 +178,15 @@ class JobSearchRepository:
             WHERE
                 jobs.archived_at IS NULL
 
+                AND EXISTS (
+                    SELECT 1 FROM job_sources s
+                    WHERE s.job_id = jobs.id AND (
+                        s.user_id IS NULL OR s.user_id IN (
+                            SELECT id FROM users WHERE candidate_id = ?
+                        )
+                    )
+                )
+
                 AND (
                     candidate_job_analyses.job_id IS NULL
 
@@ -192,6 +205,7 @@ class JobSearchRepository:
             rows = connection.execute(
                 query,
                 (
+                    candidate_id,
                     candidate_id,
                 ),
             ).fetchall()
