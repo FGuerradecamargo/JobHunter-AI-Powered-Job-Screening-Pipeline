@@ -641,6 +641,8 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "company_job_sources",
         "source_ingestion_state",
         "source_ingestion_runs",
+        "candidate_profile_snapshots",
+        "job_profile_snapshots",
     }
 )
 
@@ -773,6 +775,70 @@ def create_preparation_generation_claim_schema(connection) -> None:
     _enable_server_only_row_level_security(
         connection, "candidate_preparation_generation_claims"
     )
+
+
+def create_profile_interpretation_schema(connection) -> None:
+    """Immutable, server-only interpretation snapshots."""
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS candidate_profile_snapshots (
+            candidate_id TEXT NOT NULL,
+            profile_version INTEGER NOT NULL CHECK (profile_version > 0),
+            schema_version TEXT NOT NULL,
+            memory_signature TEXT NOT NULL,
+            supersedes_version INTEGER,
+            profile_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (candidate_id, profile_version),
+            UNIQUE (candidate_id, memory_signature, schema_version),
+            FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS job_profile_snapshots (
+            job_id TEXT NOT NULL,
+            profile_version INTEGER NOT NULL CHECK (profile_version > 0),
+            schema_version TEXT NOT NULL,
+            job_signature TEXT NOT NULL,
+            supersedes_version INTEGER,
+            profile_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (job_id, profile_version),
+            UNIQUE (job_id, job_signature, schema_version),
+            FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_candidate_profiles_current
+        ON candidate_profile_snapshots(candidate_id, profile_version DESC)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_job_profiles_current
+        ON job_profile_snapshots(job_id, profile_version DESC)
+        """
+    )
+    if is_postgres():
+        for table in ("candidate_profile_snapshots", "job_profile_snapshots"):
+            _enable_server_only_row_level_security(connection, table)
+            connection.execute(f"REVOKE ALL ON TABLE {table} FROM PUBLIC")
+            connection.execute(
+                f"""
+                DO $$ BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                        EXECUTE 'REVOKE ALL ON TABLE {table} FROM anon';
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                        EXECUTE 'REVOKE ALL ON TABLE {table} FROM authenticated';
+                    END IF;
+                END $$
+                """
+            )
 
 
 def initialize_postgres_database() -> None:
@@ -1587,6 +1653,8 @@ def initialize_postgres_database() -> None:
             )
             """
         )
+
+        create_profile_interpretation_schema(connection)
 
 
 class PostgresConnectionAdapter:
@@ -2579,6 +2647,8 @@ def initialize_sqlite_database() -> None:
             )
             """
         )
+
+        create_profile_interpretation_schema(connection)
 
 
 @lru_cache(maxsize=1)
