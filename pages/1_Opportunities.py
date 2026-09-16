@@ -1,4 +1,5 @@
 import logging
+from services.historical_cv_presenter import normalize_historical_cv
 from services.opportunity_search_run import OpportunitySearchRun
 
 logger = logging.getLogger(__name__)
@@ -1197,9 +1198,7 @@ def render_tailored_cv(
     company: str,
     title: str,
 ) -> None:
-    tailored_cv = analysis.get(
-        "tailored_cv"
-    )
+    tailored_cv = normalize_historical_cv(analysis.get("tailored_cv"))
 
     if not tailored_cv:
         return
@@ -1211,9 +1210,7 @@ def render_tailored_cv(
         )
 
         if headline:
-            st.markdown(
-                f"### {headline}"
-            )
+            st.text(headline)
 
         professional_summary = (
             tailored_cv.get(
@@ -1226,7 +1223,7 @@ def render_tailored_cv(
             st.subheader(
                 "Professional Summary"
             )
-            st.write(
+            st.text(
                 professional_summary
             )
 
@@ -1241,7 +1238,7 @@ def render_tailored_cv(
             )
 
             for skill in key_skills:
-                st.write(
+                st.text(
                     f"- {skill}"
                 )
 
@@ -1278,13 +1275,7 @@ def render_tailored_cv(
                 ]
 
                 if heading_parts:
-                    st.markdown(
-                        "**"
-                        + " - ".join(
-                            heading_parts
-                        )
-                        + "**"
-                    )
+                    st.text(" - ".join(heading_parts))
 
                 for bullet in experience.get(
                     "tailored_bullets",
@@ -1295,7 +1286,7 @@ def render_tailored_cv(
                     )
 
                     if clean_bullet:
-                        st.markdown(
+                        st.text(
                             f"- {clean_bullet}"
                         )
 
@@ -1317,7 +1308,7 @@ def render_tailored_cv(
                 )
 
                 if clean_item:
-                    st.markdown(
+                    st.text(
                         f"- {clean_item}"
                     )
 
