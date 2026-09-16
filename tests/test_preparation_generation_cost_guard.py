@@ -169,3 +169,33 @@ def test_missing_configuration_message_does_not_expose_secret_name():
     source = Path("pages/1_Opportunities.py").read_text(encoding="utf-8")
     assert "Tailored CV generation is currently unavailable." in source
     assert "OPENAI_API_KEY" not in source
+
+
+def test_failed_validation_releases_persisted_claim_and_ui_retry_works(claim_repository):
+    from tests.test_prepare_application_service import FakeContractService, FakeContextService, _valid_output
+    from tests.test_tailored_cv_repair_service import SequenceGeneratorClient
+    from services.prepare_application_service import PrepareApplicationService
+    from services.tailored_cv_generation_service import TailoredCVGenerationService
+    from services.prepared_application_ui import handle_prepare_application_action
+
+    repository, connect = claim_repository
+    invalid = _valid_output()
+    invalid["headline"]["evidence_refs"] = ["unknown"]
+    client = SequenceGeneratorClient(invalid, invalid, _valid_output())
+    service = PrepareApplicationService(
+        contract_service=FakeContractService(), context_service=FakeContextService(),
+        generation_service=TailoredCVGenerationService(client), claim_repository=repository,
+    )
+    state = {}
+    def click():
+        return handle_prepare_application_action(
+            state, candidate_id="candidate-a", job_id="job-1",
+            analysis={"recommendation": "best_match"}, action_requested=True,
+            preparation_service=service,
+        )
+    assert click().error_code == "repair_exhausted"
+    with connect() as connection:
+        assert connection.execute("SELECT count(*) FROM candidate_preparation_generation_claims").fetchone()[0] == 0
+    assert click().status == "prepared"
+    assert click().status == "prepared"
+    assert len(client.requests) == 3

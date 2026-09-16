@@ -272,7 +272,7 @@ def test_normal_view_model_excludes_provenance_and_internal_ids():
                 job_id="job-1",
                 error_message="private provider detail",
             ),
-            "did not pass validation",
+            "could not be validated",
         ),
     ],
 )

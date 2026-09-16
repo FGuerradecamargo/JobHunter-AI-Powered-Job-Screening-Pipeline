@@ -1,6 +1,10 @@
 from dataclasses import asdict, replace
+import json
 
 import pytest
+
+from models.prepare_application import PrepareApplicationResult
+from services.prepared_application_ui import prepared_application_error_message
 
 from models.application_context import ApplicationContext
 from models.application_contract import ApplicationEvidenceRef
@@ -144,6 +148,80 @@ def _run(*responses, max_repair_attempts=1, context=None):
 
 def _codes(result):
     return {item.code for item in result.validation_issues}
+
+
+@pytest.mark.parametrize("ending,stage,repair", [
+    ("disabled", "initial_truth_guard", False),
+    ("success", "validated_after_repair", True),
+    ("invalid", "repair_truth_guard", True),
+    ("parse", "repair_parse", True),
+    ("client", "repair_client", True),
+])
+def test_content_free_validation_diagnostics(caplog, ending, stage, repair):
+    private = "PRIVATE-CV-SECRET-SENTINEL"
+    invalid = _invalid_unknown()
+    invalid["headline"]["text"] = private
+    invalid["headline"]["evidence_refs"] = [private]
+    responses = [invalid]
+    if repair:
+        responses.append({
+            "success": _valid_output(), "invalid": invalid,
+            "parse": private, "client": RuntimeError(private),
+        }[ending])
+    result, client = _run(*responses, max_repair_attempts=int(repair))
+    events = [json.loads(record.message) for record in caplog.records
+              if record.name == "services.tailored_cv_diagnostics"]
+    assert events[-1]["stage"] == stage
+    assert events[-1]["repair_attempted"] is repair
+    assert events[0]["validation_codes"] == ["unknown_evidence_ref"]
+    assert events[0]["issue_count"] == 1
+    assert len(client.requests) == 1 + int(repair)
+    assert private not in caplog.text
+    assert "candidate-a" not in caplog.text
+    if ending == "success":
+        assert result.status == "validated_after_repair"
+    else:
+        message = prepared_application_error_message(PrepareApplicationResult(
+            status="generation_failed", candidate_id="candidate-a", job_id="job-1",
+            error_code=result.error_code, validation_issues=result.validation_issues,
+        ))
+        assert private not in message
+        if ending == "invalid":
+            assert "Repair attempt also failed validation" in message
+            assert "Unsupported evidence reference" in message
+
+
+def test_initial_parse_failure_diagnostic(caplog):
+    result, client = _run("PRIVATE INVALID JSON")
+    event = json.loads(caplog.records[-1].message)
+    assert event["stage"] == "initial_parse"
+    assert event["repair_attempted"] is False
+    assert event["issue_count"] == 0
+    assert len(client.requests) == 1
+    assert "PRIVATE INVALID JSON" not in caplog.text
+    assert result.error_code == "invalid_generator_output"
+
+
+def test_untrusted_issue_details_are_not_displayed_or_logged(caplog):
+    from services.tailored_cv_diagnostics import log_cv_diagnostic
+    issue = CVValidationIssue(code="PRIVATE", location="PRIVATE", message="PRIVATE")
+    log_cv_diagnostic(stage="PRIVATE", issues=[issue], error_code="PRIVATE")
+    message = prepared_application_error_message(PrepareApplicationResult(
+        status="generation_failed", candidate_id="a", job_id="b",
+        error_message="PRIVATE", validation_issues=[issue],
+    ))
+    assert "PRIVATE" not in message + caplog.text
+
+
+@pytest.mark.parametrize("code,expected", [
+    ("generation_in_progress", "already being generated"),
+    ("generation_claim_failed", "temporarily unavailable"),
+    ("generator_client_error", "generation could not be completed"),
+    ("invalid_generator_output", "structure was invalid"),
+])
+def test_generation_errors_are_not_all_reported_as_truth_guard_failure(code, expected):
+    result = PrepareApplicationResult(status="generation_failed", candidate_id="a", job_id="b", error_code=code)
+    assert expected in prepared_application_error_message(result)
 
 
 def test_initial_valid_generation_does_not_repair():

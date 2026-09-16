@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import MutableMapping
 
 from models.prepare_application import PrepareApplicationResult
+from services.tailored_cv_diagnostics import validation_failure_message
 from services.application_contract_builder import (
     APPLICATION_ELIGIBLE_RECOMMENDATIONS,
 )
@@ -169,12 +170,16 @@ def prepared_application_error_message(
         return "This opportunity is not eligible for application preparation."
     if result.error_code == "analysis_not_found":
         return "The analyzed opportunity is no longer available."
-    if result.status == "generation_failed":
-        return "The generated material did not pass validation."
     if result.error_code == "preparation_unavailable":
         return "Application preparation is currently unavailable."
     if result.error_code == "generation_in_progress":
         return "This tailored CV is already being generated. Please wait."
     if result.error_code == "generation_claim_failed":
         return "Application preparation is temporarily unavailable."
+    if result.error_code in {"generator_client_error", "repair_client_error", "generation_service_error"}:
+        return "Tailored CV generation could not be completed. Please try again later."
+    if result.error_code == "no_selected_evidence":
+        return "There is no selected evidence available to prepare this CV."
+    if result.status == "generation_failed":
+        return validation_failure_message(result)
     return "We could not prepare this application."

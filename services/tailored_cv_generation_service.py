@@ -9,6 +9,7 @@ from services.tailored_cv_repair_request_builder import (
     build_tailored_cv_repair_request,
 )
 from services.tailored_cv_truth_guard import validate_tailored_cv_draft
+from services.tailored_cv_diagnostics import ERROR_STAGES, log_cv_diagnostic
 
 
 _REPAIRABLE_ISSUE_CODES = {
@@ -42,6 +43,17 @@ class TailoredCVGenerationService:
         self.max_repair_attempts = max_repair_attempts
 
     def generate(self, context: ApplicationContext) -> TailoredCVGenerationResult:
+        result = self._generate(context)
+        if result.status != "validated":
+            log_cv_diagnostic(
+                stage=ERROR_STAGES.get(result.error_code, result.status),
+                issues=result.validation_issues,
+                error_code=result.error_code,
+                repair_attempted=result.attempt_count > 1,
+            )
+        return result
+
+    def _generate(self, context: ApplicationContext) -> TailoredCVGenerationResult:
         request = build_tailored_cv_generation_request(context)
         if not context.eligible or context.recommendation == "reject":
             return TailoredCVGenerationResult(
@@ -100,6 +112,7 @@ class TailoredCVGenerationService:
             )
 
         repair_signature = ""
+        log_cv_diagnostic(stage="initial_truth_guard", issues=validation.issues)
         attempts = 1
         for _ in range(self.max_repair_attempts):
             repair_request = build_tailored_cv_repair_request(
