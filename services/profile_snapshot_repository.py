@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 import json
 
-from models.hiring_case import RequirementImportance
+from models.hiring_case import RequirementImportance, EvidenceRequirement, TemporalRequirement
 from models.profile_interpretation import (
     AIJobProfileSnapshot,
     CandidateProfileSnapshot,
@@ -59,6 +59,10 @@ def _job_from_json(raw: str) -> AIJobProfileSnapshot:
                 "importance": RequirementImportance(item["importance"]),
                 "authority": InterpretationAuthority(item["authority"]),
                 "hard_fact_refs": tuple(item["hard_fact_refs"]),
+                "evidence_requirement": EvidenceRequirement(item.get("evidence_requirement", "defensible")),
+                "evidence_requirement_refs": tuple(item.get("evidence_requirement_refs", ())),
+                "temporal_requirement": TemporalRequirement(item.get("temporal_requirement", "not_required")),
+                "temporal_requirement_refs": tuple(item.get("temporal_requirement_refs", ())),
             }
         )
         for item in data["needs"]

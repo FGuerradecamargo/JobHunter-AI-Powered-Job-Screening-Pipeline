@@ -10,22 +10,15 @@ from models.candidate_priority import CandidatePriority
 from models.career_objective import CareerObjective
 from models.career_update import CareerUpdate
 from models.hiring_case import (
-    HiringCaseClassification, HiringCaseStrength, OpportunitySignal,
-    OpportunitySignalKind, OpportunitySignalState, OpportunityValue,
+    HiringCaseClassification, HiringCaseStrength, OpportunityValue,
     RequirementEvidenceState, RequirementImportance,
 )
 from models.hiring_case_shadow import ConfirmedCapabilityGap, HiringCaseShadowSource
 from models.job_profile import JobProfile
-from models.profile_interpretation import (
-    AIJobProfileSnapshot, CandidateProfileSnapshot, HiringCaseInterpretation,
-    InterpretationAuthority, InterpretedJobNeed, ProfileCapability,
-    ProfileCheckpoint, RequirementLink,
-)
 from models.professional_experience_profile import ProfessionalExperienceProfile
 from services.hiring_case_compatibility import read_legacy_classification
 from services.hiring_case_engine import classify_hiring_case
 from services.hiring_case_shadow_service import evaluate_profile_hiring_case_shadow
-from services.job_hard_facts import build_job_hard_facts
 from services.profile_hiring_case_adapter import build_profile_hiring_case_input
 from tests.hiring_case_calibration_cases import RootCause, calibration_cases
 
@@ -117,120 +110,9 @@ def _key(text):
     return " ".join(text.split()).casefold().rstrip(".;:,")
 
 
-def profile_inputs_from_facts(facts, source):
-    """Deterministic fake interpreter: links facts semantically, never from expectations."""
-    profile = source.job_profile
-    hard = build_job_hard_facts(
-        profile,
-        explicit_blockers=(facts.company.eligibility_blocker,) if facts.company.eligibility_blocker else (),
-    )
-    fact_by_value = {_key(item.value): item for item in hard.facts}
-    core_kinds = {"must_have_capability", "must_have_experience", "qualification", "structural_requirement"}
-    nice_kinds = {"nice_to_have"}
-    needs = []
-    links = []
-    source_refs = []
-    capabilities = []
-    confirmed_gaps = []
-    candidate_capabilities = {item.key: item for item in facts.candidate.capabilities}
-    for need in facts.company.needs:
-        hard_fact = fact_by_value.get(_key(need.text))
-        if hard_fact is None:
-            continue
-        importance = (
-            RequirementImportance.CORE if hard_fact.kind in core_kinds
-            else RequirementImportance.NICE_TO_HAVE if hard_fact.kind in nice_kinds
-            else RequirementImportance.IMPORTANT
-        )
-        need_id = f"need-{need.key}"
-        needs.append(InterpretedJobNeed(
-            need_id, need.text, importance, InterpretationAuthority.EXPLICIT,
-            (hard_fact.fact_id,), what_to_demonstrate=need.evidence_needed,
-        ))
-        capability = candidate_capabilities[need.key]
-        proof = capability.proof
-        refs = ()
-        if proof.kind in {"direct", "transferable"} and proof.source_available:
-            refs = (f"professional_experience:experience-{need.key}",)
-            source_refs.extend(refs)
-            capabilities.append(ProfileCapability(
-                f"cap-{need.key}", proof.wording, refs,
-                contexts=(proof.example,), transferable=proof.kind == "transferable",
-            ))
-        state = {
-            "direct": RequirementEvidenceState.PROVEN,
-            "transferable": RequirementEvidenceState.TRANSFERABLE,
-            "confirmed_gap": RequirementEvidenceState.GAP,
-            "absent": RequirementEvidenceState.EVIDENCE_MISSING,
-            "vague": RequirementEvidenceState.EVIDENCE_MISSING,
-        }[proof.kind]
-        if not refs and state in {RequirementEvidenceState.PROVEN, RequirementEvidenceState.TRANSFERABLE}:
-            state = RequirementEvidenceState.EVIDENCE_MISSING
-        if proof.kind == "confirmed_gap":
-            confirmed_gaps.append(need_id)
-        links.append(RequirementLink(
-            need_id, state, refs,
-            "Synthetic source-backed relationship for offline calibration.", bool(refs),
-        ))
-    candidate_profile = CandidateProfileSnapshot(
-        source.candidate.id, 1, "synthetic-memory-signature", "2026-01-01T00:00:00+00:00",
-        tuple(source_refs), tuple(capabilities),
-        ProfileCheckpoint(
-            current_position=facts.candidate.context.scope,
-            confirmed_gaps=tuple(confirmed_gaps),
-            current_direction=(facts.opportunity.career_direction,),
-        ),
-        confirmed_gaps=tuple(confirmed_gaps), objectives=(facts.opportunity.career_direction,),
-        preferences=(facts.opportunity.role_content,), seniority=facts.candidate.context.level,
-        responsibility_scope=facts.candidate.context.scope,
-    )
-    job_profile = AIJobProfileSnapshot(
-        hard.job_id, 1, hard.job_signature, "2026-01-01T00:00:00+00:00", tuple(needs),
-        problem_to_solve=facts.company.expected_work, context=facts.company.seniority_context,
-    )
-    opportunity = facts.opportunity
-    signals = []
-
-    def signal(kind, state, importance, rationale):
-        signals.append(OpportunitySignal(kind, state, importance, rationale))
-
-    if _key(opportunity.desired_family) == _key(facts.company.family):
-        signal(OpportunitySignalKind.CAREER_DIRECTION, OpportunitySignalState.POSITIVE,
-               RequirementImportance.CORE, "Role family matches the stated direction.")
-    else:
-        signal(OpportunitySignalKind.CAREER_DIRECTION, OpportunitySignalState.NEGATIVE,
-               RequirementImportance.IMPORTANT, "Role family differs from the stated direction.")
-    pay = opportunity.compensation
-    if pay.annual_offer is None or pay.annual_current is None:
-        signal(OpportunitySignalKind.COMPENSATION, OpportunitySignalState.UNKNOWN,
-               RequirementImportance.IMPORTANT, "Comparable compensation is unknown.")
-    elif "unacceptable" in pay.tradeoff.casefold() or pay.annual_offer < pay.annual_current:
-        signal(OpportunitySignalKind.COMPENSATION, OpportunitySignalState.NEGATIVE,
-               RequirementImportance.CORE, "Known compensation is an unacceptable reduction.")
-    elif pay.annual_offer > pay.annual_current:
-        signal(OpportunitySignalKind.COMPENSATION, OpportunitySignalState.POSITIVE,
-               RequirementImportance.IMPORTANT, "Known compensation improves current pay.")
-    if opportunity.role_content.startswith("Explicitly avoid: "):
-        signal(OpportunitySignalKind.ROLE_CONTENT, OpportunitySignalState.NEGATIVE,
-               RequirementImportance.CORE, "Role content conflicts with an explicit preference.")
-    allowed = {
-        "remote": opportunity.remote_allowed,
-        "hybrid": opportunity.hybrid_allowed,
-        "onsite": opportunity.onsite_allowed,
-    }
-    if opportunity.work_mode in allowed and not allowed[opportunity.work_mode]:
-        signal(OpportunitySignalKind.WORK_MODE_LOCATION, OpportunitySignalState.NEGATIVE,
-               RequirementImportance.CORE, "Known work mode conflicts with a constraint.")
-    if "downlevel" in opportunity.progression.casefold():
-        signal(OpportunitySignalKind.SENIORITY_PROGRESSION, OpportunitySignalState.NEGATIVE,
-               RequirementImportance.CORE, "Role is a material seniority reduction.")
-    elif "advancement" in opportunity.progression.casefold():
-        signal(OpportunitySignalKind.SENIORITY_PROGRESSION, OpportunitySignalState.POSITIVE,
-               RequirementImportance.IMPORTANT, "Role offers stated progression.")
-    interpretation = HiringCaseInterpretation(
-        tuple(links), tuple(signals), facts.candidate.context.severe_mismatch,
-    )
-    return candidate_profile, job_profile, hard, interpretation
+def profile_inputs_from_facts(case_id, facts, source):
+    from tests.structured_calibration_fixtures import fixture_requests
+    return fixture_requests(case_id, facts, source.candidate.id, source.analysis_source.job_id)
 
 
 def proof_reviews(case):
@@ -240,11 +122,13 @@ def proof_reviews(case):
     for need in case.facts.company.needs:
         capability = capabilities[need.key]
         proof = capability.proof
-        usable = proof.kind in {"direct", "transferable"}
+        usable = proof.kind in {"direct", "transferable"} and proof.source_available
+        repair = bool(proof.example) and not proof.source_available
         result.append({
             "requirement_key": need.key, "requirement": need.text,
             "capability_exists": capability.exists,
-            "evidence_exists": usable,
+            "evidence_exists": proof.kind in {"direct", "transferable"},
+            "source_available": proof.source_available,
             "evidence_relationship": proof.kind,
             "interview_defensible": usable,
             "safe_in_cv": usable,
@@ -253,7 +137,8 @@ def proof_reviews(case):
                 "Represent as adjacent experience only." if proof.kind == "transferable" else
                 "Retain the demonstrated scope; no claim of broader seniority."
             ),
-            "needs_evidence": expected_states[need.key] == "evidence_missing",
+            "needs_evidence": expected_states[need.key] == "evidence_missing" and not repair,
+            "needs_source_repair": repair,
             "expected_state": expected_states[need.key],
         })
     return result
@@ -261,7 +146,7 @@ def proof_reviews(case):
 
 def evaluate_case(case):
     source = source_from_facts(case.facts, case.legacy_recommendation)
-    candidate_profile, job_profile, hard, interpretation = profile_inputs_from_facts(case.facts, source)
+    candidate_profile, job_profile, hard, interpretation, envelopes = profile_inputs_from_facts(case.case_id, case.facts, source)
     shadow = evaluate_profile_hiring_case_shadow(
         source, candidate_profile=candidate_profile, job_profile=job_profile,
         hard_facts=hard, interpretation=interpretation,
@@ -308,7 +193,11 @@ def evaluate_case(case):
     root = case.diagnostic_focus.value if any_mismatch else None
     return {
         "case_id": case.case_id, "family": case.family, "review_track": case.review_track,
+        "authority_violations": sum(item.validation_status.value == "rejected" for item in envelopes),
+        "abstentions": sum(item.validation_status.value == "unavailable" for item in envelopes),
         "human_review_status": case.human_review_status,
+        "semantic_links": [asdict(item) for item in envelopes[2].output_payload.links],
+        "confidence_expected": "medium" if case.case_id == "HC20b" else None,
         "expected": asdict(case.expected), "legacy_equivalent": legacy,
         "shadow_classification": classification, "shadow_strength": strength,
         "shadow_value": value, "shadow_confidence": shadow.opportunity_confidence.value if shadow.opportunity_confidence else None,
@@ -341,6 +230,13 @@ def metrics(rows):
         "legacy_exact_matches": legacy_matches,
         "legacy_agreement_mapped": legacy_matches / len(legacy_mapped) if legacy_mapped else 0,
         "strength_mismatches": sum(row["strength_mismatch"] for row in rows),
+        "strength_agreement": sum(not row["strength_mismatch"] for row in rows) / count if count else 0,
+        "opportunity_value_agreement": sum(not row["value_mismatch"] for row in rows) / count if count else 0,
+        "confidence_reviewed": sum(row["confidence_expected"] is not None for row in rows),
+        "confidence_matches": sum(row["confidence_expected"] is not None and row["shadow_confidence"] == row["confidence_expected"] for row in rows),
+        "authority_violations": sum(row["authority_violations"] for row in rows),
+        "abstentions": sum(row["abstentions"] for row in rows),
+        "evidence_state_total": sum(len(row["proof_review"]) for row in rows),
         "value_mismatches": sum(row["value_mismatch"] for row in rows),
         "evidence_state_mismatches": sum(len(row["evidence_mismatches"]) for row in rows),
         "importance_mismatches": sum(len(row["importance_mismatches"]) for row in rows),
@@ -360,7 +256,7 @@ def run_calibration(cases=None):
     rows = [evaluate_case(case) for case in sorted(cases, key=lambda item: item.case_id)]
     return {
         "schema_version": "hiring-case-calibration-v1",
-        "reference_status": "agent_authored_pending_human_review",
+        "reference_status": "three_decisions_human_reviewed_remaining_pending_human_review",
         "legacy_status": "authored_fixture_recommendations_not_live_legacy_predictions",
         "composition": dict(sorted(Counter(row["family"] for row in rows).items())),
         "all": metrics(rows),
@@ -387,16 +283,16 @@ def render_report(result):
     lines = [
         "# Hiring Case calibration report",
         "",
-        "Reference: hiring-case-calibration-v1. Production baseline: shadow adapter a736bed.",
+        "Reference: hiring-case-calibration-v1. Offline structured interpreter v1; baseline b5d019e.",
         "",
         "## Review status and method",
         "",
         "These are 40 fictional, agent-authored cases awaiting human review, NOT a completed human-reviewed gold set. "
         "The expectations below are explicit proposed judgments under the product philosophy. No reviewer approval is claimed. "
-        "38 cases are normative proposals; 2 are exploratory because commute cost is unknown. All review statuses are pending.",
+        "HC12b, HC15b and HC20b were reviewed by the user. The other 37 judgments remain pending. Original track membership is preserved.",
         "",
         "Expected classifications, strength, value and requirement states were authored separately from execution. "
-        "They are not produced by the engine. Facts alone are projected through versioned Candidate/Job Profile contracts and a deterministic fake interpreter; expected labels never enter that projection. "
+        "They are not produced by the engine. Facts alone are projected through versioned Candidate/Job Profile contracts and four signature-keyed fixture operations with strict validation; expected labels never enter that projection. "
         "Each of 20 pairs changes one declared fact field/subtree. Related serialized fields follow from that same fact.",
         "",
         "Legacy comparison uses independently assigned synthetic fixture recommendations through the existing compatibility map, "
@@ -416,13 +312,15 @@ def render_report(result):
         f"{key}={value}" for key, value in sorted(expected_counts.items())
     ) + ".", "", "## Agreement", "",
         f"- Shadow/reference: {m['shadow_exact_matches']}/{m['total']} ({m['shadow_agreement']:.1%}); {m['shadow_mismatches']} label mismatches.",
-        f"- Normative only: {n['shadow_exact_matches']}/{n['total']} ({n['shadow_agreement']:.1%}); exploratory: 1/2.",
+        f"- Normative only: {n['shadow_exact_matches']}/{n['total']} ({n['shadow_agreement']:.1%}); exploratory: {result['exploratory']['shadow_exact_matches']}/{result['exploratory']['total']}.",
         f"- Legacy/reference: {m['legacy_exact_matches']}/{m['legacy_mapped']} mapped ({m['legacy_agreement_mapped']:.1%}); "
         f"{m['legacy_unmapped']} unmapped. Across all 40: {m['legacy_exact_matches']}/40; unmapped rows are not counted as correct.",
         f"- Strength disagreements: {m['strength_mismatches']}; opportunity value disagreements: {m['value_mismatches']}.",
         f"- Requirement evidence disagreements: {m['evidence_state_mismatches']} across 46 requirements; "
         f"importance disagreements: {m['importance_mismatches']}.",
         f"- {m['any_dimension_mismatch_cases']} cases have at least one disagreement, including cases with the same final category.",
+        f"- Authority violations: {m['authority_violations']}; unavailable operations: {m['abstentions']}.",
+        f"- Reviewed confidence: {m['confidence_matches']}/{m['confidence_reviewed']} (HC20b: MEDIUM).",
         "", "## Confusion matrices", "",
         "Rows are proposed reference labels. Columns are observed labels. Abstention remains explicit.", "",
     ]
@@ -446,29 +344,26 @@ def render_report(result):
         lines.append(f"| {cause.value} | {m['classification_mismatch_taxonomy'].get(cause.value, 0)} | "
                      f"{m['any_dimension_taxonomy'].get(cause.value, 0)} |")
     lines += ["", "## Main findings", "",
-        "The most common attributed category remains OPPORTUNITY VALUE. The new path now consumes a known unacceptable "
-        "salary reduction, work-content conflicts and severe seniority mismatch, but urgency, nuanced down-leveling and the "
-        "strategic meaning of a strong offer remain incomplete (HC06, HC18b and HC19b). Unknown salary remains UNKNOWN, not negative.",
+        "The fixture interpreter supplies authored semantic links and value interpretations, not keyword matching. "
+        "Known salary trade-offs, timing and down-leveling are represented explicitly. Unknown salary remains UNKNOWN. "
+        "These hypothetical responses test contracts; they do not demonstrate that a real provider can interpret these cases correctly.",
         "",
-        "The explicit evidence-authority boundary fixes the prior HC07b failure: a vague capability label attached to an "
-        "experience ID remains EVIDENCE_MISSING. An ID establishes provenance, not evidence quality. PROVEN and TRANSFERABLE "
-        "now require a valid source ref plus a structured semantic link.",
+        "HC12b: EVIDENCE_MISSING / VIABLE / HIGH / WORTH_A_TRY. Existing evidence has broken provenance, "
+        "not a capability gap. SOURCE_REFERENCE_UNAVAILABLE, needs_evidence=false, needs_source_repair=true.",
         "",
-        "The profile-based fake interpreter resolves the HC03b paraphrase without exact text matching. HC12b correctly "
-        "remains EVIDENCE_MISSING because the source ID is absent; whether the reference should expect PROVEN requires an "
-        "import-repair policy, not weaker authority. HC11b and HC16b expose hard-extraction importance loss.",
+        "HC15b: STRONG / HIGH / BEST_MATCH. Defensible IMPORTANT transferable support does not automatically "
+        "downgrade proven CORE needs. Direct ownership must be explicitly required; adjacent scope is preserved.",
         "",
-        "Structured seniority context now weakens HC10b and HC17b as intended. HC18b still demonstrates a value-model gap: "
-        "capability remains strong, but substantial down-leveling is not yet represented precisely enough.",
+        "HC20b: STRONG / HIGH / BEST_MATCH with MEDIUM confidence. Unknown commute cost is not a known negative. "
+        "UNCERTAINTY CHANGES CONFIDENCE BEFORE IT CHANGES VALENCE. Confidence remains coarse: another unknown "
+        "fact need not lower an already MEDIUM bucket.",
         "",
-        "The quadrant function agrees with all 40 authored reference strength/value pairs. This does not validate the "
-        "entire classification pipeline: HC15b has correct evidence states but the engine treats an IMPORTANT transferable "
-        "delivery requirement as strong overall; the proposed judgment is only viable. Human review must confirm this "
-        "semantic strength policy before changing it. No numeric thresholds or category quotas were tuned.",
+        "This means the reviewed reference set and implementation agree. It does NOT establish real-world AI accuracy. "
+        "Only the three specified judgments changed; the other 37 expectations and all original facts are frozen.",
         "",
-        "HC06b and HC11b demonstrate why final-label agreement is insufficient: value or strength is wrong even though "
-        "the resulting label happens to agree. HC20b is exploratory: without commute cost the reference MEDIUM value is "
-        "debatable, so it is not a definitive product defect.",
+        "All 40 fixture pipelines passed structural/source authority validation without abstention. Adversarial tests "
+        "separately exercise rejected and normalized outputs. Existing references cannot prove semantic entailment: "
+        "a false assertion citing a real source still requires semantic evaluation by humans or a future provider.",
         "",
         "## Controlled pairs", "",
         "Every row represents two cases; all fact changes must stay within the declared path. Expected outputs may "
@@ -494,13 +389,13 @@ def render_report(result):
     lines += ["", "## Proof and representation review", "",
               "CV-safe means only the demonstrated scope. Transferable examples must stay framed as adjacent experience; "
               "no table entry licenses claims of greater ownership or seniority. Capability and evidence are separate facts.", "",
-              "| Case / requirement | Capability exists | Evidence exists / relationship | Interview defensible | CV safe | Ask for evidence | Expected state |",
-              "| --- | --- | --- | --- | --- | --- | --- |"]
+              "| Case / requirement | Capability exists | Evidence exists / relationship | Interview defensible | CV safe | Ask for evidence | Repair source | Expected state |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- |"]
     for row in result["cases"]:
         for item in row["proof_review"]:
             lines.append(f"| {row['case_id']} / {item['requirement']} | {item['capability_exists']} | "
                          f"{item['evidence_exists']} / {item['evidence_relationship']} | {item['interview_defensible']} | "
-                         f"{item['safe_in_cv']} | {item['needs_evidence']} | {item['expected_state']} |")
+                         f"{item['safe_in_cv']} | {item['needs_evidence']} | {item['needs_source_repair']} | {item['expected_state']} |")
     lines += ["", "## Evidence-missing review", "",
               "Union of reference EVIDENCE_MISSING and shadow EVIDENCE_MISSING. This catches both missed valid proof "
               "and unsupported proof that the shadow incorrectly accepts. Real GAP confirmations remain separate.", ""]
@@ -516,11 +411,9 @@ def render_report(result):
               "Run `python -m tests.hiring_case_calibration_runner` for metrics and confusion matrices, and "
               "`python -m pytest tests/test_hiring_case_calibration.py -q` for fixture integrity and diagnostic reproducibility. "
               "All data is local and synthetic. The test harness prevents database/network access during evaluation.", "",
-              "The usable-proof boundary is now explicit in the profile path: valid source refs and structured semantic "
-              "links are required; checkpoint prose and vague attributed labels cannot self-confirm. The smallest next "
-              "implementation is a reviewed, offline provider adapter that produces these contracts from hard facts.", "",
-              "Salary units, timing and seniority/value trade-offs still need richer explicit fact contracts. This pass "
-              "does not switch production classification or certify a rollout.", ""]
+              "The separate frozen adversarial-v1 report challenges these rules without engine tuning. Review its "
+              "semantic, direct-ownership, recency and preference-conflict failures before connecting a provider. "
+              "No production rollout is certified.", ""]
     return "\n".join(lines)
 
 

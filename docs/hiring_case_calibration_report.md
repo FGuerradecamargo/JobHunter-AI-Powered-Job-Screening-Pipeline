@@ -1,12 +1,12 @@
 # Hiring Case calibration report
 
-Reference: hiring-case-calibration-v1. Production baseline: shadow adapter a736bed.
+Reference: hiring-case-calibration-v1. Offline structured interpreter v1; baseline b5d019e.
 
 ## Review status and method
 
-These are 40 fictional, agent-authored cases awaiting human review, NOT a completed human-reviewed gold set. The expectations below are explicit proposed judgments under the product philosophy. No reviewer approval is claimed. 38 cases are normative proposals; 2 are exploratory because commute cost is unknown. All review statuses are pending.
+These are 40 fictional, agent-authored cases awaiting human review, NOT a completed human-reviewed gold set. The expectations below are explicit proposed judgments under the product philosophy. No reviewer approval is claimed. HC12b, HC15b and HC20b were reviewed by the user. The other 37 judgments remain pending. Original track membership is preserved.
 
-Expected classifications, strength, value and requirement states were authored separately from execution. They are not produced by the engine. Facts alone are projected through versioned Candidate/Job Profile contracts and a deterministic fake interpreter; expected labels never enter that projection. Each of 20 pairs changes one declared fact field/subtree. Related serialized fields follow from that same fact.
+Expected classifications, strength, value and requirement states were authored separately from execution. They are not produced by the engine. Facts alone are projected through versioned Candidate/Job Profile contracts and four signature-keyed fixture operations with strict validation; expected labels never enter that projection. Each of 20 pairs changes one declared fact field/subtree. Related serialized fields follow from that same fact.
 
 Legacy comparison uses independently assigned synthetic fixture recommendations through the existing compatibility map, NOT fresh historical predictions or live AI. The two reject labels are unmapped by that map. These agreement figures measure reproducibility of this reference set, not population accuracy or improvement over production.
 
@@ -25,16 +25,18 @@ No production classification or UI behavior changed. The versioned profile contr
 | technical_operations | 4 |
 | technical_support | 6 |
 
-Expected distribution (not balanced to a quota): best_match=22, ineligible=2, skip_for_now=2, worth_a_try=7, youre_strong_but=7.
+Expected distribution (not balanced to a quota): best_match=23, ineligible=2, skip_for_now=2, worth_a_try=7, youre_strong_but=6.
 
 ## Agreement
 
-- Shadow/reference: 34/40 (85.0%); 6 label mismatches.
-- Normative only: 33/38 (86.8%); exploratory: 1/2.
-- Legacy/reference: 27/38 mapped (71.1%); 2 unmapped. Across all 40: 27/40; unmapped rows are not counted as correct.
-- Strength disagreements: 3; opportunity value disagreements: 5.
-- Requirement evidence disagreements: 1 across 46 requirements; importance disagreements: 2.
-- 9 cases have at least one disagreement, including cases with the same final category.
+- Shadow/reference: 40/40 (100.0%); 0 label mismatches.
+- Normative only: 38/38 (100.0%); exploratory: 2/2.
+- Legacy/reference: 28/38 mapped (73.7%); 2 unmapped. Across all 40: 28/40; unmapped rows are not counted as correct.
+- Strength disagreements: 0; opportunity value disagreements: 0.
+- Requirement evidence disagreements: 0 across 46 requirements; importance disagreements: 0.
+- 0 cases have at least one disagreement, including cases with the same final category.
+- Authority violations: 0; unavailable operations: 0.
+- Reviewed confidence: 1/1 (HC20b: MEDIUM).
 
 ## Confusion matrices
 
@@ -44,9 +46,9 @@ Rows are proposed reference labels. Columns are observed labels. Abstention rema
 
 | Expected | best_match | worth_a_try | youre_strong_but | skip_for_now | ineligible | not_evaluated |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| best_match | 19 | 1 | 2 | 0 | 0 | 0 |
-| worth_a_try | 1 | 6 | 0 | 0 | 0 | 0 |
-| youre_strong_but | 2 | 0 | 5 | 0 | 0 | 0 |
+| best_match | 23 | 0 | 0 | 0 | 0 | 0 |
+| worth_a_try | 0 | 7 | 0 | 0 | 0 | 0 |
+| youre_strong_but | 0 | 0 | 6 | 0 | 0 | 0 |
 | skip_for_now | 0 | 0 | 0 | 2 | 0 | 0 |
 | ineligible | 0 | 0 | 0 | 0 | 2 | 0 |
 
@@ -54,9 +56,9 @@ Rows are proposed reference labels. Columns are observed labels. Abstention rema
 
 | Expected | best_match | worth_a_try | youre_strong_but | skip_for_now | ineligible | unmapped |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| best_match | 17 | 3 | 2 | 0 | 0 | 0 |
+| best_match | 18 | 3 | 2 | 0 | 0 | 0 |
 | worth_a_try | 2 | 5 | 0 | 0 | 0 | 0 |
-| youre_strong_but | 2 | 0 | 5 | 0 | 0 | 0 |
+| youre_strong_but | 1 | 0 | 5 | 0 | 0 | 0 |
 | skip_for_now | 0 | 2 | 0 | 0 | 0 | 0 |
 | ineligible | 0 | 0 | 0 | 0 | 0 | 2 |
 
@@ -66,27 +68,27 @@ Each discrepant case has one authored primary diagnostic attribution, pending re
 
 | Primary cause | Label mismatches | Any-dimension cases |
 | --- | ---: | ---: |
-| A_REQUIREMENT_EXTRACTION | 0 | 2 |
+| A_REQUIREMENT_EXTRACTION | 0 | 0 |
 | B_EVIDENCE_LINKING | 0 | 0 |
 | C_CAPABILITY_INTERPRETATION | 0 | 0 |
-| D_OPPORTUNITY_VALUE | 3 | 4 |
-| E_CLASSIFICATION_LOGIC | 1 | 1 |
-| F_INSUFFICIENT_DATA | 1 | 1 |
-| G_EXPECTED_CASE_NEEDS_REVIEW | 1 | 1 |
+| D_OPPORTUNITY_VALUE | 0 | 0 |
+| E_CLASSIFICATION_LOGIC | 0 | 0 |
+| F_INSUFFICIENT_DATA | 0 | 0 |
+| G_EXPECTED_CASE_NEEDS_REVIEW | 0 | 0 |
 
 ## Main findings
 
-The most common attributed category remains OPPORTUNITY VALUE. The new path now consumes a known unacceptable salary reduction, work-content conflicts and severe seniority mismatch, but urgency, nuanced down-leveling and the strategic meaning of a strong offer remain incomplete (HC06, HC18b and HC19b). Unknown salary remains UNKNOWN, not negative.
+The fixture interpreter supplies authored semantic links and value interpretations, not keyword matching. Known salary trade-offs, timing and down-leveling are represented explicitly. Unknown salary remains UNKNOWN. These hypothetical responses test contracts; they do not demonstrate that a real provider can interpret these cases correctly.
 
-The explicit evidence-authority boundary fixes the prior HC07b failure: a vague capability label attached to an experience ID remains EVIDENCE_MISSING. An ID establishes provenance, not evidence quality. PROVEN and TRANSFERABLE now require a valid source ref plus a structured semantic link.
+HC12b: EVIDENCE_MISSING / VIABLE / HIGH / WORTH_A_TRY. Existing evidence has broken provenance, not a capability gap. SOURCE_REFERENCE_UNAVAILABLE, needs_evidence=false, needs_source_repair=true.
 
-The profile-based fake interpreter resolves the HC03b paraphrase without exact text matching. HC12b correctly remains EVIDENCE_MISSING because the source ID is absent; whether the reference should expect PROVEN requires an import-repair policy, not weaker authority. HC11b and HC16b expose hard-extraction importance loss.
+HC15b: STRONG / HIGH / BEST_MATCH. Defensible IMPORTANT transferable support does not automatically downgrade proven CORE needs. Direct ownership must be explicitly required; adjacent scope is preserved.
 
-Structured seniority context now weakens HC10b and HC17b as intended. HC18b still demonstrates a value-model gap: capability remains strong, but substantial down-leveling is not yet represented precisely enough.
+HC20b: STRONG / HIGH / BEST_MATCH with MEDIUM confidence. Unknown commute cost is not a known negative. UNCERTAINTY CHANGES CONFIDENCE BEFORE IT CHANGES VALENCE. Confidence remains coarse: another unknown fact need not lower an already MEDIUM bucket.
 
-The quadrant function agrees with all 40 authored reference strength/value pairs. This does not validate the entire classification pipeline: HC15b has correct evidence states but the engine treats an IMPORTANT transferable delivery requirement as strong overall; the proposed judgment is only viable. Human review must confirm this semantic strength policy before changing it. No numeric thresholds or category quotas were tuned.
+This means the reviewed reference set and implementation agree. It does NOT establish real-world AI accuracy. Only the three specified judgments changed; the other 37 expectations and all original facts are frozen.
 
-HC06b and HC11b demonstrate why final-label agreement is insufficient: value or strength is wrong even though the resulting label happens to agree. HC20b is exploratory: without commute cost the reference MEDIUM value is debatable, so it is not a definitive product defect.
+All 40 fixture pipelines passed structural/source authority validation without abstention. Adversarial tests separately exercise rejected and normalized outputs. Existing references cannot prove semantic entailment: a false assertion citing a real source still requires semantic evaluation by humans or a future provider.
 
 ## Controlled pairs
 
@@ -99,21 +101,21 @@ Every row represents two cases; all fact changes must stay within the declared p
 | P03 | candidate.capabilities.0.proof.wording | best_match -> best_match | best_match -> best_match |
 | P04 | company.needs.1.importance | best_match -> worth_a_try | best_match -> worth_a_try |
 | P05 | opportunity.compensation | best_match -> youre_strong_but | best_match -> youre_strong_but |
-| P06 | opportunity.timing | best_match -> youre_strong_but | youre_strong_but -> youre_strong_but |
+| P06 | opportunity.timing | best_match -> youre_strong_but | best_match -> youre_strong_but |
 | P07 | candidate.capabilities.0.proof | best_match -> worth_a_try | best_match -> worth_a_try |
 | P08 | company.eligibility_blocker | best_match -> ineligible | best_match -> ineligible |
 | P09 | opportunity.role_content | best_match -> youre_strong_but | best_match -> youre_strong_but |
 | P10 | candidate.context | best_match -> worth_a_try | best_match -> worth_a_try |
 | P11 | company.needs.1.parsed_slot | skip_for_now -> skip_for_now | skip_for_now -> skip_for_now |
-| P12 | candidate.capabilities.0.proof.source_available | best_match -> best_match | best_match -> worth_a_try |
+| P12 | candidate.capabilities.0.proof.source_available | best_match -> worth_a_try | best_match -> worth_a_try |
 | P13 | company.eligibility_blocker | best_match -> ineligible | best_match -> ineligible |
 | P14 | opportunity.desired_family | best_match -> youre_strong_but | best_match -> youre_strong_but |
-| P15 | candidate.capabilities.1.proof | best_match -> worth_a_try | best_match -> best_match |
+| P15 | candidate.capabilities.1.proof | best_match -> best_match | best_match -> best_match |
 | P16 | company.needs.0.parsed_slot | best_match -> best_match | best_match -> best_match |
 | P17 | candidate.context | best_match -> worth_a_try | best_match -> worth_a_try |
-| P18 | candidate.context | best_match -> youre_strong_but | best_match -> best_match |
-| P19 | opportunity.compensation | youre_strong_but -> best_match | youre_strong_but -> youre_strong_but |
-| P20 | opportunity.work_mode | best_match -> youre_strong_but | best_match -> best_match |
+| P18 | candidate.context | best_match -> youre_strong_but | best_match -> youre_strong_but |
+| P19 | opportunity.compensation | youre_strong_but -> best_match | youre_strong_but -> best_match |
+| P20 | opportunity.work_mode | best_match -> best_match | best_match -> best_match |
 
 ## Case judgments
 
@@ -131,8 +133,8 @@ S/V = strength/value. Full company, candidate and opportunity facts are in tests
 | HC04b | normative | worth_a_try; weak/high | worth_a_try; weak/high | none | The same SQL gap now prevents independent core delivery. |
 | HC05a | normative | best_match; strong/high | best_match; strong/high | none | Direct AML proof, target work and a meaningful pay improvement align. |
 | HC05b | normative | youre_strong_but; strong/low | youre_strong_but; strong/low | none | Ability is unchanged; the specified pay sacrifice defeats personal value. |
-| HC06a | normative | best_match; strong/high | youre_strong_but; strong/medium | D_OPPORTUNITY_VALUE | Proven KYC ability plus urgent income continuity justifies this lateral bridge. |
-| HC06b | normative | youre_strong_but; strong/low | youre_strong_but; strong/medium | D_OPPORTUNITY_VALUE | A stable candidate gains no progression from the identical lateral role. |
+| HC06a | normative | best_match; strong/high | best_match; strong/high | none | Proven KYC ability plus urgent income continuity justifies this lateral bridge. |
+| HC06b | normative | youre_strong_but; strong/low | youre_strong_but; strong/low | none | A stable candidate gains no progression from the identical lateral role. |
 | HC07a | normative | best_match; strong/high | best_match; strong/high | none | A concrete defensible decision record supports a safe CV claim. |
 | HC07b | normative | worth_a_try; viable/high | worth_a_try; viable/high | none | A matching skill label alone is not usable proof, even inside an experience record. |
 | HC08a | normative | best_match; strong/high | best_match; strong/high | none | The target escalation role is feasible and supported. |
@@ -142,78 +144,78 @@ S/V = strength/value. Full company, candidate and opportunity facts are in tests
 | HC10a | normative | best_match; strong/high | best_match; strong/high | none | Independent incident delivery matches company scope. |
 | HC10b | normative | worth_a_try; weak/high | worth_a_try; weak/high | none | Real examples exist, but the independent seniority/context demand is not met. |
 | HC11a | normative | skip_for_now; weak/low | skip_for_now; weak/low | none | Independent SQL investigation is a core gap and the candidate explicitly avoids this work. |
-| HC11b | normative | skip_for_now; weak/low | skip_for_now; viable/low | A_REQUIREMENT_EXTRACTION | A parser storing an unwanted role's core tool in a generic tools list must not reduce its materiality. |
+| HC11b | normative | skip_for_now; weak/low | skip_for_now; weak/low | none | A parser storing an unwanted role's core tool in a generic tools list must not reduce its materiality. |
 | HC12a | normative | best_match; strong/high | best_match; strong/high | none | The reproducible defect example supports the target role. |
-| HC12b | normative | best_match; strong/high | worth_a_try; viable/high | F_INSUFFICIENT_DATA | The same documented example exists, but its database experience ID was lost during import. |
+| HC12b | normative | worth_a_try; viable/high | worth_a_try; viable/high | none | Reviewed: the example exists but its source ID was lost. Repair provenance; this is not a capability gap or a request for new evidence. |
 | HC13a | normative | best_match; strong/high | best_match; strong/high | none | Supported recovery work fits the candidate's direction. |
 | HC13b | normative | ineligible; ineligible/high | ineligible; ineligible/high | none | The hard scheduling conflict overrides the otherwise strong case. |
 | HC14a | normative | best_match; strong/high | best_match; strong/high | none | The role is in the candidate's current chosen family. |
 | HC14b | normative | youre_strong_but; strong/medium | youre_strong_but; strong/medium | none | A capable lateral fallback has limited value relative to the new analysis target. |
 | HC15a | normative | best_match; strong/high | best_match; strong/high | none | Requirements work and important delivery responsibilities are directly evidenced. |
-| HC15b | normative | worth_a_try; viable/high | best_match; strong/high | E_CLASSIFICATION_LOGIC | Delivery ownership is important enough that an adjacent bridge leaves the overall case viable, not strong. |
+| HC15b | normative | best_match; strong/high | best_match; strong/high | none | Reviewed: defensible transferable IMPORTANT evidence does not downgrade proven CORE delivery; direct ownership was not mandatory. Preserve adjacent scope in representation. |
 | HC16a | normative | best_match; strong/high | best_match; strong/high | none | An explicit core need and direct proof make a strong case. |
-| HC16b | normative | best_match; strong/high | best_match; strong/high | A_REQUIREMENT_EXTRACTION | The same core need remains real when the parsed profile puts it in unstructured important details. |
+| HC16b | normative | best_match; strong/high | best_match; strong/high | none | The same core need remains real when the parsed profile puts it in unstructured important details. |
 | HC17a | normative | best_match; strong/high | best_match; strong/high | none | Real leadership evidence and comparable scale support this management role. |
 | HC17b | normative | worth_a_try; weak/high | worth_a_try; weak/high | none | A genuine team-leading example does not prove the required management scale. |
 | HC18a | normative | best_match; strong/high | best_match; strong/high | none | Evidenced leadership and first formal progression make this valuable. |
-| HC18b | normative | youre_strong_but; strong/low | best_match; strong/high | D_OPPORTUNITY_VALUE | Overqualification does not erase ability, but the role sacrifices the stated strategic scope. |
+| HC18b | normative | youre_strong_but; strong/low | youre_strong_but; strong/low | none | Overqualification does not erase ability, but the role sacrifices the stated strategic scope. |
 | HC19a | normative | youre_strong_but; strong/medium | youre_strong_but; strong/medium | none | Unknown salary is not a penalty; this otherwise lateral option has only uncertain upside. |
-| HC19b | normative | best_match; strong/high | youre_strong_but; strong/medium | D_OPPORTUNITY_VALUE | The known and explicitly valued salary improvement makes the same supported role attractive. |
+| HC19b | normative | best_match; strong/high | best_match; strong/high | none | The known and explicitly valued salary improvement makes the same supported role attractive. |
 | HC20a | exploratory | best_match; strong/high | best_match; strong/high | none | Remote target work appears valuable; confirm remaining conditions before accepting. |
-| HC20b | exploratory | youre_strong_but; strong/medium | best_match; strong/high | G_EXPECTED_CASE_NEEDS_REVIEW | Provisional value depends on the unmeasured commute; high value is also defensible if costs are small. |
+| HC20b | exploratory | best_match; strong/high | best_match; strong/high | none | Reviewed: acceptable hybrid with unknown commute cost retains HIGH value, with reduced confidence. Uncertainty changes confidence before valence. |
 
 ## Proof and representation review
 
 CV-safe means only the demonstrated scope. Transferable examples must stay framed as adjacent experience; no table entry licenses claims of greater ownership or seniority. Capability and evidence are separate facts.
 
-| Case / requirement | Capability exists | Evidence exists / relationship | Interview defensible | CV safe | Ask for evidence | Expected state |
-| --- | --- | --- | --- | --- | --- | --- |
-| HC01a / Investigate fraud patterns | yes | True / direct | True | True | False | proven |
-| HC01b / Investigate fraud patterns | yes | False / absent | False | False | True | evidence_missing |
-| HC02a / Investigate fraud patterns | yes | True / direct | True | True | False | proven |
-| HC02b / Investigate fraud patterns | yes | True / transferable | True | True | False | transferable |
-| HC03a / Investigate fraud patterns | yes | True / direct | True | True | False | proven |
-| HC03b / Investigate fraud patterns | yes | True / direct | True | True | False | proven |
-| HC04a / Investigate fraud patterns | yes | True / direct | True | True | False | proven |
-| HC04a / Write SQL investigation queries | no | False / confirmed_gap | False | False | False | gap |
-| HC04b / Investigate fraud patterns | yes | True / direct | True | True | False | proven |
-| HC04b / Write SQL investigation queries | no | False / confirmed_gap | False | False | False | gap |
-| HC05a / Review AML transaction alerts | yes | True / direct | True | True | False | proven |
-| HC05b / Review AML transaction alerts | yes | True / direct | True | True | False | proven |
-| HC06a / Review corporate KYC files | yes | True / direct | True | True | False | proven |
-| HC06b / Review corporate KYC files | yes | True / direct | True | True | False | proven |
-| HC07a / Document suspicious activity decisions | yes | True / direct | True | True | False | proven |
-| HC07b / Document suspicious activity decisions | yes | False / vague | False | False | True | evidence_missing |
-| HC08a / Resolve complex escalations | yes | True / direct | True | True | False | proven |
-| HC08b / Resolve complex escalations | yes | True / direct | True | True | False | proven |
-| HC09a / Resolve complex escalations | yes | True / direct | True | True | False | proven |
-| HC09b / Resolve complex escalations | yes | True / direct | True | True | False | proven |
-| HC10a / Diagnose application incidents | yes | True / direct | True | True | False | proven |
-| HC10b / Diagnose application incidents | yes | True / direct | True | True | False | proven |
-| HC11a / Diagnose application incidents | yes | True / direct | True | True | False | proven |
-| HC11a / Query production logs with SQL | no | False / confirmed_gap | False | False | False | gap |
-| HC11b / Diagnose application incidents | yes | True / direct | True | True | False | proven |
-| HC11b / Query production logs with SQL | no | False / confirmed_gap | False | False | False | gap |
-| HC12a / Reproduce software defects | yes | True / direct | True | True | False | proven |
-| HC12b / Reproduce software defects | yes | True / direct | True | True | False | proven |
-| HC13a / Restore failed scheduled jobs | yes | True / direct | True | True | False | proven |
-| HC13b / Restore failed scheduled jobs | yes | True / direct | True | True | False | proven |
-| HC14a / Restore failed scheduled jobs | yes | True / direct | True | True | False | proven |
-| HC14b / Restore failed scheduled jobs | yes | True / direct | True | True | False | proven |
-| HC15a / Map operational requirements | yes | True / direct | True | True | False | proven |
-| HC15a / Coordinate cross-functional delivery | yes | True / direct | True | True | False | proven |
-| HC15b / Map operational requirements | yes | True / direct | True | True | False | proven |
-| HC15b / Coordinate cross-functional delivery | yes | True / transferable | True | True | False | transferable |
-| HC16a / Map operational requirements | yes | True / direct | True | True | False | proven |
-| HC16b / Map operational requirements | yes | True / direct | True | True | False | proven |
-| HC17a / Lead operational teams | yes | True / direct | True | True | False | proven |
-| HC17b / Lead operational teams | yes | True / direct | True | True | False | proven |
-| HC18a / Lead operational teams | yes | True / direct | True | True | False | proven |
-| HC18b / Lead operational teams | yes | True / direct | True | True | False | proven |
-| HC19a / Plan customer adoption | yes | True / direct | True | True | False | proven |
-| HC19b / Plan customer adoption | yes | True / direct | True | True | False | proven |
-| HC20a / Plan customer adoption | yes | True / direct | True | True | False | proven |
-| HC20b / Plan customer adoption | yes | True / direct | True | True | False | proven |
+| Case / requirement | Capability exists | Evidence exists / relationship | Interview defensible | CV safe | Ask for evidence | Repair source | Expected state |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HC01a / Investigate fraud patterns | yes | True / direct | True | True | False | False | proven |
+| HC01b / Investigate fraud patterns | yes | False / absent | False | False | True | False | evidence_missing |
+| HC02a / Investigate fraud patterns | yes | True / direct | True | True | False | False | proven |
+| HC02b / Investigate fraud patterns | yes | True / transferable | True | True | False | False | transferable |
+| HC03a / Investigate fraud patterns | yes | True / direct | True | True | False | False | proven |
+| HC03b / Investigate fraud patterns | yes | True / direct | True | True | False | False | proven |
+| HC04a / Investigate fraud patterns | yes | True / direct | True | True | False | False | proven |
+| HC04a / Write SQL investigation queries | no | False / confirmed_gap | False | False | False | False | gap |
+| HC04b / Investigate fraud patterns | yes | True / direct | True | True | False | False | proven |
+| HC04b / Write SQL investigation queries | no | False / confirmed_gap | False | False | False | False | gap |
+| HC05a / Review AML transaction alerts | yes | True / direct | True | True | False | False | proven |
+| HC05b / Review AML transaction alerts | yes | True / direct | True | True | False | False | proven |
+| HC06a / Review corporate KYC files | yes | True / direct | True | True | False | False | proven |
+| HC06b / Review corporate KYC files | yes | True / direct | True | True | False | False | proven |
+| HC07a / Document suspicious activity decisions | yes | True / direct | True | True | False | False | proven |
+| HC07b / Document suspicious activity decisions | yes | False / vague | False | False | True | False | evidence_missing |
+| HC08a / Resolve complex escalations | yes | True / direct | True | True | False | False | proven |
+| HC08b / Resolve complex escalations | yes | True / direct | True | True | False | False | proven |
+| HC09a / Resolve complex escalations | yes | True / direct | True | True | False | False | proven |
+| HC09b / Resolve complex escalations | yes | True / direct | True | True | False | False | proven |
+| HC10a / Diagnose application incidents | yes | True / direct | True | True | False | False | proven |
+| HC10b / Diagnose application incidents | yes | True / direct | True | True | False | False | proven |
+| HC11a / Diagnose application incidents | yes | True / direct | True | True | False | False | proven |
+| HC11a / Query production logs with SQL | no | False / confirmed_gap | False | False | False | False | gap |
+| HC11b / Diagnose application incidents | yes | True / direct | True | True | False | False | proven |
+| HC11b / Query production logs with SQL | no | False / confirmed_gap | False | False | False | False | gap |
+| HC12a / Reproduce software defects | yes | True / direct | True | True | False | False | proven |
+| HC12b / Reproduce software defects | yes | True / direct | False | False | False | True | evidence_missing |
+| HC13a / Restore failed scheduled jobs | yes | True / direct | True | True | False | False | proven |
+| HC13b / Restore failed scheduled jobs | yes | True / direct | True | True | False | False | proven |
+| HC14a / Restore failed scheduled jobs | yes | True / direct | True | True | False | False | proven |
+| HC14b / Restore failed scheduled jobs | yes | True / direct | True | True | False | False | proven |
+| HC15a / Map operational requirements | yes | True / direct | True | True | False | False | proven |
+| HC15a / Coordinate cross-functional delivery | yes | True / direct | True | True | False | False | proven |
+| HC15b / Map operational requirements | yes | True / direct | True | True | False | False | proven |
+| HC15b / Coordinate cross-functional delivery | yes | True / transferable | True | True | False | False | transferable |
+| HC16a / Map operational requirements | yes | True / direct | True | True | False | False | proven |
+| HC16b / Map operational requirements | yes | True / direct | True | True | False | False | proven |
+| HC17a / Lead operational teams | yes | True / direct | True | True | False | False | proven |
+| HC17b / Lead operational teams | yes | True / direct | True | True | False | False | proven |
+| HC18a / Lead operational teams | yes | True / direct | True | True | False | False | proven |
+| HC18b / Lead operational teams | yes | True / direct | True | True | False | False | proven |
+| HC19a / Plan customer adoption | yes | True / direct | True | True | False | False | proven |
+| HC19b / Plan customer adoption | yes | True / direct | True | True | False | False | proven |
+| HC20a / Plan customer adoption | yes | True / direct | True | True | False | False | proven |
+| HC20b / Plan customer adoption | yes | True / direct | True | True | False | False | proven |
 
 ## Evidence-missing review
 
@@ -237,7 +239,7 @@ Union of reference EVIDENCE_MISSING and shadow EVIDENCE_MISSING. This catches bo
 
 ### HC12b: Reproduce software defects
 
-- Plausibly present: True; reference missing: False; shadow missing: True.
+- Plausibly present: True; reference missing: True; shadow missing: True.
 - Existing record: Produced a minimal reproduction, captured logs and validated the release containing the fix.
 - Resolving evidence: A concrete case describing personal actions, methods, decisions and outcome.
 - First action: Review and link the already supplied evidence before asking the candidate again.
@@ -247,6 +249,4 @@ Union of reference EVIDENCE_MISSING and shadow EVIDENCE_MISSING. This catches bo
 
 Run `python -m tests.hiring_case_calibration_runner` for metrics and confusion matrices, and `python -m pytest tests/test_hiring_case_calibration.py -q` for fixture integrity and diagnostic reproducibility. All data is local and synthetic. The test harness prevents database/network access during evaluation.
 
-The usable-proof boundary is now explicit in the profile path: valid source refs and structured semantic links are required; checkpoint prose and vague attributed labels cannot self-confirm. The smallest next implementation is a reviewed, offline provider adapter that produces these contracts from hard facts.
-
-Salary units, timing and seniority/value trade-offs still need richer explicit fact contracts. This pass does not switch production classification or certify a rollout.
+The separate frozen adversarial-v1 report challenges these rules without engine tuning. Review its semantic, direct-ownership, recency and preference-conflict failures before connecting a provider. No production rollout is certified.

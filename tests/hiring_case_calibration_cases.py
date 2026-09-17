@@ -273,7 +273,7 @@ def calibration_cases():
     b = _proof(a, replace(a.candidate.capabilities[0].proof, source_available=False))
     pair(12, a, b, "candidate.capabilities.0.proof.source_available",
          expectation("best_match", "strong", "high", {"main": "proven"}, "The reproducible defect example supports the target role."),
-         expectation("best_match", "strong", "high", {"main": "proven"}, "The same documented example exists, but its database experience ID was lost during import."),
+         expectation("worth_a_try", "viable", "high", {"main": "evidence_missing"}, "Reviewed: the example exists but its source ID was lost. Repair provenance; this is not a capability gap or a request for new evidence."),
          "best_match", "potential", RootCause.INSUFFICIENT_DATA)
 
     a = _base("technical_operations", "Technical Operations Analyst", "Restore failed scheduled jobs",
@@ -298,7 +298,7 @@ def calibration_cases():
         a.candidate.capabilities[1], proof=Proof("transferable", "Coordinate cross-functional delivery", "Coordinated support escalations between teams but did not own project delivery.")))))
     pair(15, a, b, "candidate.capabilities.1.proof",
          expectation("best_match", "strong", "high", {"main": "proven", "extra": "proven"}, "Requirements work and important delivery responsibilities are directly evidenced."),
-         expectation("worth_a_try", "viable", "high", {"main": "proven", "extra": "transferable"}, "Delivery ownership is important enough that an adjacent bridge leaves the overall case viable, not strong."),
+         expectation("best_match", "strong", "high", {"main": "proven", "extra": "transferable"}, "Reviewed: defensible transferable IMPORTANT evidence does not downgrade proven CORE delivery; direct ownership was not mandatory. Preserve adjacent scope in representation."),
          "best_match", "potential", RootCause.CLASSIFICATION_LOGIC)
 
     a = _base("business_analysis", "Process Analyst", "Map operational requirements",
@@ -345,7 +345,8 @@ def calibration_cases():
     b = replace(a, opportunity=replace(a.opportunity, work_mode="hybrid"))
     pair(20, a, b, "opportunity.work_mode",
          expectation("best_match", "strong", "high", {"main": "proven"}, "Remote target work appears valuable; confirm remaining conditions before accepting."),
-         expectation("youre_strong_but", "strong", "medium", {"main": "proven"}, "Provisional value depends on the unmeasured commute; high value is also defensible if costs are small."),
+         expectation("best_match", "strong", "high", {"main": "proven"}, "Reviewed: acceptable hybrid with unknown commute cost retains HIGH value, with reduced confidence. Uncertainty changes confidence before valence."),
          "best_match", "best_match", RootCause.EXPECTED_CASE_NEEDS_REVIEW, "exploratory")
 
-    return tuple(cases)
+    reviewed = {"HC12b", "HC15b", "HC20b"}
+    return tuple(replace(case, human_review_status="reviewed") if case.case_id in reviewed else case for case in cases)

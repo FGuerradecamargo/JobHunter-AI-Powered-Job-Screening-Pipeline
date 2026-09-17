@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from models.hiring_case import (
+    EvidenceRequirement,
+    TemporalRequirement,
+    TemporalApplicability,
     AddEvidenceContract,
     HiringCase,
     HiringCaseClassification,
@@ -30,6 +33,12 @@ def determine_hiring_case_strength(data: HiringCaseInput) -> HiringCaseStrength:
         return HiringCaseStrength.WEAK
     if data.seniority_context_mismatch:
         return HiringCaseStrength.WEAK
+    if any(item.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED
+           and item.evidence_state is RequirementEvidenceState.TRANSFERABLE for item in core):
+        return HiringCaseStrength.WEAK
+    if any(item.temporal_requirement is TemporalRequirement.CURRENT_REQUIRED
+           and item.temporal_applicability is TemporalApplicability.NOT_SATISFIED for item in core + important):
+        return HiringCaseStrength.VIABLE
     if any(
         item.evidence_state is not RequirementEvidenceState.PROVEN for item in core
     ):
@@ -41,6 +50,9 @@ def determine_hiring_case_strength(data: HiringCaseInput) -> HiringCaseStrength:
         }
         for item in important
     ):
+        return HiringCaseStrength.VIABLE
+    if any(item.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED
+           and not item.constraint_satisfied for item in important):
         return HiringCaseStrength.VIABLE
     return HiringCaseStrength.STRONG
 
@@ -92,7 +104,14 @@ def classify_hiring_case(
 
 def _proof_item(item) -> ProofItem:
     has_evidence = bool(item.evidence_refs)
-    if has_evidence:
+    if (item.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED
+            and item.evidence_state is RequirementEvidenceState.TRANSFERABLE):
+        guidance = (
+            "Describe the adjacent experience within its demonstrated scope. Direct prior ownership "
+            "is explicitly required and is not established by this evidence. Explain the bridge "
+            "and its limitations; do not present it as direct ownership."
+        )
+    elif has_evidence:
         guidance = (
             "Demonstrate the context, your actions and ownership, the methods used, "
             "and the outcome, using only the referenced experience represented in your CV."
@@ -104,6 +123,13 @@ def _proof_item(item) -> ProofItem:
         )
     else:
         guidance = "Do not claim this capability without real, defensible evidence."
+    if item.temporal_applicability is TemporalApplicability.NOT_SATISFIED and has_evidence:
+        guidance += (
+            " Retain the historical or adjacent experience honestly. It does not establish current "
+            "procedure proficiency; refresh and demonstrate the current version rather than claiming it already."
+        )
+    elif item.temporal_applicability is TemporalApplicability.UNKNOWN:
+        guidance += " Current applicability is unknown; clarify it without implying current proficiency."
     return ProofItem(
         requirement_id=item.requirement_id,
         what_they_need=item.requirement,
@@ -112,6 +138,11 @@ def _proof_item(item) -> ProofItem:
         what_to_demonstrate=guidance,
         needs_evidence=item.evidence_state is RequirementEvidenceState.EVIDENCE_MISSING,
         interview_defensible=item.interview_defensible,
+        evidence_requirement=item.evidence_requirement,
+        constraint_satisfied=item.constraint_satisfied,
+        constraint_reason_code=item.constraint_reason_code,
+        temporal_requirement=item.temporal_requirement,
+        temporal_applicability=item.temporal_applicability,
     )
 
 
@@ -138,6 +169,8 @@ def build_hiring_case(data: HiringCaseInput) -> HiringCase:
             RequirementEvidenceState.EVIDENCE_MISSING,
             RequirementEvidenceState.GAP,
         }
+        and not (item.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED
+                 and item.evidence_state is RequirementEvidenceState.GAP)
     ]
     return HiringCase(
         candidate_id=data.candidate_id,

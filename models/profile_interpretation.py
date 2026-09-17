@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from models.hiring_case import (
+    EvidenceRequirement,
+    TemporalRequirement,
     OpportunitySignal,
     RequirementEvidenceState,
     RequirementImportance,
@@ -118,10 +120,25 @@ class HardJobFact:
     source_ref: str
     explicit: bool = True
     hard_blocker: bool = False
+    evidence_requirement: EvidenceRequirement = EvidenceRequirement.DEFENSIBLE
+    constraint_need_id: str = ""
+    temporal_requirement: TemporalRequirement = TemporalRequirement.NOT_REQUIRED
+    temporal_need_id: str = ""
+    required_version: str = ""
+    superseded_versions: tuple[str, ...] = ()
+    material_change_on: str = ""
 
     def __post_init__(self) -> None:
         if not self.explicit:
             raise ValueError("The hard job layer accepts explicit facts only.")
+        if not isinstance(self.temporal_requirement, TemporalRequirement):
+            raise ValueError("Invalid temporal requirement.")
+        if self.temporal_requirement is TemporalRequirement.CURRENT_REQUIRED and not _clean(self.temporal_need_id):
+            raise ValueError("Temporal constraints must identify their requirement.")
+        if not isinstance(self.evidence_requirement, EvidenceRequirement):
+            raise ValueError("Invalid evidence requirement.")
+        if self.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED and not _clean(self.constraint_need_id):
+            raise ValueError("Direct evidence constraints must identify their requirement.")
         if not all(_clean(item) for item in (self.fact_id, self.kind, self.value, self.source_ref)):
             raise ValueError("Hard job facts require identity, value and provenance.")
 
@@ -147,8 +164,18 @@ class InterpretedJobNeed:
     hard_fact_refs: tuple[str, ...]
     what_to_demonstrate: str = ""
     hard_blocker: bool = False
+    evidence_requirement: EvidenceRequirement = EvidenceRequirement.DEFENSIBLE
+    evidence_requirement_refs: tuple[str, ...] = ()
+    temporal_requirement: TemporalRequirement = TemporalRequirement.NOT_REQUIRED
+    temporal_requirement_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.temporal_requirement, TemporalRequirement):
+            raise ValueError("Invalid temporal requirement.")
+        object.__setattr__(self, "temporal_requirement_refs", _refs(self.temporal_requirement_refs))
+        if not isinstance(self.evidence_requirement, EvidenceRequirement):
+            raise ValueError("Invalid evidence requirement.")
+        object.__setattr__(self, "evidence_requirement_refs", _refs(self.evidence_requirement_refs))
         object.__setattr__(self, "hard_fact_refs", _refs(self.hard_fact_refs))
         if not self.hard_fact_refs:
             raise ValueError("Interpreted job needs require hard-fact provenance.")
@@ -219,3 +246,12 @@ class HiringCaseInterpretation:
     requirement_links: tuple[RequirementLink, ...]
     opportunity_signals: tuple[OpportunitySignal, ...] = ()
     seniority_context_mismatch: bool = False
+    temporal_evidence: tuple[TemporalEvidenceMetadata, ...] = ()
+
+
+@dataclass(frozen=True)
+class TemporalEvidenceMetadata:
+    ref: str
+    need_id: str
+    version: str = ""
+    performed_on: str = ""

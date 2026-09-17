@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from services.job_evidence_constraints import validate_evidence_requirement
+from services.temporal_applicability import resolve_temporal_applicability
+
 from models.hiring_case import HiringCaseInput, RequirementAssessment, RequirementEvidenceState
 from models.profile_interpretation import (
     AIJobProfileSnapshot,
@@ -32,11 +36,14 @@ def build_profile_hiring_case_input(
     confirmed_gaps = {item.casefold() for item in candidate_profile.confirmed_gaps}
     requirements = []
     for need in job_profile.needs:
+        validate_evidence_requirement(need, hard_facts)
         if need.need_id in hard:
             assessment = hard[need.need_id]
             if not set(assessment.evidence_refs).issubset(valid_evidence):
                 raise ValueError("Hard assessment cited unknown candidate evidence.")
-            requirements.append(assessment)
+            requirements.append(replace(assessment, evidence_requirement=need.evidence_requirement,
+                temporal_requirement=need.temporal_requirement,
+                temporal_applicability=resolve_temporal_applicability(need, hard_facts, assessment.evidence_refs, interpretation.temporal_evidence)))
             continue
         link = links.get(need.need_id)
         if link is None:
@@ -68,6 +75,9 @@ def build_profile_hiring_case_input(
             evidence_refs=refs,
             rationale=rationale,
             interview_defensible=defensible and bool(refs),
+            evidence_requirement=need.evidence_requirement,
+            temporal_requirement=need.temporal_requirement,
+            temporal_applicability=resolve_temporal_applicability(need, hard_facts, refs, interpretation.temporal_evidence),
         ))
     hard_blockers = sorted({
         fact.value for fact in hard_facts.facts if fact.hard_blocker

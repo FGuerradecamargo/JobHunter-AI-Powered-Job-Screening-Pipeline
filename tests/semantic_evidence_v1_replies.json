@@ -1,0 +1,1391 @@
+{
+  "SE01": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE02": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE03": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE04": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE05": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE06": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "uncertain",
+            "coverage": "unknown",
+            "confidence": "high",
+            "reason_code": "insufficient_information",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "uncertain",
+        "coverage": "unknown",
+        "confidence": "unknown",
+        "reason_code": "insufficient_information",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE07": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE08": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE09": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE10": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE11": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          },
+          {
+            "need_id": "need",
+            "evidence_ref": "e1",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "joint_support",
+        "joint_support": true
+      }
+    ]
+  },
+  "SE12": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          },
+          {
+            "need_id": "need",
+            "evidence_ref": "e1",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE13": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE14": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE15": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE16": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE17": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE18": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE19": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE20": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE21": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE22": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE23": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE24": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "uncertain",
+            "coverage": "unknown",
+            "confidence": "high",
+            "reason_code": "insufficient_information",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "uncertain",
+        "coverage": "unknown",
+        "confidence": "unknown",
+        "reason_code": "insufficient_information",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE25": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE26": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE27": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE28": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE29": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE30": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE31": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "uncertain",
+            "coverage": "unknown",
+            "confidence": "high",
+            "reason_code": "insufficient_information",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "uncertain",
+        "coverage": "unknown",
+        "confidence": "unknown",
+        "reason_code": "insufficient_information",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE32": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "uncertain",
+            "coverage": "unknown",
+            "confidence": "high",
+            "reason_code": "insufficient_information",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "uncertain",
+        "coverage": "unknown",
+        "confidence": "unknown",
+        "reason_code": "insufficient_information",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE33": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "uncertain",
+            "coverage": "unknown",
+            "confidence": "high",
+            "reason_code": "conflicting_sources",
+            "interpreter_version": "semantic-fixture-v1"
+          },
+          {
+            "need_id": "need",
+            "evidence_ref": "e1",
+            "candidate_capability_id": "cap",
+            "support_relation": "uncertain",
+            "coverage": "unknown",
+            "confidence": "high",
+            "reason_code": "conflicting_sources",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "uncertain",
+        "coverage": "unknown",
+        "confidence": "unknown",
+        "reason_code": "conflicting_sources",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE34": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE35": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE36": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE37": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE38": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE39": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [],
+        "support_relation": "uncertain",
+        "coverage": "unknown",
+        "confidence": "unknown",
+        "reason_code": "insufficient_information",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE40": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          },
+          {
+            "need_id": "need",
+            "evidence_ref": "e1",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE41": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE42": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "none",
+            "coverage": "none",
+            "confidence": "high",
+            "reason_code": "no_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "none",
+        "coverage": "none",
+        "confidence": "high",
+        "reason_code": "no_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE43": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE44": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "adjacent_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "adjacent_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE45": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE46": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE47": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "adjacent",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "adjacent",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE48": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "uncertain",
+            "coverage": "unknown",
+            "confidence": "high",
+            "reason_code": "insufficient_information",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "uncertain",
+        "coverage": "unknown",
+        "confidence": "unknown",
+        "reason_code": "insufficient_information",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE49": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          },
+          {
+            "need_id": "need",
+            "evidence_ref": "e1",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE50": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE51": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE52": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE53": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE54": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "full",
+            "confidence": "high",
+            "reason_code": "direct_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "full",
+        "confidence": "high",
+        "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  }
+}

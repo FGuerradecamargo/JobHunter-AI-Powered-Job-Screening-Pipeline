@@ -1,0 +1,6 @@
+{
+  "adversarial-v1": "92e81ced079d62bc878392b2392f878452c36673dece887a5974eb065e53012a",
+  "reviewed-calibration-v1": "8872b8a0b3240e16e0fa7c5a7683285e95b8e56687206270a8d34300efcef4d0",
+  "adversarial-v1-before-temporal-review": "8815afe1f64b79db4061410b967966e15a64b36b0b59914d4009547184a50f99",
+  "adversarial-unchanged-except-AV28": "9af6b1fb6659f36ac9aa664167e7c7e5dacc24a43b256840722eb1e41e1566fe"
+}

@@ -1,0 +1,930 @@
+{
+  "version": "semantic-evidence-v1",
+  "review_status": "agent-authored product proposals pending human review; not human gold",
+  "cases": [
+    {
+      "id": "SE01",
+      "scenario": "Exact execution",
+      "job_need": "Restore failed payment services",
+      "candidate_evidence": [
+        "Independently restored failed payment services."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE02",
+      "scenario": "Paraphrased execution",
+      "job_need": "Recover service after outages",
+      "candidate_evidence": [
+        "Brought unavailable payment processing back online."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE03",
+      "scenario": "Adjacent domain",
+      "job_need": "Resolve hospital scheduling incidents",
+      "candidate_evidence": [
+        "Resolved retail delivery scheduling incidents."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE04",
+      "scenario": "Adjacent responsibility",
+      "job_need": "Own incident command",
+      "candidate_evidence": [
+        "Coordinated incident updates under the commander."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE05",
+      "scenario": "Irrelevant valid source",
+      "job_need": "Own incident recovery",
+      "candidate_evidence": [
+        "Organized the office lunch rota."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE06",
+      "scenario": "Generic skill",
+      "job_need": "Diagnose production SQL faults",
+      "candidate_evidence": [
+        "SQL listed without an example."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "uncertain",
+        "coverage": "unknown",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE07",
+      "scenario": "Related reuse recovery",
+      "job_need": "Recover services",
+      "candidate_evidence": [
+        "Recovered services and communicated restoration status."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE08",
+      "scenario": "Related reuse communication",
+      "job_need": "Communicate incident status",
+      "candidate_evidence": [
+        "Recovered services and communicated restoration status."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE09",
+      "scenario": "Unrelated reuse",
+      "job_need": "File regulated tax returns",
+      "candidate_evidence": [
+        "Recovered failed payment services."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE10",
+      "scenario": "Compound partial",
+      "job_need": "Investigate and independently approve refunds",
+      "candidate_evidence": [
+        "Investigated refunds but never approved them."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE11",
+      "scenario": "Complementary sources",
+      "job_need": "Investigate and independently approve refunds",
+      "candidate_evidence": [
+        "Investigated disputed refunds.",
+        "Independently approved the resulting refunds."
+      ],
+      "source_refs": [
+        "e0",
+        "e1"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE12",
+      "scenario": "Incomplete combination",
+      "job_need": "Investigate approve and audit refunds",
+      "candidate_evidence": [
+        "Investigated disputed refunds.",
+        "Approved refunds; no audit evidence."
+      ],
+      "source_refs": [
+        "e0",
+        "e1"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE13",
+      "scenario": "Project vs ownership",
+      "job_need": "Own professional payroll delivery",
+      "candidate_evidence": [
+        "Delivered a simulated payroll project."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE14",
+      "scenario": "Assistance",
+      "job_need": "Independently close monthly accounts",
+      "candidate_evidence": [
+        "Assisted an accountant with monthly close."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE15",
+      "scenario": "Observation",
+      "job_need": "Execute failover",
+      "candidate_evidence": [
+        "Observed an engineer execute failover."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE16",
+      "scenario": "Execution not authority",
+      "job_need": "Authorize production deployments",
+      "candidate_evidence": [
+        "Executed deployments authorized by a manager."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE17",
+      "scenario": "Participation not ownership",
+      "job_need": "Own a hiring programme",
+      "candidate_evidence": [
+        "Participated in interview panels."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE18",
+      "scenario": "Scale bridge",
+      "job_need": "Operate a multinational support function",
+      "candidate_evidence": [
+        "Owned support operations for one local office."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE19",
+      "scenario": "Frontend troubleshooting",
+      "job_need": "Diagnose backend production failures",
+      "candidate_evidence": [
+        "Helped customers reset browser sessions."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE20",
+      "scenario": "Training only",
+      "job_need": "Operate live Kubernetes clusters",
+      "candidate_evidence": [
+        "Attended a Kubernetes theory course."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE21",
+      "scenario": "Lab practice",
+      "job_need": "Operate live Kubernetes clusters",
+      "candidate_evidence": [
+        "Operated a cluster in a personal lab."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE22",
+      "scenario": "Title mismatch",
+      "job_need": "Own payroll reconciliation",
+      "candidate_evidence": [
+        "Office coordinator independently reconciled payroll."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE23",
+      "scenario": "Title inflation",
+      "job_need": "Own financial risk decisions",
+      "candidate_evidence": [
+        "Risk Director title; duties were booking meeting rooms."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE24",
+      "scenario": "Outcome no action",
+      "job_need": "Personally reduce reconciliation errors",
+      "candidate_evidence": [
+        "Team errors fell; own action unspecified."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "uncertain",
+        "coverage": "unknown",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE25",
+      "scenario": "Action no outcome requirement",
+      "job_need": "Perform reconciliation",
+      "candidate_evidence": [
+        "Reconciled daily ledgers; no impact metric supplied."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE26",
+      "scenario": "Incidental tool",
+      "job_need": "Develop SQL reporting pipelines",
+      "candidate_evidence": [
+        "Viewed dashboard reports produced using SQL."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE27",
+      "scenario": "Central tool",
+      "job_need": "Develop SQL reporting pipelines",
+      "candidate_evidence": [
+        "Built SQL transformations and scheduled reports."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE28",
+      "scenario": "Domain wrong task",
+      "job_need": "Approve insurance claims",
+      "candidate_evidence": [
+        "Scheduled training for insurance sales staff."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE29",
+      "scenario": "Transferable task",
+      "job_need": "Investigate healthcare billing anomalies",
+      "candidate_evidence": [
+        "Investigated telecom billing anomalies end to end."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE30",
+      "scenario": "Confirmed absence",
+      "job_need": "Hold refund approval authority",
+      "candidate_evidence": [
+        "Explicitly confirmed no refund approval authority."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": true,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "gap"
+      }
+    },
+    {
+      "id": "SE31",
+      "scenario": "Ambiguous scope",
+      "job_need": "Own incident recovery",
+      "candidate_evidence": [
+        "Helped with incidents; actions unspecified."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "uncertain",
+        "coverage": "unknown",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE32",
+      "scenario": "Incomplete source",
+      "job_need": "Lead an audit",
+      "candidate_evidence": [
+        "Audit record ends before role and responsibility are described."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "uncertain",
+        "coverage": "unknown",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE33",
+      "scenario": "Conflicting sources",
+      "job_need": "Independently approve refunds",
+      "candidate_evidence": [
+        "I independently approved refunds.",
+        "I only assisted; manager held sole approval authority."
+      ],
+      "source_refs": [
+        "e0",
+        "e1"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "uncertain",
+        "coverage": "unknown",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE34",
+      "scenario": "Old valid practice",
+      "job_need": "Perform double-entry bookkeeping",
+      "candidate_evidence": [
+        "Performed double-entry bookkeeping in 2008."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE35",
+      "scenario": "Old changed practice",
+      "job_need": "Use the current regulated procedure",
+      "candidate_evidence": [
+        "Executed a superseded procedure."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE36",
+      "scenario": "Authority scope missing",
+      "job_need": "Approve all high-value refunds independently",
+      "candidate_evidence": [
+        "Approved low-value refunds; high-value required manager approval."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE37",
+      "scenario": "Defensible transfer",
+      "job_need": "Coordinate aviation shift handovers",
+      "candidate_evidence": [
+        "Coordinated hospital shift handovers."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE38",
+      "scenario": "Optional not core",
+      "job_need": "Build forecasting models",
+      "candidate_evidence": [
+        "Designed presentation templates, a nice-to-have."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE39",
+      "scenario": "No records",
+      "job_need": "Own incident recovery",
+      "candidate_evidence": [],
+      "source_refs": [],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "uncertain",
+        "coverage": "unknown",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE40",
+      "scenario": "Repeated weak sources",
+      "job_need": "Own audit signoff",
+      "candidate_evidence": [
+        "Attended audit meeting.",
+        "Took notes during audit review."
+      ],
+      "source_refs": [
+        "e0",
+        "e1"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE41",
+      "scenario": "Outcome and action",
+      "job_need": "Reduce support response time",
+      "candidate_evidence": [
+        "Redesigned triage queues and reduced response time."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE42",
+      "scenario": "Tool named task absent",
+      "job_need": "Administer PostgreSQL backups",
+      "candidate_evidence": [
+        "Used an app whose backend is PostgreSQL."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "none",
+        "coverage": "none",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE43",
+      "scenario": "Decision accountability",
+      "job_need": "Own budget allocation",
+      "candidate_evidence": [
+        "Allocated departmental budgets and signed decisions."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE44",
+      "scenario": "Proposal not decision",
+      "job_need": "Own budget allocation",
+      "candidate_evidence": [
+        "Prepared budget options; executive made allocations."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "full",
+        "assessment": "transferable"
+      }
+    },
+    {
+      "id": "SE45",
+      "scenario": "Volunteer equivalent",
+      "job_need": "Coordinate event logistics",
+      "candidate_evidence": [
+        "Owned logistics for a volunteer community event."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE46",
+      "scenario": "Translation equivalent",
+      "job_need": "Support customers in Spanish",
+      "candidate_evidence": [
+        "Resolved Spanish-language customer tickets daily."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE47",
+      "scenario": "Related language insufficient",
+      "job_need": "Support customers in Spanish",
+      "candidate_evidence": [
+        "Supported customers in Portuguese only."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "adjacent",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE48",
+      "scenario": "Unclear collective pronoun",
+      "job_need": "Personally own escalation decisions",
+      "candidate_evidence": [
+        "We handled escalations; individual authority unclear."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "uncertain",
+        "coverage": "unknown",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE49",
+      "scenario": "Joint duplicate not coverage",
+      "job_need": "Investigate and approve refunds",
+      "candidate_evidence": [
+        "Investigated one refund.",
+        "Investigated a second refund; never approved either."
+      ],
+      "source_refs": [
+        "e0",
+        "e1"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "partial",
+        "assessment": "evidence_missing"
+      }
+    },
+    {
+      "id": "SE50",
+      "scenario": "Direct separate temporal",
+      "job_need": "Use current safety procedure",
+      "candidate_evidence": [
+        "Performed the current safety procedure."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "direct",
+        "coverage": "full",
+        "assessment": "proven"
+      }
+    },
+    {
+      "id": "SE51",
+      "scenario": "External candidate ref",
+      "job_need": "Own recovery",
+      "candidate_evidence": [
+        "Evidence belongs to another candidate."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "rejected",
+        "coverage": "rejected",
+        "assessment": "rejected"
+      }
+    },
+    {
+      "id": "SE52",
+      "scenario": "Checkpoint reference",
+      "job_need": "Own recovery",
+      "candidate_evidence": [
+        "Derived checkpoint says recovery is proven."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "rejected",
+        "coverage": "rejected",
+        "assessment": "rejected"
+      }
+    },
+    {
+      "id": "SE53",
+      "scenario": "Unknown source",
+      "job_need": "Own recovery",
+      "candidate_evidence": [
+        "No such source record."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "rejected",
+        "coverage": "rejected",
+        "assessment": "rejected"
+      }
+    },
+    {
+      "id": "SE54",
+      "scenario": "Stale job version",
+      "job_need": "Own recovery",
+      "candidate_evidence": [
+        "Recovered services."
+      ],
+      "source_refs": [
+        "e0"
+      ],
+      "confirmed_absence": false,
+      "expected": {
+        "relation": "rejected",
+        "coverage": "rejected",
+        "assessment": "rejected"
+      }
+    }
+  ]
+}

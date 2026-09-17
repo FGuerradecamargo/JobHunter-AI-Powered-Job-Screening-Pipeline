@@ -30,7 +30,7 @@ def test_composition_and_review_provenance_are_explicit():
     assert len(cases) == len({case.case_id for case in cases}) == 40
     assert len({case.family for case in cases}) == 8
     assert Counter(case.review_track for case in cases) == {"normative": 38, "exploratory": 2}
-    assert all(case.human_review_status == "pending" for case in cases)
+    assert {case.case_id for case in cases if case.human_review_status == "reviewed"} == {"HC12b", "HC15b", "HC20b"}
     assert {case.expected.classification for case in cases} == {
         "best_match", "worth_a_try", "youre_strong_but", "skip_for_now", "ineligible",
     }
@@ -66,7 +66,7 @@ def test_case_layers_and_proof_review_remain_reproducible(case):
             assert item["safe_in_cv"] is False
             assert item["interview_defensible"] is False
         if item["expected_state"] == "evidence_missing":
-            assert item["needs_evidence"] is True
+            assert item["needs_evidence"] is not item["needs_source_repair"]
     if first["any_mismatch"]:
         assert first["primary_root_cause"] in {cause.value for cause in RootCause}
 

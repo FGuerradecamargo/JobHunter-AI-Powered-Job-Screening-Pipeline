@@ -24,6 +24,30 @@ class RequirementImportance(str, Enum):
     NICE_TO_HAVE = "nice_to_have"
 
 
+class EvidenceRequirement(str, Enum):
+    DEFENSIBLE = "defensible"
+    DIRECT_REQUIRED = "direct_required"
+
+
+class TemporalRequirement(str, Enum):
+    NOT_REQUIRED = "not_required"
+    CURRENT_REQUIRED = "current_required"
+
+
+class TemporalApplicability(str, Enum):
+    SATISFIED = "satisfied"
+    NOT_SATISFIED = "not_satisfied"
+    UNKNOWN = "unknown"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class EvidenceConstraintReason(str, Enum):
+    SATISFIED = "satisfied"
+    DIRECT_EVIDENCE_REQUIRED = "direct_evidence_required"
+    EVIDENCE_MISSING = "evidence_missing"
+    CONFIRMED_GAP = "confirmed_gap"
+
+
 class HiringCaseStrength(str, Enum):
     STRONG = "strong"
     VIABLE = "viable"
@@ -91,8 +115,36 @@ class RequirementAssessment:
     evidence_refs: list[str] = field(default_factory=list)
     rationale: str = ""
     interview_defensible: bool = False
+    evidence_requirement: EvidenceRequirement = EvidenceRequirement.DEFENSIBLE
+    temporal_requirement: TemporalRequirement = TemporalRequirement.NOT_REQUIRED
+    temporal_applicability: TemporalApplicability = TemporalApplicability.NOT_APPLICABLE
+
+    @property
+    def constraint_satisfied(self) -> bool:
+        return self.evidence_state is RequirementEvidenceState.PROVEN or (
+            self.evidence_requirement is EvidenceRequirement.DEFENSIBLE
+            and self.evidence_state is RequirementEvidenceState.TRANSFERABLE
+        )
+
+    @property
+    def constraint_reason_code(self) -> EvidenceConstraintReason:
+        if self.constraint_satisfied:
+            return EvidenceConstraintReason.SATISFIED
+        if self.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED:
+            return EvidenceConstraintReason.DIRECT_EVIDENCE_REQUIRED
+        if self.evidence_state is RequirementEvidenceState.GAP:
+            return EvidenceConstraintReason.CONFIRMED_GAP
+        return EvidenceConstraintReason.EVIDENCE_MISSING
 
     def __post_init__(self) -> None:
+        if not isinstance(self.temporal_requirement, TemporalRequirement) or not isinstance(self.temporal_applicability, TemporalApplicability):
+            raise ValueError("Invalid temporal contract.")
+        if self.temporal_requirement is TemporalRequirement.NOT_REQUIRED:
+            object.__setattr__(self, "temporal_applicability", TemporalApplicability.NOT_APPLICABLE)
+        elif self.temporal_applicability is TemporalApplicability.NOT_APPLICABLE:
+            object.__setattr__(self, "temporal_applicability", TemporalApplicability.UNKNOWN)
+        if not isinstance(self.evidence_requirement, EvidenceRequirement):
+            raise ValueError("Invalid evidence requirement.")
         object.__setattr__(self, "requirement_id", _clean(self.requirement_id, maximum=160))
         object.__setattr__(self, "requirement", _clean(self.requirement))
         object.__setattr__(self, "rationale", _clean(self.rationale))
@@ -141,6 +193,11 @@ class ProofItem:
     what_to_demonstrate: str
     needs_evidence: bool
     interview_defensible: bool
+    evidence_requirement: EvidenceRequirement = EvidenceRequirement.DEFENSIBLE
+    constraint_satisfied: bool = False
+    constraint_reason_code: EvidenceConstraintReason = EvidenceConstraintReason.EVIDENCE_MISSING
+    temporal_requirement: TemporalRequirement = TemporalRequirement.NOT_REQUIRED
+    temporal_applicability: TemporalApplicability = TemporalApplicability.NOT_APPLICABLE
 
 
 @dataclass(frozen=True)
