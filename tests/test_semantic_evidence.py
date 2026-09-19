@@ -39,8 +39,8 @@ def test_frozen_semantic_contract_reference(case):
 
 def test_metrics_are_contract_agreement_not_ai_accuracy():
     result = run_benchmark()
-    assert (result["total"], result["accepted"], result["safely_rejected"]) == (54, 50, 4)
-    assert result["agreement_accepted"] == dict(relation=50, coverage=50, assessment=50)
+    assert (result["total"], result["accepted"], result["safely_rejected"]) == (55, 51, 4)
+    assert result["agreement_accepted"] == dict(relation=51, coverage=51, assessment=51)
 
 
 @pytest.mark.parametrize("mutation", ["candidate", "job", "content", "signature"])
@@ -76,7 +76,7 @@ def test_partial_preserved_and_cannot_be_promoted_to_whole():
 
 
 def test_unsupported_ownership_promotion_caught():
-    req, raw = setup("SE14")
+    req, raw = setup("SE21")
     raw["needs"][0]["support_relation"] = "direct"
     raw["needs"][0]["reason_code"] = "direct_support"
     result = validate_semantic_support(req, raw)
@@ -219,7 +219,7 @@ def test_direct_requirement_and_temporal_rules_remain_independent():
     from models.hiring_case import EvidenceRequirement, TemporalApplicability
     from models.profile_interpretation import HiringCaseInterpretation, TemporalEvidenceMetadata
     from services.profile_hiring_case_adapter import build_profile_hiring_case_input
-    req, raw = setup("SE14")
+    req, raw = setup("SE21")
     hard = replace(req.context.hard_facts, facts=(replace(req.context.hard_facts.facts[0],
         evidence_requirement=EvidenceRequirement.DIRECT_REQUIRED, constraint_need_id="need"),))
     job = replace(req.context.job_profile, needs=(replace(req.context.job_profile.needs[0],

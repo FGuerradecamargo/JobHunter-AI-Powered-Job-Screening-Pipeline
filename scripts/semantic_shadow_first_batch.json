@@ -1,0 +1,7 @@
+{
+  "version": "semantic-shadow-first-batch-v1",
+  "case_ids": ["SE01", "SE03", "SE05", "SE10", "AV06", "SE13", "SE31", "SE02"],
+  "maximum_requests": 8,
+  "reference_status": "synthetic proposals pending human review",
+  "live_executed": false
+}

@@ -196,7 +196,7 @@ def test_removing_resolved_conflict_requires_new_input_signature():
 def test_av02_and_av30_resolved_but_semantic_failures_visible():
     rows = {case.case_id: observe(case) for case in adversarial_cases()}
     assert rows["AV02"]["classification"] == "worth_a_try"
-    assert rows["AV02"]["states"] == ("proven", "transferable")
+    assert rows["AV02"]["states"] == ("proven", "evidence_missing")
     assert rows["AV02"]["constraints"][1] == ("direct_required", False, "direct_evidence_required")
     assert rows["AV30"]["value"] == "medium" and rows["AV30"]["confidence"] == "low"
     for case in ("AV05", "AV06", "AV27"):

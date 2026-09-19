@@ -169,7 +169,7 @@ def test_snapshots_roundtrip_and_old_snapshots_default_to_no_requirement():
 def test_av28_review_only_and_final_temporal_result():
     manifest = json.loads(Path(__file__).with_name("hiring_case_review_freeze.json").read_text())
     cases = adversarial_cases()
-    assert digest([asdict(case) for case in cases if case.case_id != "AV28"]) == manifest["adversarial-unchanged-except-AV28"]
+    assert digest([asdict(case) for case in cases if case.case_id != "AV28"]) == manifest["semantic-reviewed-adversarial-excluding-AV28"]
     result = observe(next(case for case in cases if case.case_id == "AV28"))
     assert result["states"] == ("transferable",)
     assert result["temporal"] == (("current_required", "not_satisfied"),)

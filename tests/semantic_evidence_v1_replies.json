@@ -85,16 +85,16 @@
             "evidence_ref": "e0",
             "candidate_capability_id": "cap",
             "support_relation": "adjacent",
-            "coverage": "full",
+            "coverage": "partial",
             "confidence": "high",
-            "reason_code": "adjacent_support",
+            "reason_code": "partial_support",
             "interpreter_version": "semantic-fixture-v1"
           }
         ],
         "support_relation": "adjacent",
-        "coverage": "full",
+        "coverage": "partial",
         "confidence": "high",
-        "reason_code": "adjacent_support",
+        "reason_code": "partial_support",
         "joint_support": false
       }
     ]
@@ -330,16 +330,16 @@
             "evidence_ref": "e0",
             "candidate_capability_id": "cap",
             "support_relation": "adjacent",
-            "coverage": "full",
+            "coverage": "partial",
             "confidence": "high",
-            "reason_code": "adjacent_support",
+            "reason_code": "partial_support",
             "interpreter_version": "semantic-fixture-v1"
           }
         ],
         "support_relation": "adjacent",
-        "coverage": "full",
+        "coverage": "partial",
         "confidence": "high",
-        "reason_code": "adjacent_support",
+        "reason_code": "partial_support",
         "joint_support": false
       }
     ]
@@ -355,16 +355,16 @@
             "evidence_ref": "e0",
             "candidate_capability_id": "cap",
             "support_relation": "adjacent",
-            "coverage": "full",
+            "coverage": "partial",
             "confidence": "high",
-            "reason_code": "adjacent_support",
+            "reason_code": "partial_support",
             "interpreter_version": "semantic-fixture-v1"
           }
         ],
         "support_relation": "adjacent",
-        "coverage": "full",
+        "coverage": "partial",
         "confidence": "high",
-        "reason_code": "adjacent_support",
+        "reason_code": "partial_support",
         "joint_support": false
       }
     ]
@@ -1003,27 +1003,27 @@
             "need_id": "need",
             "evidence_ref": "e0",
             "candidate_capability_id": "cap",
-            "support_relation": "adjacent",
-            "coverage": "partial",
+            "support_relation": "none",
+            "coverage": "none",
             "confidence": "high",
-            "reason_code": "partial_support",
+            "reason_code": "no_support",
             "interpreter_version": "semantic-fixture-v1"
           },
           {
             "need_id": "need",
             "evidence_ref": "e1",
             "candidate_capability_id": "cap",
-            "support_relation": "adjacent",
-            "coverage": "partial",
+            "support_relation": "none",
+            "coverage": "none",
             "confidence": "high",
-            "reason_code": "partial_support",
+            "reason_code": "no_support",
             "interpreter_version": "semantic-fixture-v1"
           }
         ],
-        "support_relation": "adjacent",
-        "coverage": "partial",
+        "support_relation": "none",
+        "coverage": "none",
         "confidence": "high",
-        "reason_code": "partial_support",
+        "reason_code": "no_support",
         "joint_support": false
       }
     ]
@@ -1114,16 +1114,16 @@
             "evidence_ref": "e0",
             "candidate_capability_id": "cap",
             "support_relation": "adjacent",
-            "coverage": "full",
+            "coverage": "partial",
             "confidence": "high",
-            "reason_code": "adjacent_support",
+            "reason_code": "partial_support",
             "interpreter_version": "semantic-fixture-v1"
           }
         ],
         "support_relation": "adjacent",
-        "coverage": "full",
+        "coverage": "partial",
         "confidence": "high",
-        "reason_code": "adjacent_support",
+        "reason_code": "partial_support",
         "joint_support": false
       }
     ]
@@ -1384,6 +1384,31 @@
         "coverage": "full",
         "confidence": "high",
         "reason_code": "direct_support",
+        "joint_support": false
+      }
+    ]
+  },
+  "SE55": {
+    "interpreter_version": "semantic-fixture-v1",
+    "needs": [
+      {
+        "need_id": "need",
+        "links": [
+          {
+            "need_id": "need",
+            "evidence_ref": "e0",
+            "candidate_capability_id": "cap",
+            "support_relation": "direct",
+            "coverage": "partial",
+            "confidence": "high",
+            "reason_code": "partial_support",
+            "interpreter_version": "semantic-fixture-v1"
+          }
+        ],
+        "support_relation": "direct",
+        "coverage": "partial",
+        "confidence": "high",
+        "reason_code": "partial_support",
         "joint_support": false
       }
     ]

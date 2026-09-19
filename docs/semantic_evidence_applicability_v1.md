@@ -1,5 +1,14 @@
 # Semantic evidence applicability v1
 
+Current normative meanings are frozen in
+[Semantic Support Contract - Reviewed V1](semantic_support_contract_reviewed_v1.md).
+That human-reviewed revision separates correspondence from material coverage,
+preserves missing proof versus confirmed absence, and documents fixture repairs.
+The benchmark now contains 55 cases (51 semantic evaluations, four authority
+rejections); the original 54-case reference and historical report are preserved.
+Implementation/schema mechanics below remain unchanged. Historical implementation
+and original-freeze descriptions below describe the initial v1 slice.
+
 ## Scope and authority
 
 Shadow-only, provider-neutral, in-memory contract. No production UI, database,

@@ -117,7 +117,7 @@ def _clear_local_session() -> None:
     st.session_state.pop("active_user_id", None)
     st.session_state.pop("active_user_owner_id", None)
     for key in list(st.session_state):
-        if str(key).startswith(("admin_viewing_as_", "admin_access_")):
+        if str(key).startswith(("admin_viewing_as_", "admin_access_", "_voice_", "onboarding_step_")):
             st.session_state.pop(key, None)
     st.session_state["reauthentication_required"] = True
 

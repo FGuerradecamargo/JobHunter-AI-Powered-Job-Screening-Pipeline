@@ -1,0 +1,2215 @@
+{
+  "version": "semantic-support-reviewed-v1",
+  "authority": "explicit human product review; not blanket human gold",
+  "previous_freezes": {
+    "adversarial-v1": "92e81ced079d62bc878392b2392f878452c36673dece887a5974eb065e53012a",
+    "reviewed-calibration-v1": "8872b8a0b3240e16e0fa7c5a7683285e95b8e56687206270a8d34300efcef4d0",
+    "adversarial-v1-before-temporal-review": "8815afe1f64b79db4061410b967966e15a64b36b0b59914d4009547184a50f99",
+    "adversarial-unchanged-except-AV28": "9af6b1fb6659f36ac9aa664167e7c7e5dacc24a43b256840722eb1e41e1566fe"
+  },
+  "previous_semantic_freeze": {
+    "version": "semantic-evidence-v1",
+    "reference_sha256": "c9a501a2b94969612320d1ad3606fbea8fc83ddb1f0a6cd589934e5f165e16b9",
+    "normalization": "CRLF to LF before hashing",
+    "frozen_before_boundary_implementation": true
+  },
+  "judgment_changes": {
+    "semantic": [
+      "SE04",
+      "SE13",
+      "SE14",
+      "SE40",
+      "SE44"
+    ],
+    "adversarial": [
+      "AV02",
+      "AV26"
+    ],
+    "calibration": []
+  },
+  "new_cases": [
+    "SE55"
+  ],
+  "original_changed_adversarial": [
+    {
+      "case_id": "AV01",
+      "scenario": "several important bridges",
+      "company": "Core incident recovery; release and vendor coordination important.",
+      "candidate": "Independent recovery with defensible adjacent coordination in both secondary areas.",
+      "opportunity": "Chosen target work.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        },
+        {
+          "text": "Coordinate release communications",
+          "importance": "important",
+          "evidence": "Coordinated support escalations across teams, not release ownership.",
+          "source_available": true,
+          "transferable": true,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        },
+        {
+          "text": "Coordinate vendors",
+          "importance": "important",
+          "evidence": "Coordinated external support, not procurement.",
+          "source_available": true,
+          "transferable": true,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          "proven",
+          "transferable",
+          "transferable"
+        ],
+        "rationale": "Reviewed B: important bridges do not automatically downgrade proven core.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven",
+          "transferable",
+          "transferable"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV02",
+      "scenario": "explicit direct ownership constraint",
+      "company": "Secondary IMPORTANT release role explicitly requires prior independent release ownership.",
+      "candidate": "Core incidents proven; only adjacent release coordination.",
+      "opportunity": "Target role.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        },
+        {
+          "text": "Own releases directly",
+          "importance": "important",
+          "evidence": "Supported release communications, never owned release.",
+          "source_available": true,
+          "transferable": true,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": true
+        }
+      ],
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "viable",
+        "value": "high",
+        "states": [
+          "proven",
+          "transferable"
+        ],
+        "rationale": "Explicit direct-ownership condition matters; IMPORTANT alone does not express it.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven",
+          "transferable"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "unsupported_direct_evidence_constraint",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV03",
+      "scenario": "multiple peripheral gaps",
+      "company": "Recovery core; optional diagram and reporting tools.",
+      "candidate": "Core recovery proven; explicitly lacks both optional tools.",
+      "opportunity": "Aligned target.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        },
+        {
+          "text": "Use optional diagram tooling",
+          "importance": "nice_to_have",
+          "evidence": "Explicitly cannot use this tool.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": true,
+          "authority": "explicit",
+          "direct_required": false
+        },
+        {
+          "text": "Optional report tool",
+          "importance": "nice_to_have",
+          "evidence": "Confirmed no use.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": true,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          "proven",
+          "gap",
+          "gap"
+        ],
+        "rationale": "Peripheral confirmed gaps do not defeat core proof.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven",
+          "gap",
+          "gap"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV04",
+      "scenario": "broken source",
+      "company": "Independent incident recovery.",
+      "candidate": "Detailed recovery record exists; import lost its authoritative ID.",
+      "opportunity": "Target work.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": false,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "viable",
+        "value": "high",
+        "states": [
+          "evidence_missing"
+        ],
+        "rationale": "Reviewed A: repair provenance, not candidate capability.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV06",
+      "scenario": "unrelated evidence reuse",
+      "company": "Recovery and tax filing both CORE.",
+      "candidate": "Recovery documented; no tax work. Provider reuses the recovery record.",
+      "opportunity": "Target role.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        },
+        {
+          "text": "File regulated tax returns",
+          "importance": "core",
+          "evidence": "No tax filing example.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "viable",
+        "value": "high",
+        "states": [
+          "proven",
+          "evidence_missing"
+        ],
+        "rationale": "Same source cannot prove unrelated tax delivery.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven",
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": true
+      },
+      "taxonomy": "semantic_entailment",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV07",
+      "scenario": "strong but poor value",
+      "company": "Supported recovery work, known pay below non-negotiable target.",
+      "candidate": "Core proven; cannot accept pay reduction.",
+      "opportunity": "EUR 30k offered against EUR 55k minimum.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "low",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Known material negative cost is independent of ability.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "negative",
+        "dimension": "compensation",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV09",
+      "scenario": "unknown salary",
+      "company": "Salary undisclosed.",
+      "candidate": "Core proven, no salary fact.",
+      "opportunity": "No other established value advantage.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "medium",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Unknown salary is not negative or positive.",
+        "confidence": "low"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "negative",
+        "dimension": "compensation",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": false,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV10",
+      "scenario": "below target",
+      "company": "EUR 45k salary.",
+      "candidate": "EUR 60k minimum confirmed; core proven.",
+      "opportunity": "Material unacceptable pay gap.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "low",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Known material compensation loss lowers value.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "negative",
+        "dimension": "compensation",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV11",
+      "scenario": "above target",
+      "company": "EUR 75k salary, unchanged hours.",
+      "candidate": "EUR 55k target and supported recovery.",
+      "opportunity": "Candidate explicitly values the increase.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Known valued pay increase is positive.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "compensation",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV12",
+      "scenario": "acceptable hybrid unknown commute",
+      "company": "Hybrid allowed; commute duration unmeasured.",
+      "candidate": "Hybrid accepted, core proven.",
+      "opportunity": "Chosen direction; no known negative commute fact.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Reviewed C/E: commute uncertainty reduces confidence, not valence.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV13",
+      "scenario": "unacceptable known commute",
+      "company": "Daily office, measured four-hour round trip.",
+      "candidate": "Core proven; user cannot accept commute burden.",
+      "opportunity": "Material known commute cost, not an eligibility blocker.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "low",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Known commute cost may lower value.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "negative",
+        "dimension": "work_mode_location",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV14",
+      "scenario": "urgent lateral bridge",
+      "company": "Lateral recovery job available now.",
+      "candidate": "Unemployed, core proven, urgently needs continuity.",
+      "opportunity": "Explicit immediate stability objective.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Current timing can make lateral work valuable.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "objective_timing",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV15",
+      "scenario": "stable lateral distraction",
+      "company": "Same lateral recovery job.",
+      "candidate": "Stable in equivalent work, deliberately avoiding another lateral move.",
+      "opportunity": "Explicit material distraction from current objective.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "low",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Known selective timing makes this lateral move low value.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "negative",
+        "dimension": "objective_timing",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV16",
+      "scenario": "overqualified",
+      "company": "Hands-on individual recovery role.",
+      "candidate": "Department head, recovery proven, seeks strategic scope.",
+      "opportunity": "Explicitly unacceptable scope reduction.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "low",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Overqualification affects value, not existing ability.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "negative",
+        "dimension": "seniority_progression",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV17",
+      "scenario": "underqualified scale",
+      "company": "Multi-site incident command through managers.",
+      "candidate": "Only small single-shift responsibility.",
+      "opportunity": "Attractive next direction.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "weak",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Proven narrow task cannot establish required leadership scale.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": true
+    },
+    {
+      "case_id": "AV18",
+      "scenario": "different title equivalent scope",
+      "company": "Incident manager title, hands-on coordination.",
+      "candidate": "Support specialist title; documented equivalent incident ownership.",
+      "opportunity": "Chosen direction.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Equivalent responsibility outweighs title mismatch.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV19",
+      "scenario": "impressive title insufficient scope",
+      "company": "Own multi-site controls.",
+      "candidate": "Director title at tiny firm; only one shift, no managers or controls.",
+      "opportunity": "Target direction.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "weak",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Title cannot replace scope evidence.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": true
+    },
+    {
+      "case_id": "AV20",
+      "scenario": "explicit hard blocker",
+      "company": "Legally required license verified mandatory and absent.",
+      "candidate": "Core work proven but cannot satisfy license.",
+      "opportunity": "Otherwise attractive.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "ineligible",
+        "strength": "ineligible",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Verified hard-layer eligibility overrides qualification.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": true,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV21",
+      "scenario": "implied condition not blocker",
+      "company": "Evening contact implied but never stated mandatory.",
+      "candidate": "Core proven; unavailable evenings.",
+      "opportunity": "Otherwise target role.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "strongly_implied",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "not_evaluated",
+        "strength": "not_evaluated",
+        "value": "not_evaluated",
+        "states": [],
+        "rationale": "Reject attempted implied hard blocker before classification.",
+        "confidence": "not_evaluated"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": true,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV22",
+      "scenario": "direction conflict",
+      "company": "Recovery role.",
+      "candidate": "Proven but explicitly avoiding recovery to pursue design.",
+      "opportunity": "Confirmed material direction conflict.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "low",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Ability and direction are independent.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "negative",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV23",
+      "scenario": "secondary accepted direction",
+      "company": "Recovery role in accepted fallback family.",
+      "candidate": "Core proven; explicitly welcomes this secondary path.",
+      "opportunity": "Secondary but genuine positive direction, not invented preference.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Secondary alignment need not be negative.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV26",
+      "scenario": "project versus professional",
+      "company": "Production recovery responsibility.",
+      "candidate": "Defensible personal sandbox recovery project, no production ownership.",
+      "opportunity": "Target work.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Built sandbox, injected failure, recovered and documented checks.",
+          "source_available": true,
+          "transferable": true,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "viable",
+        "value": "high",
+        "states": [
+          "transferable"
+        ],
+        "rationale": "Project supports adjacent practice, not production ownership.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "transferable"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV29",
+      "scenario": "unknown preference",
+      "company": "Recovery role, no special advantage established.",
+      "candidate": "Core proven; desired direction unknown.",
+      "opportunity": "No confirmed preference evidence.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "medium",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Do not invent preference alignment.",
+        "confidence": "low"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": false,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV30",
+      "scenario": "contradictory preferences",
+      "company": "Recovery role.",
+      "candidate": "Two current equally authoritative preferences conflict: pursue versus avoid recovery.",
+      "opportunity": "No reconciliation or priority provided.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "youre_strong_but",
+        "strength": "strong",
+        "value": "medium",
+        "states": [
+          "proven"
+        ],
+        "rationale": "Contradiction must remain uncertain until resolved.",
+        "confidence": "low"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "preference_conflict",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV31",
+      "scenario": "job profile uncertain",
+      "company": "Description does not establish whether recovery is actually required.",
+      "candidate": "Recovery proven.",
+      "opportunity": "Otherwise chosen direction.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "unknown",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "viable",
+        "value": "high",
+        "states": [
+          "evidence_missing"
+        ],
+        "rationale": "Unknown need cannot establish a proven match.",
+        "confidence": "medium"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": false,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    },
+    {
+      "case_id": "AV32",
+      "scenario": "checkpoint self confirmation",
+      "company": "Recovery required.",
+      "candidate": "Checkpoint calls candidate expert, no authoritative supporting evidence supplied.",
+      "opportunity": "Target work.",
+      "needs": [
+        {
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "evidence": "Traced a failed payment, isolated the cause, restored service and verified settlement.",
+          "source_available": true,
+          "transferable": false,
+          "confirmed_gap": false,
+          "authority": "explicit",
+          "direct_required": false
+        }
+      ],
+      "expected": {
+        "classification": "not_evaluated",
+        "strength": "not_evaluated",
+        "value": "not_evaluated",
+        "states": [],
+        "rationale": "Reject checkpoint evidence before engine.",
+        "confidence": "not_evaluated"
+      },
+      "reply": {
+        "states": [
+          "proven"
+        ],
+        "value": "positive",
+        "dimension": "career_direction",
+        "inferred_blocker": false,
+        "checkpoint_ref": true,
+        "reuse_first_ref": false
+      },
+      "taxonomy": "none",
+      "known_value_fact": true,
+      "hard_blocker": false,
+      "scope_mismatch": false
+    }
+  ],
+  "original_changed_calibration": [
+    {
+      "case_id": "HC02b",
+      "pair_id": "P02",
+      "variant": "b",
+      "changed_path": "candidate.capabilities.0.proof",
+      "family": "fraud_risk",
+      "facts": {
+        "company": {
+          "family": "fraud_risk",
+          "role": "Fraud Investigator",
+          "needs": [
+            {
+              "key": "main",
+              "text": "Investigate fraud patterns",
+              "importance": "core",
+              "question": "Have you personally performed this work: investigate fraud patterns?",
+              "evidence_needed": "A concrete case describing personal actions, methods, decisions and outcome.",
+              "parsed_slot": ""
+            }
+          ],
+          "expected_work": "Own day-to-day investigate fraud patterns and explain decisions.",
+          "seniority_context": "Independent mid-level practitioner; supervised escalation for exceptional cases.",
+          "eligibility_blocker": ""
+        },
+        "candidate": {
+          "capabilities": [
+            {
+              "key": "main",
+              "exists": "yes",
+              "proof": {
+                "kind": "transferable",
+                "wording": "Investigate fraud patterns",
+                "example": "Investigated disputed purchases in customer operations using transaction trails; a defensible bridge, not fraud ownership.",
+                "source_available": true
+              }
+            }
+          ],
+          "context": {
+            "level": "mid-level",
+            "scope": "Independently performed the advertised scope.",
+            "severe_mismatch": false
+          }
+        },
+        "opportunity": {
+          "compensation": {
+            "annual_offer": null,
+            "annual_current": null,
+            "currency": "",
+            "tradeoff": "Salary undisclosed; no assumed pay advantage."
+          },
+          "career_direction": "The role is an explicit current target.",
+          "desired_family": "fraud_risk",
+          "growth": "Practice in the chosen direction; no promise of employer training.",
+          "progression": "Lateral role at an appropriate level.",
+          "work_mode": "remote",
+          "location": "Same country; no relocation.",
+          "remote_allowed": true,
+          "hybrid_allowed": true,
+          "onsite_allowed": false,
+          "role_content": "Target work is desirable.",
+          "tradeoffs": "No known material cost beyond normal onboarding.",
+          "timing": "Stable and selective; choose a role in the stated target direction."
+        }
+      },
+      "expected": {
+        "classification": "worth_a_try",
+        "strength": "viable",
+        "value": "high",
+        "states": [
+          [
+            "main",
+            "transferable"
+          ]
+        ],
+        "rationale": "Dispute investigation provides an adjacent bridge with domain limits."
+      },
+      "legacy_recommendation": "potential",
+      "diagnostic_focus": "C_CAPABILITY_INTERPRETATION",
+      "review_track": "normative",
+      "human_review_status": "pending"
+    },
+    {
+      "case_id": "HC18a",
+      "pair_id": "P18",
+      "variant": "a",
+      "changed_path": "candidate.context",
+      "family": "operations_management",
+      "facts": {
+        "company": {
+          "family": "operations_management",
+          "role": "Operations Team Lead",
+          "needs": [
+            {
+              "key": "main",
+              "text": "Lead operational teams",
+              "importance": "core",
+              "question": "Have you personally performed this work: lead operational teams?",
+              "evidence_needed": "A concrete case describing personal actions, methods, decisions and outcome.",
+              "parsed_slot": ""
+            }
+          ],
+          "expected_work": "Own day-to-day lead operational teams and explain decisions.",
+          "seniority_context": "Independent mid-level practitioner; supervised escalation for exceptional cases.",
+          "eligibility_blocker": ""
+        },
+        "candidate": {
+          "capabilities": [
+            {
+              "key": "main",
+              "exists": "yes",
+              "proof": {
+                "kind": "direct",
+                "wording": "Lead operational teams",
+                "example": "Allocated work, coached colleagues and coordinated recovery from a missed service target.",
+                "source_available": true
+              }
+            }
+          ],
+          "context": {
+            "level": "senior specialist",
+            "scope": "Ready for the first formal team-lead position.",
+            "severe_mismatch": false
+          }
+        },
+        "opportunity": {
+          "compensation": {
+            "annual_offer": null,
+            "annual_current": null,
+            "currency": "",
+            "tradeoff": "Salary undisclosed; no assumed pay advantage."
+          },
+          "career_direction": "The role is an explicit current target.",
+          "desired_family": "operations_management",
+          "growth": "Practice in the chosen direction; no promise of employer training.",
+          "progression": "Hands-on team leadership; useful advancement only below department-head level.",
+          "work_mode": "remote",
+          "location": "Same country; no relocation.",
+          "remote_allowed": true,
+          "hybrid_allowed": true,
+          "onsite_allowed": false,
+          "role_content": "Target work is desirable.",
+          "tradeoffs": "No known material cost beyond normal onboarding.",
+          "timing": "Stable and selective; choose a role in the stated target direction."
+        }
+      },
+      "expected": {
+        "classification": "best_match",
+        "strength": "strong",
+        "value": "high",
+        "states": [
+          [
+            "main",
+            "proven"
+          ]
+        ],
+        "rationale": "Evidenced leadership and first formal progression make this valuable."
+      },
+      "legacy_recommendation": "best_match",
+      "diagnostic_focus": "D_OPPORTUNITY_VALUE",
+      "review_track": "normative",
+      "human_review_status": "pending"
+    }
+  ],
+  "original_adversarial_expected": {
+    "AV01": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        "proven",
+        "transferable",
+        "transferable"
+      ],
+      "rationale": "Reviewed B: important bridges do not automatically downgrade proven core.",
+      "confidence": "medium"
+    },
+    "AV02": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "proven",
+        "transferable"
+      ],
+      "rationale": "Explicit direct-ownership condition matters; IMPORTANT alone does not express it.",
+      "confidence": "medium"
+    },
+    "AV03": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        "proven",
+        "gap",
+        "gap"
+      ],
+      "rationale": "Peripheral confirmed gaps do not defeat core proof.",
+      "confidence": "medium"
+    },
+    "AV04": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "evidence_missing"
+      ],
+      "rationale": "Reviewed A: repair provenance, not candidate capability.",
+      "confidence": "medium"
+    },
+    "AV05": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "evidence_missing"
+      ],
+      "rationale": "Provenance cannot make irrelevant evidence support recovery.",
+      "confidence": "medium"
+    },
+    "AV06": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "proven",
+        "evidence_missing"
+      ],
+      "rationale": "Same source cannot prove unrelated tax delivery.",
+      "confidence": "medium"
+    },
+    "AV07": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Known material negative cost is independent of ability.",
+      "confidence": "medium"
+    },
+    "AV08": {
+      "classification": "worth_a_try",
+      "strength": "weak",
+      "value": "high",
+      "states": [
+        "gap"
+      ],
+      "rationale": "Attractive value does not repair a confirmed core gap.",
+      "confidence": "medium"
+    },
+    "AV09": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "medium",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Unknown salary is not negative or positive.",
+      "confidence": "low"
+    },
+    "AV10": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Known material compensation loss lowers value.",
+      "confidence": "medium"
+    },
+    "AV11": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Known valued pay increase is positive.",
+      "confidence": "medium"
+    },
+    "AV12": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Reviewed C/E: commute uncertainty reduces confidence, not valence.",
+      "confidence": "medium"
+    },
+    "AV13": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Known commute cost may lower value.",
+      "confidence": "medium"
+    },
+    "AV14": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Current timing can make lateral work valuable.",
+      "confidence": "medium"
+    },
+    "AV15": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Known selective timing makes this lateral move low value.",
+      "confidence": "medium"
+    },
+    "AV16": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Overqualification affects value, not existing ability.",
+      "confidence": "medium"
+    },
+    "AV17": {
+      "classification": "worth_a_try",
+      "strength": "weak",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Proven narrow task cannot establish required leadership scale.",
+      "confidence": "medium"
+    },
+    "AV18": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Equivalent responsibility outweighs title mismatch.",
+      "confidence": "medium"
+    },
+    "AV19": {
+      "classification": "worth_a_try",
+      "strength": "weak",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Title cannot replace scope evidence.",
+      "confidence": "medium"
+    },
+    "AV20": {
+      "classification": "ineligible",
+      "strength": "ineligible",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Verified hard-layer eligibility overrides qualification.",
+      "confidence": "medium"
+    },
+    "AV21": {
+      "classification": "not_evaluated",
+      "strength": "not_evaluated",
+      "value": "not_evaluated",
+      "states": [],
+      "rationale": "Reject attempted implied hard blocker before classification.",
+      "confidence": "not_evaluated"
+    },
+    "AV22": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Ability and direction are independent.",
+      "confidence": "medium"
+    },
+    "AV23": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Secondary alignment need not be negative.",
+      "confidence": "medium"
+    },
+    "AV24": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "evidence_missing"
+      ],
+      "rationale": "Learning alone is not proven independent delivery.",
+      "confidence": "medium"
+    },
+    "AV25": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "evidence_missing"
+      ],
+      "rationale": "Unsupported practice claim calls for a real example.",
+      "confidence": "medium"
+    },
+    "AV26": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "transferable"
+      ],
+      "rationale": "Project supports adjacent practice, not production ownership.",
+      "confidence": "medium"
+    },
+    "AV27": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "evidence_missing"
+      ],
+      "rationale": "Partial support cannot prove the complete mandatory requirement.",
+      "confidence": "medium"
+    },
+    "AV28": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "transferable"
+      ],
+      "rationale": "Human review: historical procedure experience remains valid and relevant; it is transferable to the changed current procedure, whose temporal constraint is not satisfied.",
+      "confidence": "medium"
+    },
+    "AV29": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "medium",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Do not invent preference alignment.",
+      "confidence": "low"
+    },
+    "AV30": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "medium",
+      "states": [
+        "proven"
+      ],
+      "rationale": "Contradiction must remain uncertain until resolved.",
+      "confidence": "low"
+    },
+    "AV31": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        "evidence_missing"
+      ],
+      "rationale": "Unknown need cannot establish a proven match.",
+      "confidence": "medium"
+    },
+    "AV32": {
+      "classification": "not_evaluated",
+      "strength": "not_evaluated",
+      "value": "not_evaluated",
+      "states": [],
+      "rationale": "Reject checkpoint evidence before engine.",
+      "confidence": "not_evaluated"
+    }
+  },
+  "original_calibration_expected": {
+    "HC01a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Direct investigation evidence supports the target role."
+    },
+    "HC01b": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "evidence_missing"
+        ]
+      ],
+      "rationale": "Capability is stated, but no case can yet support the CV or interview."
+    },
+    "HC02a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The evidence directly matches investigator responsibilities."
+    },
+    "HC02b": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "transferable"
+        ]
+      ],
+      "rationale": "Dispute investigation provides an adjacent bridge with domain limits."
+    },
+    "HC03a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Concrete investigation evidence supports the role."
+    },
+    "HC03b": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Equivalent wording describes the same supported investigation, not less capability."
+    },
+    "HC04a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ],
+        [
+          "extra",
+          "gap"
+        ]
+      ],
+      "rationale": "Investigation is proven and the SQL gap is peripheral."
+    },
+    "HC04b": {
+      "classification": "worth_a_try",
+      "strength": "weak",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ],
+        [
+          "extra",
+          "gap"
+        ]
+      ],
+      "rationale": "The same SQL gap now prevents independent core delivery."
+    },
+    "HC05a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Direct AML proof, target work and a meaningful pay improvement align."
+    },
+    "HC05b": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Ability is unchanged; the specified pay sacrifice defeats personal value."
+    },
+    "HC06a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Proven KYC ability plus urgent income continuity justifies this lateral bridge."
+    },
+    "HC06b": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "A stable candidate gains no progression from the identical lateral role."
+    },
+    "HC07a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "A concrete defensible decision record supports a safe CV claim."
+    },
+    "HC07b": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "evidence_missing"
+        ]
+      ],
+      "rationale": "A matching skill label alone is not usable proof, even inside an experience record."
+    },
+    "HC08a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The target escalation role is feasible and supported."
+    },
+    "HC08b": {
+      "classification": "ineligible",
+      "strength": "ineligible",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Mandatory relocation is an upstream blocker regardless of fit or attractiveness."
+    },
+    "HC09a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Supported work also matches the candidate's content preference."
+    },
+    "HC09b": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The candidate can do the work but explicitly wants to stop doing it."
+    },
+    "HC10a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Independent incident delivery matches company scope."
+    },
+    "HC10b": {
+      "classification": "worth_a_try",
+      "strength": "weak",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Real examples exist, but the independent seniority/context demand is not met."
+    },
+    "HC11a": {
+      "classification": "skip_for_now",
+      "strength": "weak",
+      "value": "low",
+      "states": [
+        [
+          "main",
+          "proven"
+        ],
+        [
+          "extra",
+          "gap"
+        ]
+      ],
+      "rationale": "Independent SQL investigation is a core gap and the candidate explicitly avoids this work."
+    },
+    "HC11b": {
+      "classification": "skip_for_now",
+      "strength": "weak",
+      "value": "low",
+      "states": [
+        [
+          "main",
+          "proven"
+        ],
+        [
+          "extra",
+          "gap"
+        ]
+      ],
+      "rationale": "A parser storing an unwanted role's core tool in a generic tools list must not reduce its materiality."
+    },
+    "HC12a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The reproducible defect example supports the target role."
+    },
+    "HC12b": {
+      "classification": "worth_a_try",
+      "strength": "viable",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "evidence_missing"
+        ]
+      ],
+      "rationale": "Reviewed: the example exists but its source ID was lost. Repair provenance; this is not a capability gap or a request for new evidence."
+    },
+    "HC13a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Supported recovery work fits the candidate's direction."
+    },
+    "HC13b": {
+      "classification": "ineligible",
+      "strength": "ineligible",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The hard scheduling conflict overrides the otherwise strong case."
+    },
+    "HC14a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The role is in the candidate's current chosen family."
+    },
+    "HC14b": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "medium",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "A capable lateral fallback has limited value relative to the new analysis target."
+    },
+    "HC15a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ],
+        [
+          "extra",
+          "proven"
+        ]
+      ],
+      "rationale": "Requirements work and important delivery responsibilities are directly evidenced."
+    },
+    "HC15b": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ],
+        [
+          "extra",
+          "transferable"
+        ]
+      ],
+      "rationale": "Reviewed: defensible transferable IMPORTANT evidence does not downgrade proven CORE delivery; direct ownership was not mandatory. Preserve adjacent scope in representation."
+    },
+    "HC16a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "An explicit core need and direct proof make a strong case."
+    },
+    "HC16b": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The same core need remains real when the parsed profile puts it in unstructured important details."
+    },
+    "HC17a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Real leadership evidence and comparable scale support this management role."
+    },
+    "HC17b": {
+      "classification": "worth_a_try",
+      "strength": "weak",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "A genuine team-leading example does not prove the required management scale."
+    },
+    "HC18a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Evidenced leadership and first formal progression make this valuable."
+    },
+    "HC18b": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "low",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Overqualification does not erase ability, but the role sacrifices the stated strategic scope."
+    },
+    "HC19a": {
+      "classification": "youre_strong_but",
+      "strength": "strong",
+      "value": "medium",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Unknown salary is not a penalty; this otherwise lateral option has only uncertain upside."
+    },
+    "HC19b": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "The known and explicitly valued salary improvement makes the same supported role attractive."
+    },
+    "HC20a": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Remote target work appears valuable; confirm remaining conditions before accepting."
+    },
+    "HC20b": {
+      "classification": "best_match",
+      "strength": "strong",
+      "value": "high",
+      "states": [
+        [
+          "main",
+          "proven"
+        ]
+      ],
+      "rationale": "Reviewed: acceptable hybrid with unknown commute cost retains HIGH value, with reduced confidence. Uncertainty changes confidence before valence."
+    }
+  }
+}

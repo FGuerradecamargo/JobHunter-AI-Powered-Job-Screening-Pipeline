@@ -1,0 +1,287 @@
+{
+  "version": "semantic-shadow-batch-002-v1",
+  "prompt_version": "semantic-support-prompt-v2",
+  "maximum_requests": 12,
+  "cases": [
+    {
+      "id": "SE03",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Resolve hospital scheduling incidents",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "full"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Resolved retail delivery scheduling incidents."
+        }
+      ]
+    },
+    {
+      "id": "SE04",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Own incident command",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Coordinated incident updates under the commander."
+        }
+      ]
+    },
+    {
+      "id": "SE13",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Own professional payroll delivery",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Delivered a simulated payroll project."
+        }
+      ]
+    },
+    {
+      "id": "SE14",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Independently close monthly accounts",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Assisted an accountant with monthly close."
+        }
+      ]
+    },
+    {
+      "id": "SE18",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Operate a multinational support function",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "full"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Owned support operations for one local office."
+        }
+      ]
+    },
+    {
+      "id": "SE19",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Diagnose backend production failures",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Helped customers reset browser sessions."
+        }
+      ]
+    },
+    {
+      "id": "SE40",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Own audit signoff",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "none",
+            "none"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Attended audit meeting."
+        },
+        {
+          "ref": "e1",
+          "text": "Took notes during audit review."
+        }
+      ]
+    },
+    {
+      "id": "SE44",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Own budget allocation",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Prepared budget options; executive made allocations."
+        }
+      ]
+    },
+    {
+      "id": "SE55",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "direct",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Traced a failed payment, isolated the cause, restored service and verified settlement."
+        }
+      ]
+    },
+    {
+      "id": "AV06",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "direct",
+            "full"
+          ]
+        },
+        {
+          "id": "tax",
+          "text": "File regulated tax returns",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "none",
+            "none"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Independently traced a failed payment, isolated the cause, restored service and verified settlement."
+        }
+      ]
+    },
+    {
+      "id": "AV02",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Resolve payment incidents independently",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "direct",
+            "full"
+          ]
+        },
+        {
+          "id": "release",
+          "text": "Own releases directly",
+          "importance": "important",
+          "direct_required": true,
+          "expected": [
+            "adjacent",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Independently traced a failed payment, isolated the cause, restored service and verified settlement."
+        },
+        {
+          "ref": "e1",
+          "text": "Supported release communications, never owned release."
+        }
+      ]
+    },
+    {
+      "id": "AV26",
+      "needs": [
+        {
+          "id": "need",
+          "text": "Own production recovery",
+          "importance": "core",
+          "direct_required": false,
+          "expected": [
+            "adjacent",
+            "partial"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "ref": "e0",
+          "text": "Built sandbox, injected failure, recovered and documented checks."
+        }
+      ]
+    }
+  ]
+}

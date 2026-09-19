@@ -63,9 +63,14 @@ candidate_repository = CandidateRepository()
 career_update_repository = CareerUpdateRepository()
 career_objective_repository = CareerObjectiveRepository()
 
+class _OnDemandProfileClient:
+    def generate(self, prompt):
+        return OpenAIClient().generate(prompt)
+
+
 profile_generation_service = (
     CandidateProfileGenerationService(
-        llm_client=OpenAIClient(),
+        llm_client=_OnDemandProfileClient(),
         onboarding_repository=onboarding_repository,
         candidate_repository=candidate_repository,
         career_update_repository=career_update_repository,
@@ -111,6 +116,8 @@ if not profile_ready:
         candidate_name=selected_user.display_name,
         onboarding_repository=onboarding_repository,
         profile_generation_service=profile_generation_service,
+        authenticated_user=authenticated_user,
+        active_user=active_user,
     )
     st.stop()
 

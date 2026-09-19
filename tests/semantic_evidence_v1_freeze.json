@@ -1,1 +1,9 @@
-{"version":"semantic-evidence-v1","reference_sha256":"c9a501a2b94969612320d1ad3606fbea8fc83ddb1f0a6cd589934e5f165e16b9","normalization":"CRLF to LF before hashing","frozen_before_boundary_implementation":true}
+{
+  "version": "semantic-evidence-v1-reviewed-1",
+  "reference_sha256": "0bed3ee41354e387e54401d4d8c765e17bc0e7b2d03f3411353506079207a1b4",
+  "normalization": "CRLF to LF before hashing",
+  "review_authority": "explicit human product review",
+  "original_reference_sha256": "c9a501a2b94969612320d1ad3606fbea8fc83ddb1f0a6cd589934e5f165e16b9",
+  "original_reference_path": "fixtures/semantic_evidence_v1_original_reference.json",
+  "review_ledger": "semantic_contract_review_v1.json"
+}

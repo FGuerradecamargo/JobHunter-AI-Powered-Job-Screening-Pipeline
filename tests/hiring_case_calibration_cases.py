@@ -190,7 +190,7 @@ def calibration_cases():
          "best_match", "best_match", RootCause.CAPABILITY_INTERPRETATION)
 
     b = _proof(a, Proof("transferable", "Investigate fraud patterns",
-                        "Investigated disputed purchases in customer operations using transaction trails; a defensible bridge, not fraud ownership."))
+                        "Independently owned disputed-purchase investigations in customer operations using transaction trails; a defensible domain bridge, not specialist fraud investigations."))
     pair(2, a, b, "candidate.capabilities.0.proof",
          expectation("best_match", "strong", "high", {"main": "proven"}, "The evidence directly matches investigator responsibilities."),
          expectation("worth_a_try", "viable", "high", {"main": "transferable"}, "Dispute investigation provides an adjacent bridge with domain limits."),
@@ -322,7 +322,7 @@ def calibration_cases():
     a = _base("operations_management", "Operations Team Lead", "Lead operational teams",
               "Allocated work, coached colleagues and coordinated recovery from a missed service target.")
     a = replace(a, opportunity=replace(a.opportunity, progression="Hands-on team leadership; useful advancement only below department-head level."),
-                candidate=replace(a.candidate, context=CandidateContext("senior specialist", "Ready for the first formal team-lead position.")))
+                candidate=replace(a.candidate, context=CandidateContext("senior specialist", "Independently led the described work allocation, coaching and recovery; ready for the first formal team-lead position.")))
     b = replace(a, candidate=replace(a.candidate, context=CandidateContext("department head", "Already owns several teams and seeks strategic scope; this role is substantial down-leveling.")))
     pair(18, a, b, "candidate.context",
          expectation("best_match", "strong", "high", {"main": "proven"}, "Evidenced leadership and first formal progression make this valuable."),

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 class NeedFacts:
     text: str = "Resolve payment incidents independently"
     importance: str = "core"
-    evidence: str = "Traced a failed payment, isolated the cause, restored service and verified settlement."
+    evidence: str = "Independently traced a failed payment, isolated the cause, restored service and verified settlement."
     source_available: bool = True
     transferable: bool = False
     confirmed_gap: bool = False
@@ -70,8 +70,8 @@ def adversarial_cases():
         AdversarialCase("AV02", "explicit direct ownership constraint", "Secondary IMPORTANT release role explicitly requires prior independent release ownership.",
             "Core incidents proven; only adjacent release coordination.", "Target role.",
             (P, NeedFacts("Own releases directly", "important", "Supported release communications, never owned release.", transferable=True, direct_required=True)),
-            Expected("worth_a_try", "viable", "high", ("proven", "transferable"), "Explicit direct-ownership condition matters; IMPORTANT alone does not express it."),
-            Reply(("proven", "transferable")), "unsupported_direct_evidence_constraint"),
+            Expected("worth_a_try", "viable", "high", ("proven", "evidence_missing"), "Human semantic review: release communications provide partial support, not release ownership; the explicit direct constraint remains unmet."),
+            Reply(("proven", "evidence_missing")), "unsupported_direct_evidence_constraint"),
         AdversarialCase("AV03", "multiple peripheral gaps", "Recovery core; optional diagram and reporting tools.",
             "Core recovery proven; explicitly lacks both optional tools.", "Aligned target.", (P, G, NeedFacts("Optional report tool", "nice_to_have", "Confirmed no use.", confirmed_gap=True)),
             Expected("best_match", "strong", "high", ("proven", "gap", "gap"), "Peripheral confirmed gaps do not defeat core proof."), Reply(("proven", "gap", "gap"))),
@@ -123,8 +123,8 @@ def adversarial_cases():
         AdversarialCase("AV25", "practice not defensible", "Independent incident recovery.", "Claims practice but cannot describe actions or outcome.", "Target work.", (NeedFacts(evidence="Vague claim of practice."),),
             Expected("worth_a_try", "viable", "high", ("evidence_missing",), "Unsupported practice claim calls for a real example."), Reply(("evidence_missing",))),
         AdversarialCase("AV26", "project versus professional", "Production recovery responsibility.", "Defensible personal sandbox recovery project, no production ownership.", "Target work.",
-            (NeedFacts(evidence="Built sandbox, injected failure, recovered and documented checks.", transferable=True),),
-            Expected("worth_a_try", "viable", "high", ("transferable",), "Project supports adjacent practice, not production ownership."), Reply(("transferable",))),
+            (NeedFacts("Own production recovery", evidence="Built sandbox, injected failure, recovered and documented checks.", transferable=True),),
+            Expected("worth_a_try", "viable", "high", ("evidence_missing",), "Human semantic review: sandbox execution is adjacent partial support; production ownership is not established."), Reply(("evidence_missing",))),
         AdversarialCase("AV27", "partial requirement", "Investigate AND independently approve regulated refunds.", "Investigated cases; never authorized refunds.", "Chosen direction.", (NeedFacts("Investigate and authorize refunds", evidence="Investigated only; no authorization."),),
             Expected("worth_a_try", "viable", "high", ("evidence_missing",), "Partial support cannot prove the complete mandatory requirement."), Reply(("proven",)), "semantic_entailment"),
         AdversarialCase("AV28", "recency required", "Current regulatory procedure required, changed this year.", "Ten-year-old procedure experience only.", "Chosen work.", (NeedFacts(evidence="Used obsolete procedure ten years ago."),),

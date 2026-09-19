@@ -6,6 +6,9 @@ from textwrap import dedent
 import streamlit as st
 
 from models.candidate_onboarding import CandidateOnboarding
+from components.voice_text_input import VoiceTextInputs, bind_scope
+from services.onboarding_events import OnboardingEventRepository
+from services.access_policy import AccessPolicy
 
 
 logger = logging.getLogger(__name__)
@@ -550,7 +553,16 @@ def render_profile_onboarding(
     candidate_name,
     onboarding_repository,
     profile_generation_service,
+    authenticated_user,
+    active_user,
+    voice_inputs=None,
 ):
+    if active_user.candidate_id != candidate_id or not AccessPolicy.can_access_candidate(authenticated_user, candidate_id):
+        st.error("Access denied.")
+        return
+    scope = bind_scope(st.session_state, authenticated_user.id, active_user.id, candidate_id)
+    inputs = voice_inputs or VoiceTextInputs(scope, events=OnboardingEventRepository(
+        authenticated_user.id, active_user.id, candidate_id))
     step_key = f"onboarding_step_{candidate_id}"
 
     if step_key not in st.session_state:
@@ -570,6 +582,18 @@ def render_profile_onboarding(
         )
     )
 
+    if existing_onboarding and step == 1 and not st.session_state.get('_voice_resumed_' + scope):
+        step = 4 if existing_onboarding.desired_next_work and experiences else (3 if experiences else 2)
+        st.session_state[step_key] = step
+    st.session_state['_voice_resumed_' + scope] = True
+    inputs.step = step
+    inputs.event('onboarding_started', once=True)
+    if st.session_state.get('_voice_viewed_' + scope) != step:
+        inputs.event('onboarding_step_viewed')
+        st.session_state['_voice_viewed_' + scope] = step
+    st.write("This takes about 5 minutes. Answer naturally and honestly; you don't need CV language or perfect wording. "
+        "You can speak or type in any language. WorkPilot will organize what you share, and you'll review it before it becomes part of your profile. "
+        "You can stop and continue later.")
     _render_workpilot_stepper(step)
 
     main_col, side_col = st.columns(
@@ -591,7 +615,8 @@ def render_profile_onboarding(
                     "opportunities are realistic for you."
                 )
 
-                location = st.text_input(
+                location = inputs.text_input(
+                    'location',
                     "Where are you based?",
                     value=(
                         existing_onboarding.location
@@ -601,7 +626,8 @@ def render_profile_onboarding(
                     placeholder="Example: Limerick, Ireland",
                 )
 
-                work_authorisation = st.text_input(
+                work_authorisation = inputs.text_input(
+                    'work_authorisation',
                     "Where are you legally allowed to work?",
                     value=(
                         existing_onboarding.work_authorisation
@@ -629,6 +655,7 @@ def render_profile_onboarding(
                     "Which languages do you speak?",
                     options=LANGUAGE_OPTIONS,
                     default=valid_languages,
+                    key='_voice_languages_' + scope,
                 )
 
                 if st.button(
@@ -686,6 +713,8 @@ def render_profile_onboarding(
                         onboarding
                     )
 
+                    inputs.event('first_answer_completed', 'text', once=True)
+                    inputs.event('onboarding_step_completed')
                     st.session_state[step_key] = 2
                     st.rerun()
 
@@ -741,11 +770,9 @@ def render_profile_onboarding(
 
                     st.divider()
 
-                with st.form(
-                    f"onboarding_experience_{candidate_id}"
-                ):
-                    company = st.text_input(
-                        "Company"
+                with st.container():
+                    company = inputs.text_input(
+                        'company', "Company"
                     )
 
                     month_options = list(
@@ -825,7 +852,8 @@ def render_profile_onboarding(
                                 key=f"end_year_{candidate_id}",
                             )
 
-                    career_story = st.text_area(
+                    career_story = inputs.render(
+                        'career_story',
                         "Tell us your story at this company",
                         placeholder=(
                             "How did you join? Which roles did "
@@ -835,7 +863,8 @@ def render_profile_onboarding(
                         height=180,
                     )
 
-                    day_to_day = st.text_area(
+                    day_to_day = inputs.render(
+                        'day_to_day',
                         "What was your day-to-day work actually like?",
                         placeholder=(
                             "Imagine a friend starts this job "
@@ -845,13 +874,17 @@ def render_profile_onboarding(
                     )
 
                     add_experience = (
-                        st.form_submit_button(
+                        st.button(
                             "Add this experience",
                             use_container_width=True,
+                            disabled=inputs.pending(('career_story', 'day_to_day')),
                         )
                     )
 
                 if add_experience:
+                    if inputs.pending(('career_story', 'day_to_day')):
+                        st.warning('Accept or discard the transcript before saving.')
+                        return
                     if not company.strip():
                         st.warning(
                             "Company is required."
@@ -911,6 +944,8 @@ def render_profile_onboarding(
                             ),
                         )
 
+                        inputs.event('first_answer_completed', once=True)
+                        inputs.clear(('career_story', 'day_to_day'))
                         st.rerun()
 
                 st.divider()
@@ -945,6 +980,7 @@ def render_profile_onboarding(
                             )
                             return
 
+                        inputs.event('onboarding_step_completed')
                         st.session_state[step_key] = 3
                         st.rerun()
 
@@ -960,7 +996,8 @@ def render_profile_onboarding(
                     "Now tell us where you want to go."
                 )
 
-                desired_next_work = st.text_area(
+                desired_next_work = inputs.render(
+                    'desired_next_work',
                     "What kind of work would you like to do next?",
                     value=(
                         existing_onboarding.desired_next_work
@@ -970,7 +1007,8 @@ def render_profile_onboarding(
                     height=120,
                 )
 
-                enjoyed_work = st.text_area(
+                enjoyed_work = inputs.render(
+                    'enjoyed_work',
                     "What parts of your previous jobs did you enjoy most?",
                     value=(
                         existing_onboarding.enjoyed_work
@@ -980,7 +1018,8 @@ def render_profile_onboarding(
                     height=120,
                 )
 
-                avoid_work = st.text_area(
+                avoid_work = inputs.render(
+                    'avoid_work',
                     "What would you prefer not to do again?",
                     value=(
                         existing_onboarding.avoid_work
@@ -990,7 +1029,8 @@ def render_profile_onboarding(
                     height=120,
                 )
 
-                development_interests = st.text_area(
+                development_interests = inputs.render(
+                    'development_interests',
                     "What would you like to learn or do more of?",
                     value=(
                         existing_onboarding.development_interests
@@ -1002,6 +1042,7 @@ def render_profile_onboarding(
 
                 career_priorities = st.multiselect(
                     "What matters most in your next job?",
+                    key='_voice_priorities_' + scope,
                     options=PRIORITY_OPTIONS,
                     default=(
                         existing_onboarding.career_priorities
@@ -1025,7 +1066,11 @@ def render_profile_onboarding(
                         "Review profile →",
                         type="primary",
                         use_container_width=True,
+                        disabled=inputs.pending(('desired_next_work', 'enjoyed_work', 'avoid_work', 'development_interests')),
                     ):
+                        if inputs.pending(('desired_next_work', 'enjoyed_work', 'avoid_work', 'development_interests')):
+                            st.warning('Accept or discard the transcript before saving.')
+                            return
                         if not desired_next_work.strip():
                             st.warning(
                                 "Tell us what kind of work "
@@ -1069,6 +1114,8 @@ def render_profile_onboarding(
                             onboarding
                         )
 
+                        inputs.event('first_answer_completed', once=True)
+                        inputs.event('onboarding_step_completed')
                         st.session_state[step_key] = 4
                         st.rerun()
 
@@ -1179,6 +1226,9 @@ def render_profile_onboarding(
                                 None,
                             )
 
+                            inputs.event('onboarding_step_completed')
+                            inputs.event('onboarding_completed', once=True)
+                            inputs.event('candidate_profile_created', once=True)
                             st.success(
                                 "Your Career Profile is ready."
                             )
@@ -1186,7 +1236,7 @@ def render_profile_onboarding(
                             st.rerun()
 
                         except Exception:
-                            logger.exception(
+                            logger.error(
                                 "Could not generate "
                                 "initial Career Profile."
                             )

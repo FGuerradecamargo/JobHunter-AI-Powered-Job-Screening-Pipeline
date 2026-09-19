@@ -1,6 +1,6 @@
 {
-  "version": "semantic-evidence-v1-reviewed-1",
-  "review_status": "Targeted judgments and contract explicitly human-reviewed; unchanged cases retain prior review status; not blanket human gold",
+  "version": "semantic-evidence-v1",
+  "review_status": "agent-authored product proposals pending human review; not human gold",
   "cases": [
     {
       "id": "SE01",
@@ -66,8 +66,8 @@
       "confirmed_absence": false,
       "expected": {
         "relation": "adjacent",
-        "coverage": "partial",
-        "assessment": "evidence_missing"
+        "coverage": "full",
+        "assessment": "transferable"
       }
     },
     {
@@ -223,8 +223,8 @@
       "confirmed_absence": false,
       "expected": {
         "relation": "adjacent",
-        "coverage": "partial",
-        "assessment": "evidence_missing"
+        "coverage": "full",
+        "assessment": "transferable"
       }
     },
     {
@@ -240,8 +240,8 @@
       "confirmed_absence": false,
       "expected": {
         "relation": "adjacent",
-        "coverage": "partial",
-        "assessment": "evidence_missing"
+        "coverage": "full",
+        "assessment": "transferable"
       }
     },
     {
@@ -681,8 +681,8 @@
       ],
       "confirmed_absence": false,
       "expected": {
-        "relation": "none",
-        "coverage": "none",
+        "relation": "adjacent",
+        "coverage": "partial",
         "assessment": "evidence_missing"
       }
     },
@@ -750,8 +750,8 @@
       "confirmed_absence": false,
       "expected": {
         "relation": "adjacent",
-        "coverage": "partial",
-        "assessment": "evidence_missing"
+        "coverage": "full",
+        "assessment": "transferable"
       }
     },
     {
@@ -924,23 +924,6 @@
         "relation": "rejected",
         "coverage": "rejected",
         "assessment": "rejected"
-      }
-    },
-    {
-      "id": "SE55",
-      "scenario": "Independence unspecified",
-      "job_need": "Resolve payment incidents independently",
-      "candidate_evidence": [
-        "Traced a failed payment, isolated the cause, restored service and verified settlement."
-      ],
-      "source_refs": [
-        "e0"
-      ],
-      "confirmed_absence": false,
-      "expected": {
-        "relation": "direct",
-        "coverage": "partial",
-        "assessment": "evidence_missing"
       }
     }
   ]

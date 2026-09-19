@@ -1,6 +1,8 @@
 {
-  "adversarial-v1": "92e81ced079d62bc878392b2392f878452c36673dece887a5974eb065e53012a",
-  "reviewed-calibration-v1": "8872b8a0b3240e16e0fa7c5a7683285e95b8e56687206270a8d34300efcef4d0",
+  "adversarial-v1": "6a73ae0bd5a9e460cdae38ed7475a453a1791c0ef2860192507fb7f09d86d5bf",
+  "reviewed-calibration-v1": "739b7351cf586beffff7a2f453de6cac86894a143e16216a80bb7106352ae872",
   "adversarial-v1-before-temporal-review": "8815afe1f64b79db4061410b967966e15a64b36b0b59914d4009547184a50f99",
-  "adversarial-unchanged-except-AV28": "9af6b1fb6659f36ac9aa664167e7c7e5dacc24a43b256840722eb1e41e1566fe"
+  "adversarial-unchanged-except-AV28": "9af6b1fb6659f36ac9aa664167e7c7e5dacc24a43b256840722eb1e41e1566fe",
+  "semantic-reviewed-adversarial-excluding-AV28": "c701e7e73e8a0a16e9dc2e43928838a54bf427a7d29283dca0d7637eb8eda71c",
+  "review_revision": "semantic-support-reviewed-v1"
 }
