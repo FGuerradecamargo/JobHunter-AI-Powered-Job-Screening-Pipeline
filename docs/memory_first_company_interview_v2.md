@@ -169,3 +169,86 @@ accept an explicit reflection_provider. Inject FakeReflection from the test help
 plus a fake transcription provider through VoiceTextInputs. Never configure that
 test double as a production default. tests/test_voice_onboarding_ui.py contains
 the complete isolated Streamlit AppTest fixture and both path regressions.
+
+## Real browser validation - 2026-09-19
+
+The V2 voice onboarding completed its first controlled real-browser validation
+with a participant who was not involved in designing the interview.
+
+Environment:
+
+- Desktop browser.
+- Real microphone capture.
+- Real OpenAI transcription using `gpt-4o-transcribe`.
+- Fake/provider-neutral reflection.
+- Fake repository; no production database writes.
+- No Candidate Profile generation.
+- No production access.
+
+Observed path:
+
+1. The participant completed all 8 fixed memory questions by voice.
+2. `Show me what you've got` triggered the deferred transcription batch.
+3. All 8 voice answers were transcribed successfully.
+4. No answer entered the failed-transcription/re-record path.
+5. Question-to-answer identity remained intact.
+6. The reflection stage completed using the fake reflection provider.
+7. The review/correction stage was reached successfully.
+8. The final open question was shown.
+9. The participant skipped the final open question.
+10. Skip remained `Not provided`; it was not interpreted as a gap or absence.
+11. `This looks right` completed the journey successfully.
+12. The final smoke result reported 9 confirmed source records:
+    8 fixed-question sources plus the skipped final source.
+
+Result:
+
+The real voice/transcription journey passed end-to-end in the controlled browser
+environment. The Voice / Onboarding technical gate is considered closed for the
+current Beta plan.
+
+Global WorkPilot Beta readiness moved from 65% to 70%.
+
+### Human UX feedback
+
+The first external participant reported that the interview felt like it contained
+too many questions and suggested reducing the number.
+
+This is important Alpha friction feedback, but it is not yet sufficient evidence
+to remove questions. The current 8-question core was selected after synthetic
+coverage tests designed to capture enough material for:
+
+- core work and responsibilities;
+- context;
+- stakeholders;
+- tools and resources;
+- problem resolution;
+- concrete evidence;
+- autonomy and escalation;
+- quality and standards;
+- outcomes and scale;
+- observable work patterns.
+
+The product decision remains:
+
+- keep the current V2 question set for now;
+- record perceived interview length as a real-user friction signal;
+- observe whether the same feedback recurs with additional unknown users;
+- only compress questions if coverage can be preserved;
+- do not optimise for shorter onboarding at the cost of a materially weaker
+  Candidate Profile.
+
+The next validation question is therefore not simply "can we use fewer questions?"
+but:
+
+"Can we preserve the same Candidate Profile evidence coverage with less perceived
+effort for the user?"
+
+This should be evaluated during Private Alpha.
+
+### Remaining limitation
+
+This validation confirms the real browser voice/transcription path, but does not
+validate the quality of a live AI reflection or live Candidate Profile generation.
+Those remain separate controlled validations.
+
