@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from models.gmail_connection import GmailConnection
+from services.provider_failure import log_failure
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +27,7 @@ def callback():
     env = dict(st=ui, authenticated_user=SimpleNamespace(id="actor"),
                active_user=SimpleNamespace(id="owner"), GmailConnection=GmailConnection,
                oauth_state_repository=Mock(), oauth_service=Mock(),
-               gmail_repository=Mock(), gmail_access_audit=Mock(), logger=Mock())
+               gmail_repository=Mock(), gmail_access_audit=Mock(), logger=Mock(), log_failure=log_failure)
     env["oauth_state_repository"].consume.return_value = state
     env["oauth_service"].exchange_authorization_code.return_value = result
     exec(compile(ast.Module(body=functions, type_ignores=[]), str(ROOT / "pages/2_Sources.py"), "exec"), env)

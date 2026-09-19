@@ -1,4 +1,6 @@
 import requests
+import logging
+from services.provider_failure import log_failure, provider_boundary, ProviderFailure
 from bs4 import BeautifulSoup
 
 
@@ -35,15 +37,16 @@ def extract_job_description(html: str) -> str | None:
 
 def fetch_job_description(url: str) -> str | None:
     try:
-        response = requests.get(
-            url,
-            headers=HEADERS,
-            timeout=15,
-        )
-        response.raise_for_status()
+        with provider_boundary('job_enrichment'):
+            response = requests.get(
+                url,
+                headers=HEADERS,
+                timeout=15,
+            )
+            response.raise_for_status()
 
-    except requests.RequestException as error:
-        print(f"Falha ao acessar {url}: {error}")
+    except ProviderFailure as error:
+        log_failure(logging.getLogger(__name__), 'job_enrichment', error)
         return None
 
     description = extract_job_description(
@@ -51,7 +54,7 @@ def fetch_job_description(url: str) -> str | None:
     )
 
     if description is None:
-        print(f"Descrição não encontrada em: {url}")
+        logging.getLogger(__name__).info('job_description_unavailable')
 
     return description
 

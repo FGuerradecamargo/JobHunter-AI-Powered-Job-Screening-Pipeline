@@ -315,12 +315,7 @@ def test_failure_retry_success_same_memory_version():
         is False
     )
 
-    assert (
-        "temporary LLM failure"
-        in first[
-            "interpretation_error"
-        ]
-    )
+    assert first["interpretation_error"] == "operation_failed"
 
     assert (
         repository.snapshot[

@@ -51,6 +51,8 @@ Confirmed interview answers are candidate statements, not automatically proven c
 Use each question only as context, never as an assertion by the candidate.
 Skipped answers mean not provided, never absence or a gap. Preserve original meaning.
 For guided experiences, use confirmed_interview_answers with company metadata as the source.
+USER_CONFIRMED_EDIT is the user's explicitly confirmed replacement account, not AI interpretation.
+It supersedes the earlier interview account. Empty corrected fields are not evidence of absence.
 
 The profile will later be used to compare the candidate fairly against
 job opportunities, so preserve professional evidence instead of

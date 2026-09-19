@@ -1,5 +1,6 @@
 import logging
 import hashlib
+from services.provider_failure import failure_code, ProviderRateLimit
 import json
 import time
 from dataclasses import asdict
@@ -1600,7 +1601,7 @@ class CandidateJobAnalysisService:
                     result_state="failed",
                     result_stage=row_stage,
                     analysis=None,
-                    error_text=str(error),
+                    error_text=failure_code(error),
                 )
 
                 result["failed"] += 1
@@ -1609,7 +1610,7 @@ class CandidateJobAnalysisService:
                     {
                         "job_id": job.id,
                         "title": job.title,
-                        "error": str(error),
+                        "error": failure_code(error),
                     }
                 )
 
@@ -1713,7 +1714,7 @@ class CandidateJobAnalysisService:
                         len(ai_analyses)
                     )
 
-            except RateLimitError:
+            except (RateLimitError, ProviderRateLimit):
                 result["failed"] += len(
                     batch
                 )
@@ -1845,20 +1846,14 @@ class CandidateJobAnalysisService:
                         result_state="failed",
                         result_stage="batch_ai",
                         analysis=None,
-                        error_text=(
-                            "Batch AI analysis failed: "
-                            f"{error}"
-                        ),
+                        error_text=failure_code(error),
                     )
 
                     result["errors"].append(
                         {
                             "job_id": job.id,
                             "title": job.title,
-                            "error": (
-                                "Batch AI analysis failed: "
-                                f"{error}"
-                            ),
+                            "error": failure_code(error),
                         }
                     )
 
@@ -2121,7 +2116,7 @@ class CandidateJobAnalysisService:
                         result_state="failed",
                         result_stage=item_stage,
                         analysis=None,
-                        error_text=str(error),
+                        error_text=failure_code(error),
                     )
 
                     result["failed"] += 1
@@ -2130,7 +2125,7 @@ class CandidateJobAnalysisService:
                         {
                             "job_id": job.id,
                             "title": job.title,
-                            "error": str(error),
+                            "error": failure_code(error),
                         }
                     )
 

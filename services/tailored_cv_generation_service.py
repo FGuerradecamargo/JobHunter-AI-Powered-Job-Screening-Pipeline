@@ -79,7 +79,7 @@ class TailoredCVGenerationService:
             return TailoredCVGenerationResult(
                 status="generation_error",
                 error_code="invalid_generator_output",
-                error_message=str(exc),
+                error_message="The generated CV structure was invalid.",
                 request_signature=request.source_signature,
                 attempt_count=1,
             )
@@ -129,7 +129,7 @@ class TailoredCVGenerationService:
                 return TailoredCVGenerationResult(
                     status="repair_failed",
                     error_code="invalid_repair_output",
-                    error_message=str(exc),
+                    error_message="The repaired CV structure was invalid.",
                     request_signature=request.source_signature,
                     repair_signature=repair_signature,
                     attempt_count=attempts,

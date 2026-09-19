@@ -864,7 +864,7 @@ if scan_result:
         )
 
         for error in scan_result.get("errors", []):
-            st.code(str(error))
+            st.warning("An opportunity could not be analyzed. Please try again later.")
 
 
 # =========================================================

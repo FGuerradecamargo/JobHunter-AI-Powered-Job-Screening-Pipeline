@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from services.provider_failure import provider_operation
 from dataclasses import dataclass
 from datetime import timezone
 from typing import Optional
@@ -97,6 +98,7 @@ class GmailOAuthService:
             code_verifier=flow.code_verifier,
         )
 
+    @provider_operation('gmail_oauth')
     def exchange_authorization_code(
             self,
             authorization_code: str,

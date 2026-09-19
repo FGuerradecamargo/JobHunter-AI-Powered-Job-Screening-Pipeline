@@ -1,4 +1,5 @@
 from __future__ import annotations
+from services.provider_failure import failure_code
 
 from dataclasses import dataclass
 
@@ -155,7 +156,7 @@ class GmailJobProcessor:
                 self._gmail_message_repository.mark_failed(
                     user_id=user_id,
                     gmail_message_id=message_id,
-                    error_message=str(error),
+                    error_message=failure_code(error),
                 )
 
         return GmailJobProcessingResult(

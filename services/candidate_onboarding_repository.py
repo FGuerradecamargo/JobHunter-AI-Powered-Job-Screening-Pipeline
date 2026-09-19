@@ -41,12 +41,15 @@ class CandidateOnboardingRepository:
                     (candidate_id, experience_id, a.interview_version, a.question_id, a.question_version,
                      a.question_text, a.answer_mode, a.confirmed_text, int(a.skipped), now, a.source_kind))
 
-    def list_company_answers(self, candidate_id, experience_id):
+    def list_company_answers(self, candidate_id, experience_id, *, include_history=False):
         with get_connection() as connection:
             rows = connection.execute('''SELECT a.* FROM company_interview_answers a
                 JOIN candidate_work_experiences e ON e.id = a.work_experience_id AND e.candidate_id = a.candidate_id
                 WHERE a.candidate_id = ? AND a.work_experience_id = ? ORDER BY a.question_id''',
                 (candidate_id, experience_id)).fetchall()
+        edits = [r for r in rows if r['source_kind'] == 'USER_CONFIRMED_EDIT']
+        if edits and not include_history:
+            rows = [edits[-1]]
         return [ConfirmedCompanyAnswer(r['question_id'], r['question_text'], r['answer_mode'],
             r['confirmed_text'], bool(r['skipped']), r['interview_version'], r['question_version'], r['source_kind']) for r in rows]
 
@@ -235,10 +238,26 @@ class CandidateOnboardingRepository:
     def update_work_experience(
         self,
         experience: WorkExperience,
+        *,
+        confirmed_source_edit: bool = False,
     ) -> None:
         now = utc_now()
 
         with get_connection() as connection:
+            original = connection.execute(
+                'SELECT * FROM candidate_work_experiences WHERE id = ? AND candidate_id = ?',
+                (experience.id, experience.candidate_id),
+            ).fetchone()
+            if original is None:
+                raise ValueError('Work experience was not found for candidate.')
+            guided = connection.execute(
+                'SELECT 1 FROM company_interview_answers WHERE work_experience_id = ? AND candidate_id = ?',
+                (experience.id, experience.candidate_id),
+            ).fetchone() is not None
+            changed = any(original[field] != getattr(experience, field).strip()
+                for field in ('career_story', 'day_to_day_narrative'))
+            if guided and changed and confirmed_source_edit is not True:
+                raise ValueError('Confirm your source corrections before saving.')
             cursor = connection.execute(
                 """
                 UPDATE candidate_work_experiences
@@ -264,6 +283,25 @@ class CandidateOnboardingRepository:
                     experience.candidate_id,
                 ),
             )
+            if guided and confirmed_source_edit is True:
+                # The UPDATE locks the experience before allocating its next revision.
+                # Preserve original answers and every previous user correction.
+                revision = connection.execute(
+                    "SELECT COUNT(*) AS n FROM company_interview_answers WHERE candidate_id = ? "
+                    "AND work_experience_id = ? AND source_kind = 'USER_CONFIRMED_EDIT'",
+                    (experience.candidate_id, experience.id),
+                ).fetchone()['n'] + 1
+                if changed or revision == 1:
+                    connection.execute('''INSERT INTO company_interview_answers
+                        (candidate_id, work_experience_id, interview_version, question_id, question_version,
+                         question_text, answer_mode, confirmed_text, skipped, confirmed_at, source_kind)
+                        VALUES (?, ?, ?, ?, ?, ?, 'text', ?, 0, ?, 'USER_CONFIRMED_EDIT')''',
+                        (experience.candidate_id, experience.id, 'experience-edit-v1',
+                         f'user_edit_{revision:08d}', 'experience-edit-v1',
+                         'User-confirmed replacement account of this experience',
+                         json.dumps({'career_story': experience.career_story.strip(),
+                                     'day_to_day_narrative': experience.day_to_day_narrative.strip()},
+                                    ensure_ascii=False), now))
 
         if cursor.rowcount != 1:
             raise ValueError(

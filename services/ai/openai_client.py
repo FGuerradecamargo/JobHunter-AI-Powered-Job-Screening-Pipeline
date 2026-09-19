@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from services.ai.llm_client import LLMClient
+from services.provider_failure import provider_operation
 
 
 class OpenAIClient(LLMClient):
@@ -30,6 +31,7 @@ class OpenAIClient(LLMClient):
             api_key=api_key,
         )
 
+    @provider_operation('ai_generation')
     def generate(
         self,
         prompt: str,

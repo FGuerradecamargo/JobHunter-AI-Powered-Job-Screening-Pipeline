@@ -1,4 +1,5 @@
 from __future__ import annotations
+from services.provider_failure import failure_code
 
 from typing import Any, Callable
 
@@ -522,10 +523,7 @@ class CareerMemoryManager:
                 ),
                 "interpretation_attempted": True,
                 "interpretation_applied": False,
-                "interpretation_error": (
-                    f"{type(exc).__name__}: "
-                    f"{exc}"
-                ),
+                "interpretation_error": failure_code(exc),
             }
 
     def refresh(

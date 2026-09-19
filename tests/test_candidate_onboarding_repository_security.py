@@ -12,8 +12,12 @@ from services.candidate_onboarding_repository import (
 
 
 class FakeCursor:
-    def __init__(self, rowcount):
+    def __init__(self, rowcount, row=None):
         self.rowcount = rowcount
+        self.row = row
+
+    def fetchone(self):
+        return self.row
 
 
 class FakeConnection:
@@ -23,6 +27,8 @@ class FakeConnection:
 
     def execute(self, sql, params=()):
         self.calls.append((" ".join(sql.split()), params))
+        if sql.startswith('SELECT *') and self.rowcount:
+            return FakeCursor(self.rowcount, {'career_story': 'Story', 'day_to_day_narrative': 'Daily work'})
         return FakeCursor(self.rowcount)
 
 
@@ -64,7 +70,7 @@ def test_update_scopes_experience_to_candidate(
         _experience("candidate-a")
     )
 
-    sql, params = connection.calls[0]
+    sql, params = next(call for call in connection.calls if call[0].startswith('UPDATE'))
 
     assert "id = ? AND candidate_id = ?" in sql
     assert params[-2:] == (

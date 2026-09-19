@@ -105,9 +105,12 @@ def _private_transport_logs():
         def filter(self, record):
             return record.thread != owner
     guard = PrivateCall()
-    names = {"openai._base_client", "httpx", "httpcore.connection", "httpcore.http11", "httpcore.http2", "httpcore.proxy"}
+    names = {"openai._base_client", "httpx", "httpcore.connection", "httpcore.http11", "httpcore.http2", "httpcore.proxy",
+             "urllib3.connectionpool", "requests_oauthlib.oauth2_session", "oauthlib.oauth2.rfc6749.clients.base",
+             "googleapiclient.http", "googleapiclient.discovery", "google.auth.transport.requests"}
     names.update(name for name in list(logging.Logger.manager.loggerDict)
-                 if name.startswith(("openai.", "httpx.", "httpcore.")))
+                 if name.startswith(("openai.", "httpx.", "httpcore.", "urllib3.", "google.auth.",
+                                     "googleapiclient.", "requests_oauthlib.", "oauthlib.")))
     loggers = [logging.getLogger(name) for name in names]
     for logger in loggers:
         logger.addFilter(guard)

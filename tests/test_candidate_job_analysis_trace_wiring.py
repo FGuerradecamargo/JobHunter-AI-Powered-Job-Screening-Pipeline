@@ -434,10 +434,7 @@ def test_batch_ai_failure_creates_failed_run_without_current_write(
     assert failed["result_state"] == "failed"
     assert failed["result_stage"] == "batch_ai"
 
-    assert (
-        "simulated batch failure"
-        in failed["error_text"]
-    )
+    assert failed["error_text"] == "operation_failed"
 
     assert failed["career_memory_version"] == 7
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from services.provider_failure import log_failure
 import hashlib
 from urllib.parse import urlparse
 
@@ -151,12 +152,6 @@ def handle_oauth_callback() -> None:
             "or failed."
         )
 
-        if oauth_error_description:
-            message += (
-                f" Details: "
-                f"{oauth_error_description}"
-            )
-
         st.error(message)
         return
 
@@ -241,7 +236,7 @@ def handle_oauth_callback() -> None:
         st.error(
             "Could not complete Gmail connection."
         )
-        logger.exception("Could not complete Gmail connection.")
+        log_failure(logger, 'gmail_oauth', error)
         return
 
     gmail_access_audit.record_connected(
@@ -484,13 +479,11 @@ if (
                 processing_result.jobs_unchanged,
             )
 
-        except Exception:
+        except Exception as error:
             st.error(
                 "Could not synchronize Gmail."
             )
-            logger.exception(
-                "Could not synchronize Gmail."
-            )
+            log_failure(logger, 'gmail_sync', error)
 
 else:
     st.info(

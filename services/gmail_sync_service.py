@@ -1,4 +1,5 @@
 from __future__ import annotations
+from services.provider_failure import provider_operation
 
 import base64
 
@@ -92,6 +93,7 @@ class GmailSyncService:
                 or GmailMessageRepository()
         )
 
+    @provider_operation('gmail_sync')
     def sync_recent_job_alerts(
             self,
             user_id: str,

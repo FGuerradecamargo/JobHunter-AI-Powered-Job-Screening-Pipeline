@@ -1,4 +1,6 @@
 from __future__ import annotations
+import logging
+from services.provider_failure import failure_code, log_failure
 
 from dataclasses import dataclass
 
@@ -135,18 +137,13 @@ class GmailBackgroundSyncService:
                     GmailUserBackgroundResult(
                         user_id=user_id,
                         success=False,
-                        error=str(error),
+                        error=failure_code(error),
                     )
                 )
 
                 failed += 1
 
-                print(
-                    "[GMAIL BACKGROUND ERROR]",
-                    user_id,
-                    "|",
-                    repr(error),
-                )
+                log_failure(logging.getLogger(__name__), 'gmail_background', error)
 
         return GmailBackgroundSyncResult(
             users_found=len(user_ids),

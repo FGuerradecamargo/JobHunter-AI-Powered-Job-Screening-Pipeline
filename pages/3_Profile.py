@@ -27,6 +27,7 @@ from services.session_auth import (
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context
+from services.provider_failure import log_failure
 from components.profile_onboarding import render_profile_onboarding
 
 authenticated_user = (
@@ -490,6 +491,13 @@ with experience_tab:
                     ),
                 )
 
+                source_edit_confirmed = False
+                if experience.confirmed_interview_answers:
+                    source_edit_confirmed = st.checkbox(
+                        "I confirm this text as my corrected account of this experience.",
+                        key=f"confirm_source_edit_{experience.id}",
+                    )
+
                 col_save, col_delete = (
                     st.columns(2)
                 )
@@ -500,6 +508,7 @@ with experience_tab:
                         key=(
                             f"save_{experience.id}"
                         ),
+                        disabled=bool(experience.confirmed_interview_answers) and not source_edit_confirmed,
                         use_container_width=True,
                     ):
                         updated_experience = (
@@ -529,7 +538,8 @@ with experience_tab:
                         )
 
                         onboarding_repository.update_work_experience(
-                            updated_experience
+                            updated_experience,
+                            confirmed_source_edit=source_edit_confirmed,
                         )
 
                         st.success(
@@ -1257,10 +1267,8 @@ with details_tab:
 
                     st.rerun()
 
-                except Exception:
-                    logger.exception(
-                        "Could not generate profile."
-                    )
+                except Exception as error:
+                    log_failure(logger, 'profile_generation', error)
                     st.error(
                         "Could not generate profile. "
                         "Please try again."
