@@ -19,7 +19,8 @@ def build_candidate_profile_prompt(
 
     experiences_json = json.dumps(
         [
-            asdict(experience)
+            dict(asdict(experience), career_story='', day_to_day_narrative='')
+            if experience.confirmed_interview_answers else asdict(experience)
             for experience in experiences
         ],
         ensure_ascii=False,
@@ -45,6 +46,11 @@ Your task is to build a structured professional model of the candidate
 from their own narrative and work history.
 
 This is NOT a CV-writing task.
+
+Confirmed interview answers are candidate statements, not automatically proven capabilities.
+Use each question only as context, never as an assertion by the candidate.
+Skipped answers mean not provided, never absence or a gap. Preserve original meaning.
+For guided experiences, use confirmed_interview_answers with company metadata as the source.
 
 The profile will later be used to compare the candidate fairly against
 job opportunities, so preserve professional evidence instead of

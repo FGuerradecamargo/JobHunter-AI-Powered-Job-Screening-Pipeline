@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
+from models.company_interview import ConfirmedCompanyAnswer, validate_answers
 from services.database import (
     get_connection,
     initialize_database,
@@ -13,6 +14,41 @@ from services.database import (
 class CandidateOnboardingRepository:
     def __init__(self) -> None:
         initialize_database()
+
+    def confirm_company_interview(self, *, candidate_id, company, start_date, end_date, answers, experience_id):
+        validate_answers(answers)
+        if not candidate_id or not experience_id or not company.strip() or (end_date and end_date < start_date):
+            raise ValueError('Invalid company metadata.')
+        projection = '\n\n'.join(f'[{a.question_id.upper()}] {a.question_text}\n{a.confirmed_text}'
+            for a in answers if not a.skipped)
+        now = utc_now()
+        with get_connection() as connection:
+            existing = connection.execute('SELECT candidate_id FROM candidate_work_experiences WHERE id = ?',
+                (experience_id,)).fetchone()
+            if existing:
+                if existing['candidate_id'] != candidate_id:
+                    raise ValueError('Work experience was not found for candidate.')
+                return  # Idempotent confirmation after a successful save/rerun.
+            connection.execute('''INSERT INTO candidate_work_experiences
+                (id, candidate_id, company, start_date, end_date, career_story, day_to_day_narrative, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (experience_id, candidate_id, company.strip(), start_date, end_date, '', projection, now, now))
+            for a in answers:
+                connection.execute('''INSERT INTO company_interview_answers
+                    (candidate_id, work_experience_id, interview_version, question_id, question_version,
+                     question_text, answer_mode, confirmed_text, skipped, confirmed_at, source_kind)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (candidate_id, experience_id, a.interview_version, a.question_id, a.question_version,
+                     a.question_text, a.answer_mode, a.confirmed_text, int(a.skipped), now, a.source_kind))
+
+    def list_company_answers(self, candidate_id, experience_id):
+        with get_connection() as connection:
+            rows = connection.execute('''SELECT a.* FROM company_interview_answers a
+                JOIN candidate_work_experiences e ON e.id = a.work_experience_id AND e.candidate_id = a.candidate_id
+                WHERE a.candidate_id = ? AND a.work_experience_id = ? ORDER BY a.question_id''',
+                (candidate_id, experience_id)).fetchall()
+        return [ConfirmedCompanyAnswer(r['question_id'], r['question_text'], r['answer_mode'],
+            r['confirmed_text'], bool(r['skipped']), r['interview_version'], r['question_version'], r['source_kind']) for r in rows]
 
     def save_onboarding(
         self,
@@ -191,6 +227,7 @@ class CandidateOnboardingRepository:
                 day_to_day_narrative=row[
                     "day_to_day_narrative"
                 ],
+                confirmed_interview_answers=self.list_company_answers(candidate_id, row['id']),
             )
             for row in rows
         ]

@@ -547,6 +547,10 @@ def _render_workpilot_side_panel(step):
     st.html(html)
 
 
+from components.company_interview import render_company_interview
+from services.company_interview import start_interview
+
+
 def render_profile_onboarding(
     *,
     candidate_id,
@@ -556,6 +560,7 @@ def render_profile_onboarding(
     authenticated_user,
     active_user,
     voice_inputs=None,
+    reflection_provider=None,
 ):
     if active_user.candidate_id != candidate_id or not AccessPolicy.can_access_candidate(authenticated_user, candidate_id):
         st.error("Access denied.")
@@ -725,6 +730,18 @@ def render_profile_onboarding(
             elif step == 2:
                 st.subheader("YOUR EXPERIENCE")
 
+                draft = st.session_state.get('_voice_company_draft_' + scope)
+                if draft:
+                    if draft['candidate_id'] != candidate_id:
+                        st.error('Access denied.')
+                        return
+                    st.write(f"Imagine I\u2019m starting tomorrow in the same job you had at {draft['company']}. "
+                        "Just tell me how it really was. You don\u2019t need to make it sound professional "
+                        "or organize your answer. Just answer what comes to mind.")
+                    render_company_interview(draft, scope, onboarding_repository, inputs,
+                        reflection_provider=reflection_provider)
+                    return
+
                 st.write(
                     "Tell us what you actually did. Do not worry "
                     "about writing it like a CV."
@@ -852,101 +869,20 @@ def render_profile_onboarding(
                                 key=f"end_year_{candidate_id}",
                             )
 
-                    career_story = inputs.render(
-                        'career_story',
-                        "Tell us your story at this company",
-                        placeholder=(
-                            "How did you join? Which roles did "
-                            "you have? Did you move teams, get "
-                            "promoted or take on new responsibilities?"
-                        ),
-                        height=180,
-                    )
-
-                    day_to_day = inputs.render(
-                        'day_to_day',
-                        "What was your day-to-day work actually like?",
-                        placeholder=(
-                            "Imagine a friend starts this job "
-                            "tomorrow. What would they actually do?"
-                        ),
-                        height=200,
-                    )
-
-                    add_experience = (
-                        st.button(
-                            "Add this experience",
-                            use_container_width=True,
-                            disabled=inputs.pending(('career_story', 'day_to_day')),
-                        )
-                    )
-
-                if add_experience:
-                    if inputs.pending(('career_story', 'day_to_day')):
-                        st.warning('Accept or discard the transcript before saving.')
-                        return
-                    if not company.strip():
-                        st.warning(
-                            "Company is required."
-                        )
-
-                    elif (
-                        start_month is None
-                        or start_year is None
-                    ):
-                        st.warning(
-                            "Select the month and year you started."
-                        )
-
-                    elif (
-                        not currently_here
-                        and (
-                            end_month is None
-                            or end_year is None
-                        )
-                    ):
-                        st.warning(
-                            "Select when you left, or choose "
-                            "'I currently work here'."
-                        )
-
-                    elif not career_story.strip():
-                        st.warning(
-                            "Tell us your story at this company."
-                        )
-
-                    elif not day_to_day.strip():
-                        st.warning(
-                            "Describe your day-to-day work."
-                        )
-
+                    begin = st.button('Start company interview', type='primary')
+                if begin:
+                    if not company.strip() or start_month is None or start_year is None or (
+                        not currently_here and (end_month is None or end_year is None)):
+                        st.warning('Add company and dates before continuing.')
                     else:
-                        onboarding_repository.add_work_experience(
-                            candidate_id=candidate_id,
-                            company=company.strip(),
-                            start_date=(
-                                f"{start_year:04d}-"
-                                f"{start_month:02d}"
-                            ),
-                            end_date=(
-                                None
-                                if currently_here
-                                else (
-                                    f"{end_year:04d}-"
-                                    f"{end_month:02d}"
-                                )
-                            ),
-                            career_story=(
-                                career_story.strip()
-                            ),
-                            day_to_day_narrative=(
-                                day_to_day.strip()
-                            ),
-                        )
-
-                        inputs.event('first_answer_completed', once=True)
-                        inputs.clear(('career_story', 'day_to_day'))
-                        st.rerun()
+                        try:
+                            st.session_state['_voice_company_draft_' + scope] = start_interview(
+                                scope, candidate_id, company, f'{start_year:04d}-{start_month:02d}',
+                                None if currently_here else f'{end_year:04d}-{end_month:02d}')
+                        except ValueError:
+                            st.warning('Check company and dates.')
+                        else:
+                            st.rerun()
 
                 st.divider()
 

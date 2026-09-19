@@ -643,6 +643,7 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "source_ingestion_runs",
         "candidate_profile_snapshots",
         "job_profile_snapshots",
+        "company_interview_answers",
     }
 )
 
@@ -2655,9 +2656,42 @@ def initialize_sqlite_database() -> None:
 def initialize_database() -> None:
     if is_postgres():
         initialize_postgres_database()
-        return
+    else:
+        initialize_sqlite_database()
+    with get_connection() as connection:
+        create_company_interview_schema(connection)
 
-    initialize_sqlite_database()
+
+def create_company_interview_schema(connection):
+    connection.execute('''CREATE UNIQUE INDEX IF NOT EXISTS idx_work_experience_owner
+        ON candidate_work_experiences(id, candidate_id)''')
+    connection.execute('''CREATE TABLE IF NOT EXISTS company_interview_answers (
+        candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+        work_experience_id TEXT NOT NULL REFERENCES candidate_work_experiences(id) ON DELETE CASCADE,
+        interview_version TEXT NOT NULL, question_id TEXT NOT NULL,
+        question_version TEXT NOT NULL, question_text TEXT NOT NULL,
+        answer_mode TEXT NOT NULL CHECK (answer_mode IN ('voice', 'text', 'skip')),
+        confirmed_text TEXT NOT NULL, skipped INTEGER NOT NULL CHECK (skipped IN (0, 1)),
+        confirmed_at TEXT NOT NULL,
+        PRIMARY KEY (candidate_id, work_experience_id, question_id),
+        FOREIGN KEY (work_experience_id, candidate_id)
+            REFERENCES candidate_work_experiences(id, candidate_id) ON DELETE CASCADE
+    )''')
+    if is_postgres():
+        connection.execute("ALTER TABLE company_interview_answers ADD COLUMN IF NOT EXISTS source_kind TEXT NOT NULL DEFAULT 'FIXED_QUESTION'")
+    elif 'source_kind' not in {row['name'] for row in connection.execute('PRAGMA table_info(company_interview_answers)').fetchall()}:
+        connection.execute("ALTER TABLE company_interview_answers ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'FIXED_QUESTION'")
+    if is_postgres():
+        _enable_server_only_row_level_security(connection, 'company_interview_answers')
+        connection.execute('REVOKE ALL ON TABLE company_interview_answers FROM PUBLIC')
+        connection.execute('''DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                REVOKE ALL ON TABLE company_interview_answers FROM anon;
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                REVOKE ALL ON TABLE company_interview_answers FROM authenticated;
+            END IF;
+        END $$''')
 
 
 def upsert_recommendation(
