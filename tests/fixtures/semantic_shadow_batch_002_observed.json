@@ -1,0 +1,132 @@
+{
+  "version": "batch-002-observed-pairs-v1",
+  "authority": "OBSERVED_REAL_AI reported by user; historical observation, not reference gold",
+  "source": "User-provided Batch 002 summary; raw outputs and per-link metadata unavailable",
+  "reported": {
+    "requests": 12,
+    "retries": 0,
+    "failures": 0,
+    "prompt": "semantic-support-prompt-v2",
+    "requested_model": "gpt-5.6-sol",
+    "returned_model": "gpt-5.6-sol",
+    "store": false
+  },
+  "cases": [
+    {
+      "id": "SE03",
+      "needs": {
+        "need": [
+          "adjacent",
+          "full"
+        ]
+      }
+    },
+    {
+      "id": "SE04",
+      "needs": {
+        "need": [
+          "adjacent",
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "SE13",
+      "needs": {
+        "need": [
+          "adjacent",
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "SE14",
+      "needs": {
+        "need": [
+          "direct",
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "SE18",
+      "needs": {
+        "need": [
+          "adjacent",
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "SE19",
+      "needs": {
+        "need": [
+          "none",
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "SE40",
+      "needs": {
+        "need": [
+          "none",
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "SE44",
+      "needs": {
+        "need": [
+          "direct",
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "SE55",
+      "needs": {
+        "need": [
+          "direct",
+          "partial"
+        ]
+      }
+    },
+    {
+      "id": "AV06",
+      "needs": {
+        "need": [
+          "direct",
+          "full"
+        ],
+        "tax": [
+          "none",
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "AV02",
+      "needs": {
+        "need": [
+          "direct",
+          "full"
+        ],
+        "release": [
+          "none",
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "AV26",
+      "needs": {
+        "need": [
+          "adjacent",
+          "partial"
+        ]
+      }
+    }
+  ]
+}
