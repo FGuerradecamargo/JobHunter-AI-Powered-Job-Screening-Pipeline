@@ -284,7 +284,7 @@ google_oidc_pending = bool(
 
 if authenticated_user is None:
     home_page = st.Page(
-        "pages/00_Home.py",
+        "app.py",
         title="Home",
         icon=":material/home:",
         default=True,
@@ -302,7 +302,8 @@ if authenticated_user is None:
             login_page,
             password_reset_page,
             email_verification_page,
-        ]
+        ],
+        position="hidden",
     )
 
     if (

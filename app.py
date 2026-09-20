@@ -1,9 +1,11 @@
 import streamlit as st
+from components.public_landing import render_public_landing
 
 from components.job_analysis_view import render_job_analysis
 
 from services.candidate_repository import CandidateRepository
 from services.session_auth import (
+    get_authenticated_user,
     render_logout_button,
     require_authenticated_user,
 )
@@ -733,6 +735,10 @@ def main() -> None:
         page_icon="ðŸŽ¯",
         layout="wide",
     )
+
+    if get_authenticated_user() is None:
+        render_public_landing()
+        st.stop()
 
     initialize_database()
 
