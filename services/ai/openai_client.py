@@ -29,6 +29,8 @@ class OpenAIClient(LLMClient):
 
         self.client = OpenAI(
             api_key=api_key,
+            timeout=120.0,
+            max_retries=0,
         )
 
     @provider_operation('ai_generation')

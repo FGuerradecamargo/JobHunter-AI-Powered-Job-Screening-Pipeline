@@ -239,6 +239,39 @@ def test_finish_then_failed_only_rerecord_then_edit_review():
     assert 'This looks right' in ui.buttons
 
 
+def test_unavailable_reflection_skips_futile_retry_and_continues_from_sources():
+    d, p = draft(), Provider()
+    complete(d, mode='text')
+    inputs = SimpleNamespace(
+        config=VoiceConfig(True, True, 'fake'),
+        provider=p,
+        events=None,
+    )
+
+    with pytest.raises(Rerun):
+        render_company_interview(
+            d,
+            'scope',
+            None,
+            inputs,
+            UI("Show me what you've got"),
+        )
+
+    assert d['stage'] == 'final'
+
+    ui = UI()
+    render_company_interview(
+        d,
+        'scope',
+        None,
+        inputs,
+        ui,
+    )
+
+    assert 'Retry reflection' not in ui.buttons
+
+
+
 def test_final_frozen():
     from models.company_interview import FINAL_QUESTION
     assert FINAL_QUESTION == 'Remember, I start tomorrow. Is there anything else about the job I should know?'

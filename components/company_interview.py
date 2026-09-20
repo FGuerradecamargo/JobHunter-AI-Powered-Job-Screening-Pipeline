@@ -13,6 +13,7 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
     if draft['scope'] != scope or ui.session_state.get('_voice_owner') != scope:
         raise ValueError('Invalid interview scope.')
     prefix = '_voice_company_' + draft['id']
+    reflection_available = reflection_provider is not None
     reflection_provider = reflection_provider or ReflectionUnavailable()
     count = len(draft['answers'])
     def event(name, question_id=None, mode=None, once=False):
@@ -40,7 +41,11 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
             process(draft, scope, inputs.provider, inputs.config, authorized=True)
         event('company_transcription_failed' if draft['stage'] == 'failed' else 'company_transcription_completed')
         if draft['stage'] == 'reflection_pending':
-            run_reflection()
+            if reflection_available:
+                run_reflection()
+            else:
+                draft['stage'] = 'reflection_failed'
+                review_reflection(draft, scope)
     if draft.get('acknowledgement'):
         ui.write(draft['acknowledgement'])
     if draft['stage'] in ('memory', 'adaptive', 'final'):
@@ -123,9 +128,10 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
         return
     if draft['stage'] in ('reflection_pending', 'reflection_failed'):
         ui.warning('The draft reflection is unavailable. Your answers are safe.')
-        if ui.button('Retry reflection'):
-            run_reflection()
-            ui.rerun()
+        if reflection_available:
+            if ui.button('Retry reflection'):
+                run_reflection()
+                ui.rerun()
         if ui.button('Continue with my source answers', type='tertiary'):
             draft['stage'] = 'reflection_failed'
             review_reflection(draft, scope)
