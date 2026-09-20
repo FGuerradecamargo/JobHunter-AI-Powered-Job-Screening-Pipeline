@@ -1,4 +1,5 @@
 import streamlit as st
+from components.public_landing import render_public_landing
 
 from services.account_recovery_service import (
     AccountRecoveryService,
@@ -25,11 +26,14 @@ st.set_page_config(
     page_icon="🔐",
 )
 
-st.title("WorkPilot")
-
 auth_service = AuthService()
 
 authenticated_user = get_authenticated_user()
+
+if authenticated_user is None and not st.user.is_logged_in:
+    render_public_landing()
+else:
+    st.title("WorkPilot")
 
 authentication_notice = st.session_state.pop(
     "authentication_notice",
