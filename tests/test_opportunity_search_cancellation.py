@@ -204,21 +204,21 @@ def test_logout_or_expiry_discards_run_and_search_cache():
     assert set(state) == {"reauthentication_required"}
 
 
-def test_fast_reruns_disabled_and_runtime_override_fails_closed():
+def test_streamlit_runtime_mode_does_not_disable_opportunity_search():
     import tomllib
-    config = tomllib.loads((ROOT / ".streamlit/config.toml").read_text(encoding="utf-8"))
+
+    config = tomllib.loads(
+        (ROOT / ".streamlit/config.toml").read_text(encoding="utf-8")
+    )
     assert config["runner"]["fastReruns"] is False
-    tree = ast.parse((ROOT / "pages/1_Opportunities.py").read_text(encoding="utf-8"))
-    guard = next(n for n in tree.body if isinstance(n, ast.If)
-                 and isinstance(n.test, ast.UnaryOp)
-                 and isinstance(n.test.operand, ast.Name)
-                 and n.test.operand.id == "search_execution_ready")
-    run = make_run()
-    env = dict(search_execution_ready=False, search_run=run, search_scope=SCOPE,
-               st=SimpleNamespace(warning=Mock()))
-    exec(compile(ast.Module(body=[guard], type_ignores=[]), "search guard", "exec"), env)
-    assert run.status == "stopped"
-    env["st"].warning.assert_called_once()
+
+    source = (
+        ROOT / "pages/1_Opportunities.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'st.get_option("runner.fastReruns")' not in source
+    assert "search_execution_ready = True" in source
+    assert "Search is temporarily unavailable." not in source
 
 
 def test_streamlit_stop_button_preserves_partial_and_new_search_works():

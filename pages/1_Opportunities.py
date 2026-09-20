@@ -576,11 +576,10 @@ if search_run is not None and search_run.scope != search_scope:
 st.session_state["scan_in_progress"] = (
     search_run is not None and search_run.status == "running"
 )
-search_execution_ready = not st.get_option("runner.fastReruns")
-if not search_execution_ready:
-    if search_run is not None:
-        search_run.stop(search_scope, search_run.scan_id)
-    st.warning("Search is temporarily unavailable. Please try again later.")
+# Streamlit Community Cloud forces runner.fastReruns=True.
+# Search safety comes from one persisted unit per rerun plus DB claims,
+# not from requiring a particular Streamlit rerun mode.
+search_execution_ready = True
 
 
 def request_opportunity_scan() -> None:
