@@ -93,7 +93,7 @@ def page_unit():
     names = {"empty_scan_result", "merge_scan_result", "merge_activation_result",
              "advance_opportunity_search", "stop_opportunity_scan"}
     nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
-    env = dict(repository=Mock(), analysis_service=Mock(), candidate_id="candidate",
+    env = dict(repository=Mock(), analysis_service=Mock(), candidate_id="candidate", BATCH_MAX_SIZE=10,
                candidate_signature="signature", ANALYSIS_VERSION="version",
                candidate=SimpleNamespace(target_role_families=[], bridge_role_families=[],
                                          competitive_role_families=[]),
@@ -115,7 +115,8 @@ def test_real_page_unit_initial_activation_then_one_job_per_rerun(page_unit):
     env["analysis_service"].analyze_pending.assert_not_called()
     run.advance(SCOPE, env["advance_opportunity_search"])
     env["analysis_service"].analyze_pending.assert_called_once_with(
-        candidate_id="candidate", limit=1, ai_budget=None, job_ids=["job"], scan_id=run.scan_id)
+        candidate_id="candidate", limit=1, ai_budget=None, job_ids=["job"], scan_id=run.scan_id,
+        prepare_only=True)
     assert env["repository"].list_jobs_to_analyze_for_candidate.call_args.kwargs["limit"] == 1
     assert run.aggregate["selected"] == 1
     env["stop_opportunity_scan"](SCOPE, run.scan_id)
@@ -123,7 +124,7 @@ def test_real_page_unit_initial_activation_then_one_job_per_rerun(page_unit):
     assert env["analysis_service"].analyze_pending.call_count == 1
 
 
-@pytest.mark.parametrize("result", [{"analyzed": 0}, {"analyzed": 1, "usage_limit_reached": True},
+@pytest.mark.parametrize("result", [{"analyzed": 1, "usage_limit_reached": True},
                                      {"analyzed": 1, "provider_quota_exhausted": True}])
 def test_page_no_progress_or_quota_finishes_without_retry(page_unit, result):
     run = page_unit["search_run"]
@@ -142,6 +143,61 @@ def test_page_partial_activation_and_target_preserved(page_unit):
     assert run.aggregate["opportunities_found"] == 1
     assert run.aggregate["activated_best_match"] == 1
     assert run.status == "complete"
+
+
+def test_claim_lost_after_selection_skips_job_and_continues(page_unit):
+    env = page_unit
+    run = env["search_run"]
+    run.initialized = True
+    remaining = [{"id": "busy"}, {"id": "available"}]
+    def select(**kwargs):
+        return [row for row in remaining if row["id"] not in kwargs.get("exclude_job_ids", [])][:1]
+    env["repository"].list_jobs_to_analyze_for_candidate.side_effect = select
+    env["analysis_service"].analyze_pending.side_effect = [
+        {"selected": 0, "analyzed": 0}, {"selected": 1, "analyzed": 1},
+    ]
+    run.advance(SCOPE, env["advance_opportunity_search"])
+    assert run.status == "running"
+    run.advance(SCOPE, env["advance_opportunity_search"])
+    assert run.status == "running"
+    assert run.aggregate["selected"] == 1
+    assert [call.kwargs["job_ids"] for call in env["analysis_service"].analyze_pending.call_args_list] == [["busy"], ["available"]]
+    remaining.clear()
+    run.advance(SCOPE, env["advance_opportunity_search"])
+    assert run.status == "complete"
+    assert env["analysis_service"].analyze_pending.call_count == 2
+
+
+def test_unavailable_only_pool_finishes_without_retry_and_fresh_run_is_clean(page_unit):
+    env = page_unit
+    run = env["search_run"]
+    run.initialized = True
+    env["repository"].list_jobs_to_analyze_for_candidate.side_effect = (
+        lambda **kw: [] if "busy" in kw["exclude_job_ids"] else [{"id": "busy"}]
+    )
+    env["analysis_service"].analyze_pending.return_value = {"selected": 0, "analyzed": 0}
+    run.advance(SCOPE, env["advance_opportunity_search"])
+    assert run.status == "running"
+    run.advance(SCOPE, env["advance_opportunity_search"])
+    assert run.status == "complete"
+    assert env["analysis_service"].analyze_pending.call_count == 1
+    fresh = OpportunitySearchRun(*SCOPE, target=5, aggregate=env["empty_scan_result"]())
+    assert fresh.unavailable_job_ids == set()
+    assert run.unavailable_job_ids == {"busy"}
+
+
+@pytest.mark.parametrize("flag", ["usage_limit_reached", "provider_quota_exhausted", "failed"])
+def test_empty_selection_with_stop_or_failure_is_not_retried(page_unit, flag):
+    run = page_unit["search_run"]
+    run.initialized = True
+    page_unit["analysis_service"].analyze_pending.return_value = {
+        "selected": 0, "analyzed": 0, flag: 1,
+    }
+    run.advance(SCOPE, page_unit["advance_opportunity_search"])
+    assert run.status == ("failed" if flag == "failed" else "complete")
+    assert not run.unavailable_job_ids
+    run.advance(SCOPE, page_unit["advance_opportunity_search"])
+    assert page_unit["analysis_service"].analyze_pending.call_count == 1
 
 
 def test_ui_has_no_blocking_loop_and_renders_results_before_advancing():

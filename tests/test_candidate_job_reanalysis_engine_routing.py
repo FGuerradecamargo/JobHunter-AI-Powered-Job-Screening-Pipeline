@@ -167,6 +167,7 @@ def test_analyze_pending_uses_discovery_selector_and_shared_engine(
 
     assert result == {
         "mode": "discovery",
+        "unavailable_job_ids": [],
     }
 
 

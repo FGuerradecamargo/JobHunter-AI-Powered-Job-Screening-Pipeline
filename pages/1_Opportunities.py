@@ -1,6 +1,7 @@
 import logging
 from services.historical_cv_presenter import normalize_historical_cv
 from services.opportunity_search_run import OpportunitySearchRun
+from services.ai.prompt_builder import BATCH_MAX_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -657,27 +658,62 @@ def advance_opportunity_search() -> bool:
         search_run.initialized = True
         return aggregate["opportunities_found"] < search_run.target
 
-    jobs = repository.list_jobs_to_analyze_for_candidate(
-        candidate_id=candidate_id,
-        analysis_version=ANALYSIS_VERSION,
-        candidate_signature=candidate_signature,
-        limit=1,
-        target_families=candidate.target_role_families,
-        bridge_families=candidate.bridge_role_families,
-        competitive_families=candidate.competitive_role_families,
-    )
-    if not jobs:
+    if aggregate["opportunities_found"] >= search_run.target:
         return False
-    job_id = str(jobs[0]["id"])
-    if ensure_candidate_job_analysis(candidate_id=candidate_id, job_id=job_id):
-        search_run.links_created += 1
-    batch_result = analysis_service.analyze_pending(
-        candidate_id=candidate_id,
-        limit=1,
-        ai_budget=search_run.budget,
-        job_ids=[job_id],
-        scan_id=search_run.scan_id,
-    )
+
+    buffer = search_run.prepared_job_ids
+    flush = len(buffer) == BATCH_MAX_SIZE
+    exhausted = False
+    jobs = []
+    if not flush:
+        jobs = repository.list_jobs_to_analyze_for_candidate(
+            candidate_id=candidate_id,
+            analysis_version=ANALYSIS_VERSION,
+            candidate_signature=candidate_signature,
+            limit=1,
+            target_families=candidate.target_role_families,
+            bridge_families=candidate.bridge_role_families,
+            competitive_families=candidate.competitive_role_families,
+            exclude_job_ids=sorted(search_run.unavailable_job_ids | set(buffer)),
+        )
+        exhausted = not jobs
+        flush = exhausted and bool(buffer)
+        if exhausted and not buffer:
+            return False
+
+    if flush:
+        requested_ids = list(buffer)
+        batch_result = analysis_service.analyze_pending(
+            candidate_id=candidate_id, limit=len(requested_ids),
+            ai_budget=search_run.budget, job_ids=requested_ids,
+            scan_id=search_run.scan_id, require_full_batch=not exhausted,
+        )
+        eligible = batch_result.get("ai_eligible_job_ids", [])
+        # A partial claim/revalidation result is refilled before any paid call.
+        buffer[:] = eligible if batch_result.get("recommendation_deferred") else []
+        search_run.unavailable_job_ids.update(batch_result.get("unavailable_job_ids", []))
+        # Preparation was already counted on earlier reruns.
+        batch_result = dict(batch_result)
+        for key in ("selected", "ai_eligible", "descriptions_reused",
+                    "descriptions_fetched", "descriptions_failed"):
+            batch_result[key] = 0
+    else:
+        job_id = str(jobs[0]["id"])
+        if ensure_candidate_job_analysis(candidate_id=candidate_id, job_id=job_id):
+            search_run.links_created += 1
+        batch_result = analysis_service.analyze_pending(
+            candidate_id=candidate_id, limit=1,
+            ai_budget=search_run.budget, job_ids=[job_id],
+            scan_id=search_run.scan_id, prepare_only=True,
+        )
+        for prepared_id in batch_result.get("ai_eligible_job_ids", []):
+            if prepared_id not in buffer:
+                buffer.append(prepared_id)
+        if batch_result.get("selected") == 0 and not (
+            batch_result.get("failed") or batch_result.get("usage_limit_reached")
+            or batch_result.get("provider_quota_exhausted")
+        ):
+            search_run.unavailable_job_ids.add(job_id)
     merge_scan_result(aggregate, batch_result)
     merge_activation_result(
         aggregate,
@@ -686,13 +722,13 @@ def advance_opportunity_search() -> bool:
             max(0, search_run.target - aggregate["opportunities_found"]),
         ),
     )
-    if batch_result.get("failed", 0) and not batch_result.get("analyzed", 0):
+    if batch_result.get("failed", 0):
         search_run.status = "failed"
     return (
         aggregate["opportunities_found"] < search_run.target
+        and not batch_result.get("failed", 0)
         and not batch_result.get("usage_limit_reached", False)
         and not batch_result.get("provider_quota_exhausted", False)
-        and batch_result.get("analyzed", 0) > 0
     )
 
 

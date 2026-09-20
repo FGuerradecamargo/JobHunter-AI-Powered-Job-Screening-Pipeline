@@ -466,6 +466,44 @@ def test_discovery_skips_unlinkable_equivalent_and_reaches_next_job(discovery_po
     assert repo.count_jobs_to_analyze_for_candidate("b", "v1", "signature") == len(other)
 
 
+def test_discovery_respects_active_claims_and_recovers_expired_claims(discovery_pool, monkeypatch):
+    import services.job_search_repository as search_module
+    now = "2026-09-20T12:00:00+00:00"
+    monkeypatch.setattr(search_module, "utc_now", lambda: now, raising=False)
+    for identifier in ("claimed", "available"):
+        discovery_pool(identifier, identifier)
+    database.ensure_candidate_job_analysis("a", "claimed")
+    with database.get_connection() as connection:
+        connection.execute("UPDATE jobs SET created_at = '2099-01-01' WHERE id = 'claimed'")
+        connection.execute(
+            "UPDATE candidate_job_analyses SET analysis_claim_token = 'other-worker', "
+            "analysis_claim_expires_at = ? WHERE candidate_id = 'a' AND job_id = 'claimed'",
+            ("2026-09-20T12:30:00+00:00",),
+        )
+    repo = JobSearchRepository()
+    assert [r["id"] for r in repo.list_jobs_to_analyze_for_candidate("a", "v1", "sig")] == ["available"]
+    assert repo.count_jobs_to_analyze_for_candidate("a", "v1", "sig") == 1
+    assert len(repo.list_jobs_to_analyze_for_candidate("b", "v1", "sig")) == 2
+    assert repo.count_jobs_to_analyze_for_candidate("b", "v1", "sig") == 2
+    monkeypatch.setattr(search_module, "utc_now", lambda: "2026-09-20T12:30:00+00:00")
+    assert len(repo.list_jobs_to_analyze_for_candidate("a", "v1", "sig")) == 2
+    assert repo.count_jobs_to_analyze_for_candidate("a", "v1", "sig") == 2
+
+
+def test_discovery_run_exclusions_are_bound_and_do_not_change_later_search(discovery_pool):
+    for identifier in ("one", "two", "quote'job"):
+        discovery_pool(identifier, identifier)
+    repo = JobSearchRepository()
+    assert [r["id"] for r in repo.list_jobs_to_analyze_for_candidate(
+        "a", "v1", "sig", exclude_job_ids=["one", "quote'job"],
+    )] == ["two"]
+    assert repo.list_jobs_to_analyze_for_candidate(
+        "a", "v1", "sig", exclude_job_ids=["one", "two", "quote'job"],
+    ) == []
+    assert len(repo.list_jobs_to_analyze_for_candidate("a", "v1", "sig")) == 3
+    assert repo.count_jobs_to_analyze_for_candidate("a", "v1", "sig") == 3
+
+
 def test_gmail_processor_keeps_personal_provenance(db, monkeypatch):
     from services.gmail_job_processor import GmailJobProcessor
     from services.user_repository import UserRepository

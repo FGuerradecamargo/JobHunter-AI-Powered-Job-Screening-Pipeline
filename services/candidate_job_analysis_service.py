@@ -969,6 +969,8 @@ class CandidateJobAnalysisService:
         ai_budget: AIUsageBudget | None = None,
         job_ids: list[str] | None = None,
         scan_id: str | None = None,
+        prepare_only: bool = False,
+        require_full_batch: bool | None = None,
     ) -> dict[str, Any]:
         """
         Analyze jobs that have never completed their
@@ -976,7 +978,15 @@ class CandidateJobAnalysisService:
 
         Discovery and reanalysis intentionally use
         different selectors.
+
+        prepare_only persists hard rejects and returns survivor IDs without
+        recommendation AI. A cooperative flush sets require_full_batch=True,
+        or False only after discovery exhaustion; None preserves legacy calls.
+        Every call reacquires claims and revalidates preparation, then releases
+        its remaining claims before returning.
         """
+        if prepare_only or require_full_batch is not None:
+            limit = min(limit, BATCH_MAX_SIZE)
         claim_token = (
             "candidate_job_claim_"
             + uuid4().hex
@@ -1008,8 +1018,20 @@ class CandidateJobAnalysisService:
             ).strip()
         ]
 
+        requested_ids = list(dict.fromkeys(
+            str(job_id).strip() for job_id in (job_ids or [])
+            if str(job_id).strip()
+        ))
+        # Only a fully requested workset can identify missing acquisitions:
+        # jobs omitted by a caller's limit are not evidence of a claim race.
+        claimed_ids = set(claimed_job_ids)
+        unavailable_job_ids = (
+            [job_id for job_id in requested_ids if job_id not in claimed_ids]
+            if len(requested_ids) <= limit else []
+        )
+
         try:
-            return self._run_candidate_job_analysis(
+            result = self._run_candidate_job_analysis(
                 candidate_id=candidate_id,
                 source_rows=source_rows,
                 target_opportunities=(
@@ -1022,7 +1044,11 @@ class CandidateJobAnalysisService:
                 analysis_claim_token=(
                     claim_token
                 ),
+                prepare_only=prepare_only,
+                require_full_batch=require_full_batch,
             )
+            result["unavailable_job_ids"] = unavailable_job_ids
+            return result
 
         finally:
             try:
@@ -1173,6 +1199,8 @@ class CandidateJobAnalysisService:
         scan_id: str | None = None,
         run_mode: str | None = None,
         analysis_claim_token: str | None = None,
+        prepare_only: bool = False,
+        require_full_batch: bool | None = None,
     ) -> dict[str, Any]:
         resolved_scan_id = str(
             scan_id
@@ -1617,6 +1645,23 @@ class CandidateJobAnalysisService:
         result["ai_eligible"] = len(
             ai_queue
         )
+
+        # Only IDs cross reruns. Profiles remain in their existing persistent
+        # cache; claims are released by analyze_pending's finally block.
+        result["ai_eligible_job_ids"] = [item["job"].id for item in ai_queue]
+        result["recommendation_deferred"] = prepare_only or (
+            require_full_batch is True and len(ai_queue) < BATCH_MAX_SIZE
+        )
+        if result["recommendation_deferred"]:
+            return result
+        if require_full_batch is not None and result["failed"]:
+            return result
+        if require_full_batch and (
+            ai_budget is not None and ai_budget.remaining is not None
+            and ai_budget.remaining < BATCH_MAX_SIZE
+        ):
+            result["usage_limit_reached"] = True
+            return result
 
         if not ai_queue:
             return result

@@ -18,6 +18,8 @@ class OpportunitySearchRun:
     initialized: bool = False
     links_created: int = 0
     budget: object = None
+    unavailable_job_ids: set[str] = field(default_factory=set)
+    prepared_job_ids: list[str] = field(default_factory=list)
 
     @property
     def scope(self) -> tuple[str, str, str, str]:

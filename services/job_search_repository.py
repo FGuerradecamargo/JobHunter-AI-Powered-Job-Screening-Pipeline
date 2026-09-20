@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from services.database import get_connection
+from services.database import get_connection, utc_now
 from services.job_family_affinity import (
     score_job_family_affinity,
 )
@@ -126,6 +126,7 @@ class JobSearchRepository:
         target_families: list[str] | None = None,
         bridge_families: list[str] | None = None,
         competitive_families: list[str] | None = None,
+        exclude_job_ids: list[str] | None = None,
     ):
         """
         Return jobs eligible for initial candidate discovery.
@@ -146,7 +147,12 @@ class JobSearchRepository:
         temporary compatibility parameters.
         """
 
-        query = """
+        excluded_ids = tuple(dict.fromkeys(exclude_job_ids or []))
+        excluded_filter = (
+            "AND jobs.id NOT IN (" + ",".join("?" for _ in excluded_ids) + ")"
+            if excluded_ids else ""
+        )
+        query = f"""
             SELECT
                 jobs.id,
                 jobs.title,
@@ -212,6 +218,14 @@ class JobSearchRepository:
                     )
                 )
 
+                AND (
+                    COALESCE(TRIM(candidate_job_analyses.analysis_claim_token), '') = ''
+                    OR candidate_job_analyses.analysis_claim_expires_at IS NULL
+                    OR candidate_job_analyses.analysis_claim_expires_at <= ?
+                )
+
+                {excluded_filter}
+
             ORDER BY
                 jobs.created_at DESC,
                 jobs.id
@@ -224,6 +238,8 @@ class JobSearchRepository:
                     candidate_id,
                     candidate_id,
                     candidate_id,
+                    utc_now(),
+                    *excluded_ids,
                 ),
             ).fetchall()
 
@@ -349,7 +365,8 @@ class JobSearchRepository:
 
         Stale/version/signature changes are intentionally
         excluded and will be handled by reanalysis.
-        Source visibility and equivalent-job exclusions match the selector.
+        Source visibility, equivalent-job and active-claim exclusions match
+        the selector. Session-local skipped IDs do not change this pool count.
         """
 
         query = """
@@ -396,6 +413,11 @@ class JobSearchRepository:
                                 = LOWER(TRIM(COALESCE(jobs.location, '')))
                     )
                 )
+                AND (
+                    COALESCE(TRIM(candidate_job_analyses.analysis_claim_token), '') = ''
+                    OR candidate_job_analyses.analysis_claim_expires_at IS NULL
+                    OR candidate_job_analyses.analysis_claim_expires_at <= ?
+                )
         """
 
         with get_connection() as connection:
@@ -405,6 +427,7 @@ class JobSearchRepository:
                     candidate_id,
                     candidate_id,
                     candidate_id,
+                    utc_now(),
                 ),
             ).fetchone()
 
