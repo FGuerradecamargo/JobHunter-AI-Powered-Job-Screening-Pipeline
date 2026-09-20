@@ -741,8 +741,11 @@ if search_run is not None:
             args=(search_scope, search_run.scan_id),
         )
         st.info(
-            f"{search_run.aggregate['selected']} jobs reviewed. "
-            f"{search_run.aggregate['opportunities_found']} opportunities kept."
+            "Searching for opportunities...\n\n"
+            f"Reviewed: {search_run.aggregate['selected']}\n\n"
+            f"Passed initial screening: {search_run.aggregate['ai_eligible']}\n\n"
+            f"Preparing deeper analysis: {len(search_run.prepared_job_ids)}/{BATCH_MAX_SIZE}\n\n"
+            "WorkPilot is still searching."
         )
 
     aggregate = search_run.aggregate
@@ -759,7 +762,7 @@ if search_run is not None:
     st.session_state["scan_in_progress"] = search_run.status == "running"
     if search_run.status == "stopped":
         st.info(f"Search stopped. {aggregate['opportunities_found']} opportunities kept.")
-    elif search_run.status == "failed":
+    elif search_run.status == "failed" and not aggregate.get("provider_quota_exhausted"):
         st.warning(
             "Search could not finish. Already saved opportunities are kept. "
             "You can start a new search."
@@ -770,7 +773,12 @@ scan_result = st.session_state.get(
     "last_scan_result"
 )
 
-if scan_result:
+if scan_result and st.session_state.get("scan_in_progress", False):
+    pool_remaining = st.session_state.get("last_pool_remaining", 0)
+    if pool_remaining:
+        st.caption(f"{pool_remaining:,} more opportunities available.")
+
+if scan_result and not st.session_state.get("scan_in_progress", False):
     st.divider()
 
     total_scanned = st.session_state.get(
@@ -893,7 +901,13 @@ if scan_result:
         0,
     )
 
-    if failed:
+    if scan_result.get("provider_quota_exhausted"):
+        st.warning(
+            "We couldn't continue the deeper analysis right now. "
+            "Your existing results are safe, and these opportunities "
+            "can be analyzed again later."
+        )
+    elif failed:
         st.warning(
             f"{failed} job(s) failed during analysis."
         )
@@ -1668,7 +1682,8 @@ if (
     for job in good_opportunities:
         render_job(job)
 
-elif scan_result:
+elif (scan_result and not st.session_state.get("scan_in_progress", False)
+      and not scan_result.get("provider_quota_exhausted")):
     st.html(
         '<div class="wp-empty-category">'
         'This scan did not identify an opportunity strong '

@@ -297,6 +297,7 @@ active_user = SimpleNamespace(id="owner")
 candidate_id = "candidate"
 candidate_signature = "signature"
 ANALYSIS_VERSION = "version"
+BATCH_MAX_SIZE = 10
 OPPORTUNITY_TARGETS = {"Quick": 5, "Standard": 10}
 repository = Mock()
 repository.count_jobs_to_analyze_for_candidate.return_value = 10
