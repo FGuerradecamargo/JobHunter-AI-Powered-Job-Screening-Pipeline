@@ -196,6 +196,22 @@ class JobSearchRepository:
                     )
                 )
 
+                -- Match ensure_candidate_job_analysis's existing deduplication.
+                AND (
+                    candidate_job_analyses.job_id IS NOT NULL
+                    OR NOT EXISTS (
+                        SELECT 1 FROM candidate_job_analyses linked
+                        INNER JOIN jobs equivalent ON equivalent.id = linked.job_id
+                        WHERE linked.candidate_id = ?
+                            AND LOWER(TRIM(COALESCE(equivalent.title, '')))
+                                = LOWER(TRIM(COALESCE(jobs.title, '')))
+                            AND LOWER(TRIM(COALESCE(equivalent.company, '')))
+                                = LOWER(TRIM(COALESCE(jobs.company, '')))
+                            AND LOWER(TRIM(COALESCE(equivalent.location, '')))
+                                = LOWER(TRIM(COALESCE(jobs.location, '')))
+                    )
+                )
+
             ORDER BY
                 jobs.created_at DESC,
                 jobs.id
@@ -205,6 +221,7 @@ class JobSearchRepository:
             rows = connection.execute(
                 query,
                 (
+                    candidate_id,
                     candidate_id,
                     candidate_id,
                 ),
@@ -332,6 +349,7 @@ class JobSearchRepository:
 
         Stale/version/signature changes are intentionally
         excluded and will be handled by reanalysis.
+        Source visibility and equivalent-job exclusions match the selector.
         """
 
         query = """
@@ -346,6 +364,15 @@ class JobSearchRepository:
             WHERE
                 jobs.archived_at IS NULL
 
+                AND EXISTS (
+                    SELECT 1 FROM job_sources s
+                    WHERE s.job_id = jobs.id AND (
+                        s.user_id IS NULL OR s.user_id IN (
+                            SELECT id FROM users WHERE candidate_id = ?
+                        )
+                    )
+                )
+
                 AND (
                     candidate_job_analyses.job_id IS NULL
 
@@ -354,12 +381,29 @@ class JobSearchRepository:
                         AND candidate_job_analyses.opportunity_state = 'none'
                     )
                 )
+
+                AND (
+                    candidate_job_analyses.job_id IS NOT NULL
+                    OR NOT EXISTS (
+                        SELECT 1 FROM candidate_job_analyses linked
+                        INNER JOIN jobs equivalent ON equivalent.id = linked.job_id
+                        WHERE linked.candidate_id = ?
+                            AND LOWER(TRIM(COALESCE(equivalent.title, '')))
+                                = LOWER(TRIM(COALESCE(jobs.title, '')))
+                            AND LOWER(TRIM(COALESCE(equivalent.company, '')))
+                                = LOWER(TRIM(COALESCE(jobs.company, '')))
+                            AND LOWER(TRIM(COALESCE(equivalent.location, '')))
+                                = LOWER(TRIM(COALESCE(jobs.location, '')))
+                    )
+                )
         """
 
         with get_connection() as connection:
             row = connection.execute(
                 query,
                 (
+                    candidate_id,
+                    candidate_id,
                     candidate_id,
                 ),
             ).fetchone()

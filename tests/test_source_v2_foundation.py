@@ -379,6 +379,91 @@ def test_candidate_discovery_only_includes_global_and_own_personal_jobs(db):
     other = repo.list_jobs_to_analyze_for_candidate("b", "v1", "signature")
     assert {row["id"] for row in own} == {"manual:private", "alpha:public"}
     assert {row["id"] for row in other} == {"alpha:public"}
+    assert repo.count_jobs_to_analyze_for_candidate("a", "v1", "signature") == len(own)
+    assert repo.count_jobs_to_analyze_for_candidate("b", "v1", "signature") == len(other)
+
+
+@pytest.fixture
+def discovery_pool(db):
+    from models.candidate import Candidate
+    from services.candidate_repository import CandidateRepository
+    from services.user_repository import UserRepository
+    for identifier in ("a", "b"):
+        CandidateRepository().save(Candidate(
+            id=identifier, name=identifier, current_role="", current_level="",
+            professional_summary="",
+        ))
+        UserRepository().create(identifier + "@example.test", identifier,
+                                candidate_id=identifier, user_id="user-" + identifier)
+
+    def add(identifier, title, owner=None, source=True):
+        with database.get_connection() as connection:
+            connection.execute(
+                "INSERT INTO jobs (id, title, company, location, created_at, updated_at) "
+                "VALUES (?, ?, 'Acme', 'Dublin', ?, ?)",
+                (identifier, title, "2026-01-01", "2026-01-01"),
+            )
+        if source:
+            JobSourceRepository().add_source(
+                job_id=identifier, source_type="manual" if owner else "alpha", user_id=owner,
+            )
+    return add
+
+
+def test_discovery_count_and_list_share_visibility_and_lifecycle(discovery_pool):
+    for identifier, owner, source in (
+        ("global", None, True), ("own", "user-a", True),
+        ("foreign", "user-b", True), ("no-source", None, False),
+        ("archived", None, True), ("analyzed", None, True), ("pending", None, True),
+    ):
+        discovery_pool(identifier, identifier, owner, source)
+    JobSourceRepository().add_source(job_id="global", source_type="beta", user_id=None)
+    database.ensure_candidate_job_analysis("a", "analyzed")
+    database.ensure_candidate_job_analysis("a", "pending")
+    with database.get_connection() as connection:
+        connection.execute("UPDATE jobs SET archived_at = '2026-01-02' WHERE id = 'archived'")
+        connection.execute("UPDATE candidate_job_analyses SET analysis_state = 'analyzed' "
+                           "WHERE candidate_id = 'a' AND job_id = 'analyzed'")
+    repo = JobSearchRepository()
+    for candidate, expected in (
+        ("a", {"global", "own", "pending"}),
+        ("b", {"global", "foreign", "pending", "analyzed"}),
+    ):
+        rows = repo.list_jobs_to_analyze_for_candidate(candidate, "v1", "signature")
+        assert {row["id"] for row in rows} == expected
+        assert repo.count_jobs_to_analyze_for_candidate(candidate, "v1", "signature") == len(expected)
+
+
+@pytest.mark.parametrize("state,archived", [("analyzed", False), ("pending", False),
+                                             ("analyzed", True)])
+def test_discovery_skips_unlinkable_equivalent_and_reaches_next_job(discovery_pool, state, archived):
+    discovery_pool("original", "Engineer")
+    discovery_pool("duplicate", " ENGINEER ")
+    discovery_pool("next", "Different role")
+    assert database.ensure_candidate_job_analysis("a", "original")
+    with database.get_connection() as connection:
+        connection.execute("UPDATE candidate_job_analyses SET analysis_state = ? WHERE candidate_id = 'a'",
+                           (state,))
+        connection.execute("UPDATE jobs SET created_at = '2099-01-01' WHERE id = 'duplicate'")
+        if archived:
+            connection.execute("UPDATE jobs SET archived_at = '2026-01-02' WHERE id = 'original'")
+    # This is the production failure: selecting this ID cannot create a pending link.
+    assert not database.ensure_candidate_job_analysis("a", "duplicate")
+    repo = JobSearchRepository()
+    rows = repo.list_jobs_to_analyze_for_candidate("a", "v1", "signature")
+    expected = {"next", "original"} if state == "pending" else {"next"}
+    assert {row["id"] for row in rows} == expected
+    assert repo.count_jobs_to_analyze_for_candidate("a", "v1", "signature") == len(expected)
+    selected = repo.list_jobs_to_analyze_for_candidate("a", "v1", "signature", limit=1)[0]
+    database.ensure_candidate_job_analysis("a", selected["id"])
+    assert [row["id"] for row in database.list_pending_candidate_jobs(
+        "a", limit=1, job_ids=[selected["id"]],
+    )] == [selected["id"]]
+    # Another candidate's equivalent link must not suppress this candidate's pool.
+    other = repo.list_jobs_to_analyze_for_candidate("b", "v1", "signature")
+    assert {row["id"] for row in other} == ({"duplicate", "next"} if archived else
+                                           {"original", "duplicate", "next"})
+    assert repo.count_jobs_to_analyze_for_candidate("b", "v1", "signature") == len(other)
 
 
 def test_gmail_processor_keeps_personal_provenance(db, monkeypatch):
