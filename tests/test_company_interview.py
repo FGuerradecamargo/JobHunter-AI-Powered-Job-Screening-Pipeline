@@ -201,17 +201,58 @@ def test_one_question_voice_default_progress_no_review_or_future(index):
     assert not p.calls
 
 
-def test_audio_capture_advances_without_provider_or_playback():
+def test_all_eight_voice_questions_require_confirmation_and_keep_voice():
     d, p = draft(), Provider()
-    ui = UI(recording=io.BytesIO(wav()))
+    inputs = SimpleNamespace(config=VoiceConfig(True, True, 'fake'), provider=p, events=None)
+    for index in range(8):
+        ui = UI(recording=io.BytesIO(wav()))
+        render_company_interview(d, 'scope', None, inputs, ui)
+        assert QUESTIONS[index] in ui.shown
+        assert len(d['answers']) == index
+        assert ui.audio_labels and not ui.areas
+        with pytest.raises(Rerun):
+            render_company_interview(d, 'scope', None, inputs,
+                UI('Continue with recording', recording=io.BytesIO(wav())))
+        assert not d['typing']
+    assert len(d['answers']) == 8 and not p.calls
+
+
+def test_voice_text_fallback_returns_to_voice_for_next_question():
+    d, p = draft(), Provider()
     inputs = SimpleNamespace(config=VoiceConfig(True, True, 'fake'), provider=p, events=None)
     with pytest.raises(Rerun):
-        render_company_interview(d, 'scope', None, inputs, ui)
-    assert len(d['answers']) == 1 and not p.calls
-    assert d['acknowledgement'] == ACKNOWLEDGEMENTS[0]
-    assert not ui.areas
+        render_company_interview(d, 'scope', None, inputs, UI('type instead'))
+    with pytest.raises(Rerun):
+        render_company_interview(d, 'scope', None, inputs, UI('Continue'))
     ui = UI()
     render_company_interview(d, 'scope', None, inputs, ui)
+    assert QUESTIONS[1] in ui.shown and ui.audio_labels and not ui.areas
+    assert not p.calls
+
+
+def test_audio_capture_requires_explicit_confirmation_before_advancing():
+    d, p = draft(), Provider()
+    inputs = SimpleNamespace(config=VoiceConfig(True, True, 'fake'), provider=p, events=None)
+
+    ui = UI(recording=io.BytesIO(wav()))
+    render_company_interview(d, 'scope', None, inputs, ui)
+
+    assert not d['answers'] and not p.calls
+    assert 'Continue with recording' in ui.buttons
+    assert not ui.areas
+
+    ui = UI('Continue with recording', io.BytesIO(wav()))
+    with pytest.raises(Rerun):
+        render_company_interview(d, 'scope', None, inputs, ui)
+
+    assert len(d['answers']) == 1 and not p.calls
+    assert d['acknowledgement'] == ACKNOWLEDGEMENTS[0]
+
+    ui = UI()
+    render_company_interview(d, 'scope', None, inputs, ui)
+
+    assert QUESTIONS[1] in ui.shown
+    assert ui.audio_labels == ['Tap to start talking']
     assert ACKNOWLEDGEMENTS[0] in ui.shown
 
 

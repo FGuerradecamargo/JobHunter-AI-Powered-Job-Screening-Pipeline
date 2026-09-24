@@ -30,6 +30,21 @@ class AttrDict(dict):
         self[name] = value
 
 
+@pytest.mark.parametrize('reuse', [False, True])
+def test_logout_render_reuses_only_explicit_current_render_user(monkeypatch, reuse):
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+    user = SimpleNamespace(display_name='Synthetic')
+    resolve = Mock(return_value=user)
+    monkeypatch.setattr(session_auth, 'get_authenticated_user', resolve)
+    caption = Mock()
+    monkeypatch.setattr(session_auth, 'st', SimpleNamespace(
+        sidebar=nullcontext(), caption=caption, button=lambda *a, **kw: False))
+    session_auth.render_logout_button(**({'authenticated_user': user} if reuse else {}))
+    assert resolve.call_count == (0 if reuse else 1)
+    caption.assert_called_once_with('Signed in as Synthetic')
+
+
 class FakeCookies(dict):
     def save(self):
         pass

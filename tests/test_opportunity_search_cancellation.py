@@ -319,7 +319,10 @@ if "seeded" not in st.session_state:
     assert app.session_state["opportunity_search_run"].status == "stopped"
     assert any(i.value == "Search stopped. 3 opportunities kept." for i in app.info)
     assert app.session_state["last_scan_result"]["opportunities_found"] == 3
+    assert app.selectbox[0].proto.form_id == "opportunity_search_controls"
+    app.selectbox[0].set_value("Quick")
     next(b for b in app.button if b.label == "Find opportunities for me").click().run()
     assert not app.exception
     assert app.session_state["opportunity_search_run"].status == "running"
     assert app.session_state["opportunity_search_run"].scan_id != original_id
+    assert app.session_state["opportunity_search_run"].target == 5

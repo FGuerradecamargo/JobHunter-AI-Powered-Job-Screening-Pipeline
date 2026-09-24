@@ -42,7 +42,7 @@ user_context = (
 
 active_user = user_context.active_user
 
-render_logout_button()
+render_logout_button(authenticated_user=authenticated_user)
 
 st.set_page_config(
     page_title="Professional Profile",
@@ -95,12 +95,6 @@ if not AccessPolicy.can_access_candidate(
     st.error("Access denied.")
     st.stop()
 
-existing_onboarding = (
-    onboarding_repository.get_onboarding(
-        candidate_id
-    )
-)
-
 generated_candidate = candidate_repository.get(
     candidate_id
 )
@@ -121,6 +115,9 @@ if not profile_ready:
         active_user=active_user,
     )
     st.stop()
+
+
+existing_onboarding = onboarding_repository.get_onboarding(candidate_id)
 
 
 # Reset session-based fields when changing candidate/user.

@@ -70,16 +70,52 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
         if voice:
             if callable(getattr(ui, 'audio_input', None)):
                 ui.write("Tap again when you're done.")
-                recording = ui.audio_input('Tap to start talking', key=key + '_audio',
-                    width='stretch', help="Tap the same microphone control again to stop recording.")
+                recording = ui.audio_input(
+                    'Tap to start talking',
+                    key=key + '_audio',
+                    width='stretch',
+                    help="Tap the same microphone control again to stop recording.",
+                )
+
                 if recording is not None:
-                    try:
-                        received('voice', recording.getvalue())
-                    except ValueError:
-                        ui.warning('Recording could not be used. Try a new recording or type instead.')
-                    else:
+                    ui.caption('Recording ready.')
+
+                    if ui.button(
+                        'Continue with recording',
+                        key=key + '_voice_submit',
+                        type='primary',
+                    ):
+                        try:
+                            received('voice', recording.getvalue())
+                        except ValueError:
+                            ui.warning(
+                                'Recording could not be used. '
+                                'Try a new recording or type instead.'
+                            )
+                        else:
+                            ui.rerun()
+
+                    if ui.button(
+                        'Discard recording and type instead',
+                        key=key + '_type',
+                        type='tertiary',
+                    ):
+                        draft['typing'] = True
                         ui.rerun()
-            if ui.button('type instead', key=key + '_type', type='tertiary'):
+
+                elif ui.button(
+                    'type instead',
+                    key=key + '_type',
+                    type='tertiary',
+                ):
+                    draft['typing'] = True
+                    ui.rerun()
+
+            elif ui.button(
+                'type instead',
+                key=key + '_type',
+                type='tertiary',
+            ):
                 draft['typing'] = True
                 ui.rerun()
         else:
@@ -174,7 +210,7 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
                 if (str(key).startswith(prefix)
                         or str(key).startswith('_voice_field_' + scope + '_company')
                         or str(key) in {f'{field}_{draft["candidate_id"]}' for field in
-                            ('start_month', 'start_year', 'end_month', 'end_year', 'current_role')}):
+                            ('company', 'start_month', 'start_year', 'end_month', 'end_year', 'current_role')}):
                     del ui.session_state[key]
             ui.session_state.pop('_voice_company_draft_' + scope, None)
             ui.rerun()

@@ -82,6 +82,29 @@ def test_component_rejects_foreign_candidate():
     assert not at.exception and at.error[0].value == 'Access denied.'
 
 
+def test_interview_reruns_do_not_reload_onboarding_or_experiences():
+    app = APP.replace('class Repo:', '''class Repo:
+    def __getattribute__(self, name):
+        if name in ('get_onboarding', 'list_work_experiences'):
+            assert not st.session_state.get('_voice_company_draft_' + scope)
+        return object.__getattribute__(self, name)
+''')
+    at = AppTest.from_string(app).run()
+    at.text_input[0].set_value('Ireland')
+    at.multiselect[0].set_value(['English'])
+    button(at, 'Continue →').click().run()
+    at.text_input[0].set_value('Synthetic Co')
+    at.selectbox[0].set_value(1)
+    at.selectbox[1].set_value(2020)
+    at.checkbox[0].check()
+    button(at, 'Start company interview').click().run()
+    for index in range(8):
+        assert not at.exception
+        at.text_area[0].set_value('Source ' + str(index))
+        button(at, 'Continue').click().run()
+    assert not at.exception
+
+
 def test_pending_transcript_blocks_save_until_explicit_acceptance():
     at = AppTest.from_string(APP, default_timeout=15).run()
     at.text_input[0].set_value('Ireland')
@@ -106,6 +129,7 @@ def test_pending_transcript_blocks_save_until_explicit_acceptance():
     assert not at.exception
     saved = at.session_state['saved_experiences'][0]
     assert saved.day_to_day_narrative.strip() == 'User corrected Portuguese answer'
+    assert at.text_input[0].value == ''
 
 
 def test_v2_reflection_correction_adaptive_final_and_editable_sources():

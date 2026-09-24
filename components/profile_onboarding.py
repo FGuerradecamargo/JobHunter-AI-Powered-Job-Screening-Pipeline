@@ -575,13 +575,14 @@ def render_profile_onboarding(
 
     step = st.session_state[step_key]
 
-    existing_onboarding = (
+    interviewing = step == 2 and st.session_state.get('_voice_company_draft_' + scope) is not None
+    existing_onboarding = None if interviewing else (
         onboarding_repository.get_onboarding(
             candidate_id
         )
     )
 
-    experiences = (
+    experiences = [] if interviewing else (
         onboarding_repository.list_work_experiences(
             candidate_id
         )
@@ -787,23 +788,27 @@ def render_profile_onboarding(
 
                     st.divider()
 
-                with st.container():
-                    company = inputs.text_input(
-                        'company', "Company"
-                    )
+                month_options = list(
+                    range(1, 13)
+                )
 
-                    month_options = list(
-                        range(1, 13)
-                    )
+                month_labels = {
+                    month: calendar.month_name[month]
+                    for month in month_options
+                }
 
-                    month_labels = {
-                        month: calendar.month_name[month]
-                        for month in month_options
-                    }
+                current_year = date.today().year
+                year_options = list(
+                    range(current_year, 1969, -1)
+                )
 
-                    current_year = date.today().year
-                    year_options = list(
-                        range(current_year, 1969, -1)
+                with st.form(
+                    key=f"company_metadata_{candidate_id}",
+                    clear_on_submit=False,
+                ):
+                    company = st.text_input(
+                        "Company",
+                        key=f"company_{candidate_id}",
                     )
 
                     st.markdown("**When did you start?**")
@@ -838,49 +843,77 @@ def render_profile_onboarding(
                         key=f"current_role_{candidate_id}",
                     )
 
-                    end_month = None
-                    end_year = None
+                    st.markdown("**When did you leave?**")
+                    st.caption(
+                        "Leave these blank if you currently work here."
+                    )
 
-                    if not currently_here:
-                        st.markdown("**When did you leave?**")
+                    end_month_col, end_year_col = st.columns(2)
 
-                        end_month_col, end_year_col = st.columns(2)
+                    with end_month_col:
+                        end_month = st.selectbox(
+                            "End month",
+                            options=month_options,
+                            index=None,
+                            format_func=lambda value: (
+                                month_labels[value]
+                            ),
+                            placeholder="Month",
+                            label_visibility="collapsed",
+                            key=f"end_month_{candidate_id}",
+                        )
 
-                        with end_month_col:
-                            end_month = st.selectbox(
-                                "End month",
-                                options=month_options,
-                                index=None,
-                                format_func=lambda value: (
-                                    month_labels[value]
-                                ),
-                                placeholder="Month",
-                                label_visibility="collapsed",
-                                key=f"end_month_{candidate_id}",
-                            )
+                    with end_year_col:
+                        end_year = st.selectbox(
+                            "End year",
+                            options=year_options,
+                            index=None,
+                            placeholder="Year",
+                            label_visibility="collapsed",
+                            key=f"end_year_{candidate_id}",
+                        )
 
-                        with end_year_col:
-                            end_year = st.selectbox(
-                                "End year",
-                                options=year_options,
-                                index=None,
-                                placeholder="Year",
-                                label_visibility="collapsed",
-                                key=f"end_year_{candidate_id}",
-                            )
+                    begin = st.form_submit_button(
+                        "Start company interview",
+                        type="primary",
+                        use_container_width=True,
+                    )
 
-                    begin = st.button('Start company interview', type='primary')
                 if begin:
-                    if not company.strip() or start_month is None or start_year is None or (
-                        not currently_here and (end_month is None or end_year is None)):
-                        st.warning('Add company and dates before continuing.')
+                    if (
+                        not company.strip()
+                        or start_month is None
+                        or start_year is None
+                        or (
+                            not currently_here
+                            and (
+                                end_month is None
+                                or end_year is None
+                            )
+                        )
+                    ):
+                        st.warning(
+                            "Add company and dates before continuing."
+                        )
                     else:
                         try:
-                            st.session_state['_voice_company_draft_' + scope] = start_interview(
-                                scope, candidate_id, company, f'{start_year:04d}-{start_month:02d}',
-                                None if currently_here else f'{end_year:04d}-{end_month:02d}')
+                            st.session_state[
+                                '_voice_company_draft_' + scope
+                            ] = start_interview(
+                                scope,
+                                candidate_id,
+                                company,
+                                f'{start_year:04d}-{start_month:02d}',
+                                (
+                                    None
+                                    if currently_here
+                                    else f'{end_year:04d}-{end_month:02d}'
+                                ),
+                            )
                         except ValueError:
-                            st.warning('Check company and dates.')
+                            st.warning(
+                                "Check company and dates."
+                            )
                         else:
                             st.rerun()
 

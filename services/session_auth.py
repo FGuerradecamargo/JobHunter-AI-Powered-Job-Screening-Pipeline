@@ -359,8 +359,9 @@ def require_login() -> AppUser:
     return require_authenticated_user()
 
 
-def render_logout_button() -> None:
-    user = get_authenticated_user()
+def render_logout_button(*, authenticated_user: AppUser | None = None) -> None:
+    # Callers may reuse authentication resolved during this same render only.
+    user = authenticated_user if authenticated_user is not None else get_authenticated_user()
 
     if user is None:
         return

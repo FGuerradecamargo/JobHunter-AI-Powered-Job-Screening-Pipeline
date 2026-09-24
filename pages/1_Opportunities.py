@@ -76,7 +76,7 @@ user_context = (
 
 active_user = user_context.active_user
 
-render_logout_button()
+render_logout_button(authenticated_user=authenticated_user)
 
 repository = JobSearchRepository()
 candidate_repository = CandidateRepository()
@@ -610,24 +610,25 @@ st.html(
     """
 )
 
-target_label = st.selectbox(
-    "How many opportunities would you like me to find?",
-    list(OPPORTUNITY_TARGETS.keys()),
-    index=1,
-    disabled=st.session_state["scan_in_progress"],
-)
-target_opportunities = OPPORTUNITY_TARGETS[target_label]
+with st.form("opportunity_search_controls"):
+    target_label = st.selectbox(
+        "How many opportunities would you like me to find?",
+        list(OPPORTUNITY_TARGETS.keys()),
+        index=1,
+        disabled=st.session_state["scan_in_progress"],
+    )
+    target_opportunities = OPPORTUNITY_TARGETS[target_label]
 
-st.button(
-    "Searching for opportunities..."
-    if st.session_state["scan_in_progress"]
-    else "Find opportunities for me",
-    type="primary",
-    use_container_width=True,
-    disabled=(st.session_state["scan_in_progress"] or analysis_service is None
-              or not search_execution_ready),
-    on_click=request_opportunity_scan,
-)
+    st.form_submit_button(
+        "Searching for opportunities..."
+        if st.session_state["scan_in_progress"]
+        else "Find opportunities for me",
+        type="primary",
+        use_container_width=True,
+        disabled=(st.session_state["scan_in_progress"] or analysis_service is None
+                  or not search_execution_ready),
+        on_click=request_opportunity_scan,
+    )
 if analysis_configuration_error:
     st.caption(analysis_configuration_error)
 
@@ -754,11 +755,7 @@ if search_run is not None:
     st.session_state["last_scan_total"] = aggregate["selected"]
     st.session_state["last_links_created"] = search_run.links_created
     st.session_state["last_scan_target"] = search_run.target
-    st.session_state["last_pool_remaining"] = repository.count_jobs_to_analyze_for_candidate(
-        candidate_id=candidate_id,
-        analysis_version=ANALYSIS_VERSION,
-        candidate_signature=candidate_signature,
-    )
+    st.session_state["last_pool_remaining"] = pool_available
     st.session_state["scan_in_progress"] = search_run.status == "running"
     if search_run.status == "stopped":
         st.info(f"Search stopped. {aggregate['opportunities_found']} opportunities kept.")

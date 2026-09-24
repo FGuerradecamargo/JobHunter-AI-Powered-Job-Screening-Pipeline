@@ -27,6 +27,7 @@ candidate_id = "candidate"
 candidate_signature = "signature"
 ANALYSIS_VERSION = "version"
 repository = SimpleNamespace(count_jobs_to_analyze_for_candidate=lambda **kw: 1322)
+pool_available = repository.count_jobs_to_analyze_for_candidate()
 stop_opportunity_scan = lambda *args: None
 ''' + ast.get_source_segment(source, empty) + f'''
 aggregate = empty_scan_result()
