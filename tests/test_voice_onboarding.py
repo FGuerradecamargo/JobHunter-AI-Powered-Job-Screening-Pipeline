@@ -214,6 +214,6 @@ def test_logout_cleanup_removes_only_onboarding_and_auth_state(monkeypatch):
     class Cookies(dict):
         def save(self): pass
     monkeypatch.setattr(session_auth, 'st', SimpleNamespace(session_state=state))
-    monkeypatch.setattr(session_auth, 'cookies', Cookies())
+    monkeypatch.setattr(session_auth, '_get_cookies', lambda: Cookies())
     session_auth._clear_local_session()
     assert state == {'unrelated':'keep', 'reauthentication_required':True}

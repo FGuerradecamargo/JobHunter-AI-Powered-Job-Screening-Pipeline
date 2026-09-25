@@ -4,6 +4,7 @@ import os
 import secrets
 
 import streamlit as st
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 from streamlit_cookies_manager import EncryptedCookieManager
 
 from models.app_user import AppUser
@@ -60,13 +61,26 @@ def _resolve_session_cookie_key() -> str:
 SESSION_COOKIE_KEY = _resolve_session_cookie_key()
 
 
-cookies = EncryptedCookieManager(
-    prefix="jobhunter_",
-    password=SESSION_COOKIE_KEY,
-)
+def _get_cookies() -> EncryptedCookieManager:
+    context = get_script_run_ctx()
+    if context is None:
+        raise RuntimeError("Authentication requires a Streamlit session context.")
 
-if not cookies.ready():
-    st.stop()
+    # Streamlit replaces cursors on each script run. Reuse only within that run
+    # to avoid duplicate component keys, never across browsers or reruns.
+    runtime = getattr(context, "_workpilot_cookie_runtime", None)
+    if runtime is None or runtime[0] is not context.cursors:
+        cookies = EncryptedCookieManager(
+            prefix="jobhunter_",
+            password=SESSION_COOKIE_KEY,
+        )
+        context._workpilot_cookie_runtime = (context.cursors, cookies)
+    else:
+        cookies = runtime[1]
+
+    if not cookies.ready():
+        st.stop()
+    return cookies
 
 
 def _hash_session_token(
@@ -105,6 +119,7 @@ def _parse_utc_datetime(value: str) -> datetime:
 
 
 def _clear_local_session() -> None:
+    cookies = _get_cookies()
     for key in (
         "opportunity_search_run", "scan_requested", "scan_in_progress",
         "last_scan_result", "last_scan_total", "last_links_created",
@@ -130,6 +145,7 @@ def _expire_local_session() -> None:
 
 
 def get_authenticated_user() -> AppUser | None:
+    cookies = _get_cookies()
     ensure_session_table()
 
     token = cookies.get(
@@ -233,6 +249,7 @@ def get_current_user() -> AppUser | None:
 def login_user(
     user: AppUser,
 ) -> None:
+    cookies = _get_cookies()
     ensure_session_table()
 
     token = secrets.token_urlsafe(48)
@@ -297,6 +314,7 @@ def revoke_user_sessions(
 
 
 def logout_user() -> None:
+    cookies = _get_cookies()
     token = cookies.get(
         SESSION_COOKIE
     )

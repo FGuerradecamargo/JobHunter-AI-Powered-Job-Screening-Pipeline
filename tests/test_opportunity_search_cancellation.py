@@ -254,7 +254,7 @@ def test_logout_or_expiry_discards_run_and_search_cache():
     class Cookies(dict):
         def save(self):
             pass
-    env = dict(st=SimpleNamespace(session_state=state), cookies=Cookies(), SESSION_COOKIE="session")
+    env = dict(st=SimpleNamespace(session_state=state), _get_cookies=Cookies, SESSION_COOKIE="session")
     exec(compile(ast.Module(body=[function], type_ignores=[]), "session_auth", "exec"), env)
     env["_clear_local_session"]()
     assert set(state) == {"reauthentication_required"}

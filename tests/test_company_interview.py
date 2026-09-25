@@ -352,7 +352,7 @@ def test_logout_removes_company_audio(monkeypatch):
     monkeypatch.setattr(auth.st, 'session_state', state)
     class Cookies(dict):
         def save(self): pass
-    monkeypatch.setattr(auth, 'cookies', Cookies())
+    monkeypatch.setattr(auth, '_get_cookies', lambda: Cookies())
     auth._clear_local_session()
     assert not any(k.startswith('_voice_') for k in state)
 

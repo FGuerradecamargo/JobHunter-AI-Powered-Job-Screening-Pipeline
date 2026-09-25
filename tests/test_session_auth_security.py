@@ -254,8 +254,8 @@ def session_runtime(
 
     monkeypatch.setattr(
         session_auth,
-        "cookies",
-        cookies,
+        "_get_cookies",
+        lambda: cookies,
     )
 
     monkeypatch.setattr(
