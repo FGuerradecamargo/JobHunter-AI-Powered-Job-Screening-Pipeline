@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from parser.email_job_parser import (
     extract_jobs_from_email,
 )
-from services.database import (
-    upsert_raw_job,
-)
+from services.job_observation_repository import JobObservationRepository
 from services.gmail_message_repository import (
     GmailMessageRepository,
 )
@@ -121,17 +119,13 @@ class GmailJobProcessor:
                 jobs_found += len(jobs)
 
                 for job in jobs.values():
-                    result = upsert_raw_job(job)
-
                     source_type = (
                         "gmail_"
                         + parsed.source
                     )
 
-                    self._job_source_repository.add_source(
-                        job_id=job.id,
-                        user_id=user_id,
-                        source_type=source_type,
+                    _, result = JobObservationRepository(self._job_source_repository).record(
+                        job, source_type, user_id=user_id,
                     )
 
                     if result == "created":

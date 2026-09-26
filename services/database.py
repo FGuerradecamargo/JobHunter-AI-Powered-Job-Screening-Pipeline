@@ -2660,6 +2660,8 @@ def initialize_database() -> None:
         initialize_sqlite_database()
     with get_connection() as connection:
         create_company_interview_schema(connection)
+        from services.job_observation_schema import migrate_job_observations
+        migrate_job_observations(connection, postgres=is_postgres())
 
 
 def create_company_interview_schema(connection):
@@ -2742,17 +2744,7 @@ def upsert_recommendation(
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
-            ON CONFLICT(id) DO UPDATE SET
-                title = excluded.title,
-                company = excluded.company,
-                location = excluded.location,
-                url = excluded.url,
-                recommendation = excluded.recommendation,
-                competitive_status = excluded.competitive_status,
-                current_fit = excluded.current_fit,
-                growth_value = excluded.growth_value,
-                analysis_json = excluded.analysis_json,
-                updated_at = excluded.updated_at
+            ON CONFLICT(id) DO NOTHING
             """,
             (
                 job_id,
@@ -3399,12 +3391,14 @@ def update_candidate_job_notes(
 
 def upsert_raw_job(
     job: Job,
+    *,
+    _connection=None,
 ) -> str:
     """
     Insere uma vaga nova no pool compartilhado.
 
-    Se a vaga já existir, atualiza apenas quando o novo
-    raw_text possui mais informações.
+    Existing records are immutable through this unscoped compatibility writer.
+    Updates require explicit provenance in JobObservationRepository.
     """
     job_id = str(job.id).strip()
 
@@ -3427,7 +3421,8 @@ def upsert_raw_job(
         raw_text=job.raw_text or "",
     )
 
-    with get_connection() as connection:
+    from contextlib import nullcontext
+    with (nullcontext(_connection) if _connection is not None else get_connection()) as connection:
         existing_row = connection.execute(
             """
             SELECT
@@ -3486,58 +3481,7 @@ def upsert_raw_job(
 
             return "created"
 
-        current_raw_text = (
-            existing_row["raw_text"]
-            or ""
-        )
-
-        new_raw_text = job.raw_text or ""
-
-        if len(new_raw_text) <= len(
-            current_raw_text
-        ):
-            return "unchanged"
-
-        connection.execute(
-            """
-            UPDATE jobs
-            SET
-                raw_text = ?,
-                description = COALESCE(?, description),
-                title = COALESCE(?, title),
-                company = COALESCE(?, company),
-                location = COALESCE(?, location),
-                url = COALESCE(?, url),
-                remote = COALESCE(?, remote),
-                salary = COALESCE(?, salary),
-                easy_apply = ?,
-                category = ?,
-                sub_category = ?,
-                updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                new_raw_text,
-                job.description,
-                job.title,
-                job.company,
-                job.location,
-                job.url,
-                (
-                    None
-                    if job.remote is None
-                    else int(job.remote)
-                ),
-                job.salary,
-                int(job.easy_apply),
-                job_category.category,
-                job_category.sub_category,
-                now,
-                job_id,
-            ),
-        )
-
-        return "updated"
+        return "unchanged"
 
 
 def ensure_candidate_job_analysis(
@@ -4467,12 +4411,19 @@ def update_shared_job_analysis_data(
             SET
                 description = ?,
                 updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND url = ?
+                AND (description IS NULL OR description = '')
+                AND EXISTS (
+                    SELECT 1 FROM job_content_authority a
+                    JOIN job_observations o ON o.observation_id = a.observation_id
+                    WHERE a.job_id = jobs.id AND o.user_id IS NULL
+                )
             """,
             (
                 job.description,
                 utc_now(),
                 str(job.id),
+                job.url,
             ),
         )
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from contextlib import nullcontext
 
 from services.database import get_connection
 from services.job_observation import is_personal_source
@@ -12,6 +13,8 @@ class JobSourceRepository:
         job_id: str,
         source_type: str,
         user_id: str | None = None,
+        *,
+        connection=None,
     ) -> None:
         source_type = str(source_type or "").strip().lower()
         if not source_type or (user_id is not None and not str(user_id).strip()):
@@ -22,7 +25,7 @@ class JobSourceRepository:
             datetime.now(timezone.utc).isoformat()
         )
 
-        with get_connection() as connection:
+        with (nullcontext(connection) if connection is not None else get_connection()) as connection:
             if user_id is None:
                 connection.execute(
                     """

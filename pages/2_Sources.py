@@ -16,7 +16,6 @@ from models.gmail_connection import GmailConnection
 from models.job import Job
 from services.database import (
     initialize_database,
-    upsert_raw_job,
 )
 from services.job_source_repository import JobSourceRepository
 from services.gmail_message_repository import GmailMessageRepository
@@ -630,14 +629,9 @@ if manual_submit:
                 description=description,
             )
 
-            upsert_raw_job(
-                manual_job
-            )
-
-            job_source_repository.add_source(
-                job_id=job_id,
-                user_id=selected_user.id,
-                source_type="manual",
+            from services.job_observation_repository import JobObservationRepository
+            JobObservationRepository(job_source_repository).record(
+                manual_job, "manual", user_id=selected_user.id,
             )
 
             st.success(

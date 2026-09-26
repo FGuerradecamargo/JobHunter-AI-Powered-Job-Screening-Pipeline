@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from models.job import Job
 
@@ -28,8 +28,10 @@ def normalize_observation(job: Job, source_type: str) -> JobObservation:
         parsed = urlsplit(url)
         if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError("Job observation URL is invalid.")
-        # Preserve path and query: these can contain the actual vacancy ID.
-        url = urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, parsed.fragment))
+        # Remove only known tracking keys; unknown query keys may identify a vacancy.
+        query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+                 if not key.lower().startswith("utm_") and key.lower() not in {"trackingid", "trk", "fbclid", "gclid"}]
+        url = urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, urlencode(query), parsed.fragment))
     job_id = external_id if external_id.startswith(source_type + ":") else source_type + ":" + external_id
     normalized = replace(
         job, id=job_id, title=title, url=url,
