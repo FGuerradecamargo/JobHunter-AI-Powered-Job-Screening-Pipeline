@@ -20,6 +20,23 @@ class ApplicationLifecycleService:
         self.repository = repository or ApplicationLifecycleRepository()
         self.clock = clock
 
+    def mark_ready_to_apply(self, candidate_id, job_id):
+        current = self.repository.get(candidate_id, job_id)
+        if current is None:
+            return self._missing(candidate_id, job_id)
+        if current["status"] == "applied":
+            return self._result("already_applied", current)
+        if current["status"] != "in_review":
+            return self._invalid_transition(candidate_id, job_id, current)
+        updated = self.repository.mark_ready_to_apply(candidate_id, job_id, self.clock())
+        if updated is None:
+            return self._missing(candidate_id, job_id)
+        if updated["status"] == "applied":
+            return self._result("already_applied", updated)
+        if updated["opportunity_state"] != "ready_to_apply":
+            return self._invalid_transition(candidate_id, job_id, updated)
+        return self._result("ready_to_apply", updated)
+
     def mark_applied(
         self,
         candidate_id: str,

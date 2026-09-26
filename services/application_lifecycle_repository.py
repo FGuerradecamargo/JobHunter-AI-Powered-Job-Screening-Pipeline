@@ -6,6 +6,16 @@ from services.database import get_connection
 
 
 class ApplicationLifecycleRepository:
+    def mark_ready_to_apply(self, candidate_id, job_id, updated_at):
+        with get_connection() as connection:
+            connection.execute(
+                """UPDATE candidate_job_analyses SET opportunity_state = 'ready_to_apply', updated_at = ?
+                   WHERE candidate_id = ? AND job_id = ? AND status = 'in_review'
+                     AND opportunity_state <> 'ready_to_apply'""",
+                (updated_at, candidate_id, job_id),
+            )
+        return self.get(candidate_id, job_id)
+
     def get(self, candidate_id: str, job_id: str) -> dict[str, Any] | None:
         with get_connection() as connection:
             row = connection.execute(

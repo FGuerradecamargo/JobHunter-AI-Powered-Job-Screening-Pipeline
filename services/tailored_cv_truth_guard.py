@@ -118,6 +118,8 @@ def _normalized_draft(draft: DraftTailoredCV) -> DraftTailoredCV:
 def validate_tailored_cv_draft(
     draft: DraftTailoredCV,
     context: ApplicationContext,
+    *,
+    require_text_grounding: bool = False,
 ) -> CVValidationResult:
     normalized = _normalized_draft(draft)
     issues = []
@@ -172,6 +174,12 @@ def validate_tailored_cv_draft(
                 known.append(item)
 
         allowed = _AUTHORITY_BY_CLAIM_TYPE.get(statement.claim_type, set())
+        if require_text_grounding and not any(
+            _normalize(statement.text).casefold().rstrip(".") == _normalize(item.statement).casefold().rstrip(".")
+            for item in known
+        ):
+            issues.append(_issue("unsupported_statement", location,
+                                 "Text requires explicit source support; review this claim."))
         unsupported_authorities = {
             item.authority for item in known if item.authority not in allowed
         }
@@ -222,6 +230,16 @@ def validate_tailored_cv_draft(
                         "Statement explicitly conflicts with a protected structural gap.",
                     )
                 )
+
+    if require_text_grounding:
+        for index, experience in enumerate(normalized.experiences):
+            sources = [item for item in authorized.values()
+                       if item.source_type == "professional_experience" and item.source_id == experience.source_experience_id]
+            if not any(_normalize(item.metadata.get("company", "")) == experience.company
+                       and _normalize(item.metadata.get("stated_role", "")) == experience.role
+                       for item in sources):
+                issues.append(_issue("unsupported_experience_header", f"experiences[{index}]",
+                                     "Employer and role must match source experience."))
 
     draft_signature = build_source_signature(
         {
