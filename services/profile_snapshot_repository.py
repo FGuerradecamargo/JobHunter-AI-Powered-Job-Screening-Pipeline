@@ -6,11 +6,21 @@ import json
 from models.hiring_case import RequirementImportance, EvidenceRequirement, TemporalRequirement
 from models.profile_interpretation import (
     AIJobProfileSnapshot,
+    CandidateFactCoverage,
+    CandidateLanguage,
+    CandidateLicence,
+    CandidatePreference,
+    CandidatePreferenceSemantic,
     CandidateProfileSnapshot,
+    CandidateWorkAuthorization,
+    CoverageState,
+    CredentialStatus,
     InterpretationAuthority,
     InterpretedJobNeed,
+    JobRequirementStatus,
     ProfileCapability,
     ProfileCheckpoint,
+    RequirementSubstitutability,
 )
 from services.database import get_connection, initialize_database
 
@@ -47,6 +57,21 @@ def _candidate_from_json(raw: str) -> CandidateProfileSnapshot:
         "evidence_gaps", "objectives", "preferences",
     ):
         data[name] = tuple(data.get(name, ()))
+    data["structured_preferences"] = tuple(
+        CandidatePreference(**{**item, "semantic": CandidatePreferenceSemantic(item["semantic"])})
+        for item in data.get("structured_preferences", ())
+    )
+    data["languages"] = tuple(CandidateLanguage(**item) for item in data.get("languages", ()))
+    data["licences"] = tuple(
+        CandidateLicence(**{**item, "status": CredentialStatus(item.get("status", "unknown"))})
+        for item in data.get("licences", ())
+    )
+    data["work_authorizations"] = tuple(
+        CandidateWorkAuthorization(**item) for item in data.get("work_authorizations", ())
+    )
+    data["fact_coverage"] = CandidateFactCoverage(**{
+        name: CoverageState(value) for name, value in data.get("fact_coverage", {}).items()
+    })
     return CandidateProfileSnapshot(**data)
 
 
@@ -58,6 +83,8 @@ def _job_from_json(raw: str) -> AIJobProfileSnapshot:
                 **item,
                 "importance": RequirementImportance(item["importance"]),
                 "authority": InterpretationAuthority(item["authority"]),
+                "requirement_status": JobRequirementStatus(item.get("requirement_status", "unknown")),
+                "substitutability": RequirementSubstitutability(item.get("substitutability", "unknown")),
                 "hard_fact_refs": tuple(item["hard_fact_refs"]),
                 "evidence_requirement": EvidenceRequirement(item.get("evidence_requirement", "defensible")),
                 "evidence_requirement_refs": tuple(item.get("evidence_requirement_refs", ())),

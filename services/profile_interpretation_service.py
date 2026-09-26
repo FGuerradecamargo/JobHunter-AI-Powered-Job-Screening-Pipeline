@@ -58,6 +58,11 @@ class ProfileInterpretationService:
             preferences=draft.preferences,
             seniority=draft.seniority,
             responsibility_scope=draft.responsibility_scope,
+            structured_preferences=draft.structured_preferences,
+            languages=draft.languages,
+            licences=draft.licences,
+            work_authorizations=draft.work_authorizations,
+            fact_coverage=draft.fact_coverage,
         )
         self.repository.save_candidate(profile)
         return profile

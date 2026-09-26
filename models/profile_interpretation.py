@@ -23,6 +23,49 @@ class InterpretationAuthority(str, Enum):
     UNKNOWN = "unknown"
 
 
+class CoverageState(str, Enum):
+    """How complete the source layer is for a finite candidate fact family."""
+
+    CONFIRMED_COMPLETE = "confirmed_complete"
+    PARTIAL = "partial"
+    UNKNOWN = "unknown"
+
+
+class CandidatePreferenceSemantic(str, Enum):
+    """Preference and constraint semantics must never be conflated."""
+
+    PREFERENCE = "preference"
+    ALLOWED_SET = "allowed_set"
+    CONSTRAINT = "constraint"
+
+
+class CredentialStatus(str, Enum):
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    PENDING = "pending"
+    UNKNOWN = "unknown"
+
+
+class JobRequirementStatus(str, Enum):
+    REQUIRED = "required"
+    PREFERRED = "preferred"
+    USEFUL = "useful"
+    EXPLICITLY_NOT_REQUIRED = "explicitly_not_required"
+    UNKNOWN = "unknown"
+
+
+class RequirementSubstitutability(str, Enum):
+    NON_SUBSTITUTABLE = "non_substitutable"
+    SUBSTITUTABLE = "substitutable"
+    UNKNOWN = "unknown"
+
+
+class RequirementRelevance(str, Enum):
+    CORE = "core"
+    SUPPORTING = "supporting"
+    MINOR = "minor"
+
+
 def _clean(value: str) -> str:
     return " ".join(str(value or "").split())
 
@@ -43,6 +86,110 @@ class SourceEvidence:
             raise ValueError("Candidate profile evidence must have source_fact authority.")
         if not _clean(self.ref) or not _clean(self.source_type):
             raise ValueError("Source evidence identity and type are required.")
+
+
+@dataclass(frozen=True)
+class CandidateFactCoverage:
+    """
+    Completeness metadata for finite candidate facts.
+
+    A missing item may only be treated as confirmed absence when the
+    corresponding family is CONFIRMED_COMPLETE. This encodes the V1 rule:
+    not found != absent.
+    """
+
+    languages: CoverageState = CoverageState.UNKNOWN
+    licences: CoverageState = CoverageState.UNKNOWN
+    work_authorizations: CoverageState = CoverageState.UNKNOWN
+    constraints: CoverageState = CoverageState.UNKNOWN
+    compensation: CoverageState = CoverageState.UNKNOWN
+    work_modes: CoverageState = CoverageState.UNKNOWN
+    employment_types: CoverageState = CoverageState.UNKNOWN
+
+    def confirms_absence(self, dimension: str) -> bool:
+        if dimension not in {
+            "languages",
+            "licences",
+            "work_authorizations",
+            "constraints",
+            "compensation",
+            "work_modes",
+            "employment_types",
+        }:
+            raise ValueError(f"Unknown candidate fact dimension: {dimension}")
+        return getattr(self, dimension) is CoverageState.CONFIRMED_COMPLETE
+
+
+@dataclass(frozen=True)
+class CandidateLanguage:
+    name: str
+    proficiency: str = ""
+    evidence_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", _clean(self.name))
+        object.__setattr__(self, "proficiency", _clean(self.proficiency))
+        object.__setattr__(self, "evidence_refs", _refs(self.evidence_refs))
+        if not self.name:
+            raise ValueError("Language name is required.")
+        if not self.evidence_refs:
+            raise ValueError("Candidate language requires source evidence refs.")
+
+
+@dataclass(frozen=True)
+class CandidateLicence:
+    name: str
+    jurisdiction: str = ""
+    status: CredentialStatus = CredentialStatus.UNKNOWN
+    expiry: str = ""
+    evidence_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", _clean(self.name))
+        object.__setattr__(self, "jurisdiction", _clean(self.jurisdiction))
+        object.__setattr__(self, "expiry", _clean(self.expiry))
+        object.__setattr__(self, "evidence_refs", _refs(self.evidence_refs))
+        if not isinstance(self.status, CredentialStatus):
+            raise ValueError("Invalid credential status.")
+        if not self.name:
+            raise ValueError("Licence/certification name is required.")
+        if not self.evidence_refs:
+            raise ValueError("Candidate licence requires source evidence refs.")
+
+
+@dataclass(frozen=True)
+class CandidateWorkAuthorization:
+    jurisdiction: str
+    status: str = ""
+    evidence_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "jurisdiction", _clean(self.jurisdiction))
+        object.__setattr__(self, "status", _clean(self.status))
+        object.__setattr__(self, "evidence_refs", _refs(self.evidence_refs))
+        if not self.jurisdiction:
+            raise ValueError("Work-authorization jurisdiction is required.")
+        if not self.evidence_refs:
+            raise ValueError("Work authorization requires source evidence refs.")
+
+
+@dataclass(frozen=True)
+class CandidatePreference:
+    kind: str
+    value: str
+    semantic: CandidatePreferenceSemantic
+    evidence_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kind", _clean(self.kind))
+        object.__setattr__(self, "value", _clean(self.value))
+        object.__setattr__(self, "evidence_refs", _refs(self.evidence_refs))
+        if not isinstance(self.semantic, CandidatePreferenceSemantic):
+            raise ValueError("Invalid candidate preference semantic.")
+        if not self.kind or not self.value:
+            raise ValueError("Candidate preference kind and value are required.")
+        if not self.evidence_refs:
+            raise ValueError("Candidate preference requires source evidence refs.")
 
 
 @dataclass(frozen=True)
@@ -97,6 +244,11 @@ class CandidateProfileSnapshot:
     preferences: tuple[str, ...] = ()
     seniority: str = ""
     responsibility_scope: str = ""
+    structured_preferences: tuple[CandidatePreference, ...] = ()
+    languages: tuple[CandidateLanguage, ...] = ()
+    licences: tuple[CandidateLicence, ...] = ()
+    work_authorizations: tuple[CandidateWorkAuthorization, ...] = ()
+    fact_coverage: CandidateFactCoverage = field(default_factory=CandidateFactCoverage)
     supersedes_version: int | None = None
     schema_version: str = CANDIDATE_PROFILE_SCHEMA_VERSION
 
@@ -110,6 +262,17 @@ class CandidateProfileSnapshot:
         for capability in self.capabilities:
             if not set(capability.evidence_refs).issubset(available):
                 raise ValueError("Capability evidence refs must exist in the source snapshot.")
+        for item in (
+            *self.structured_preferences,
+            *self.languages,
+            *self.licences,
+            *self.work_authorizations,
+        ):
+            if not set(item.evidence_refs).issubset(available):
+                raise ValueError("Structured candidate facts must cite the source snapshot.")
+
+    def can_confirm_absence(self, dimension: str) -> bool:
+        return self.fact_coverage.confirms_absence(dimension)
 
 
 @dataclass(frozen=True)
@@ -127,6 +290,8 @@ class HardJobFact:
     required_version: str = ""
     superseded_versions: tuple[str, ...] = ()
     material_change_on: str = ""
+    requirement_status: JobRequirementStatus = JobRequirementStatus.UNKNOWN
+    substitutability: RequirementSubstitutability = RequirementSubstitutability.UNKNOWN
 
     def __post_init__(self) -> None:
         if not self.explicit:
@@ -139,6 +304,10 @@ class HardJobFact:
             raise ValueError("Invalid evidence requirement.")
         if self.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED and not _clean(self.constraint_need_id):
             raise ValueError("Direct evidence constraints must identify their requirement.")
+        if not isinstance(self.requirement_status, JobRequirementStatus):
+            raise ValueError("Invalid requirement status.")
+        if not isinstance(self.substitutability, RequirementSubstitutability):
+            raise ValueError("Invalid requirement substitutability.")
         if not all(_clean(item) for item in (self.fact_id, self.kind, self.value, self.source_ref)):
             raise ValueError("Hard job facts require identity, value and provenance.")
 
@@ -168,6 +337,8 @@ class InterpretedJobNeed:
     evidence_requirement_refs: tuple[str, ...] = ()
     temporal_requirement: TemporalRequirement = TemporalRequirement.NOT_REQUIRED
     temporal_requirement_refs: tuple[str, ...] = ()
+    requirement_status: JobRequirementStatus = JobRequirementStatus.UNKNOWN
+    substitutability: RequirementSubstitutability = RequirementSubstitutability.UNKNOWN
 
     def __post_init__(self) -> None:
         if not isinstance(self.temporal_requirement, TemporalRequirement):
@@ -176,11 +347,37 @@ class InterpretedJobNeed:
         if not isinstance(self.evidence_requirement, EvidenceRequirement):
             raise ValueError("Invalid evidence requirement.")
         object.__setattr__(self, "evidence_requirement_refs", _refs(self.evidence_requirement_refs))
+        if not isinstance(self.requirement_status, JobRequirementStatus):
+            raise ValueError("Invalid requirement status.")
+        if not isinstance(self.substitutability, RequirementSubstitutability):
+            raise ValueError("Invalid requirement substitutability.")
         object.__setattr__(self, "hard_fact_refs", _refs(self.hard_fact_refs))
         if not self.hard_fact_refs:
             raise ValueError("Interpreted job needs require hard-fact provenance.")
         if self.authority is not InterpretationAuthority.EXPLICIT and self.hard_blocker:
             raise ValueError("Only explicit hard facts may create a hard blocker.")
+        if self.hard_blocker and self.requirement_status in {
+            JobRequirementStatus.PREFERRED,
+            JobRequirementStatus.USEFUL,
+            JobRequirementStatus.EXPLICITLY_NOT_REQUIRED,
+        }:
+            raise ValueError("A non-required job need cannot be a hard blocker.")
+
+    @property
+    def performance_relevance(self) -> RequirementRelevance:
+        return {
+            RequirementImportance.CORE: RequirementRelevance.CORE,
+            RequirementImportance.IMPORTANT: RequirementRelevance.SUPPORTING,
+            RequirementImportance.NICE_TO_HAVE: RequirementRelevance.MINOR,
+        }[self.importance]
+
+    @property
+    def is_non_substitutable_required(self) -> bool:
+        return (
+            self.authority is InterpretationAuthority.EXPLICIT
+            and self.requirement_status is JobRequirementStatus.REQUIRED
+            and self.substitutability is RequirementSubstitutability.NON_SUBSTITUTABLE
+        )
 
 
 @dataclass(frozen=True)
@@ -229,6 +426,11 @@ class CandidateProfileDraft:
     preferences: tuple[str, ...] = ()
     seniority: str = ""
     responsibility_scope: str = ""
+    structured_preferences: tuple[CandidatePreference, ...] = ()
+    languages: tuple[CandidateLanguage, ...] = ()
+    licences: tuple[CandidateLicence, ...] = ()
+    work_authorizations: tuple[CandidateWorkAuthorization, ...] = ()
+    fact_coverage: CandidateFactCoverage = field(default_factory=CandidateFactCoverage)
 
 
 @dataclass(frozen=True)
