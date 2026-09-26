@@ -14,6 +14,7 @@ import os
 
 from models.gmail_connection import GmailConnection
 from models.job import Job
+from services.system_state_presenter import gmail_notice
 from services.database import (
     initialize_database,
     upsert_raw_job,
@@ -288,10 +289,7 @@ if gmail_connected:
         )
 
 else:
-    st.info(
-        "Connect Gmail to bring your job alerts "
-        "into WorkPilot automatically."
-    )
+    st.info(gmail_notice(connected=False).message)
 
 
 if "gmail_authorization_url" not in st.session_state:

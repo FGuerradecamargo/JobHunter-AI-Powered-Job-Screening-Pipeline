@@ -2,6 +2,10 @@ import logging
 from services.historical_cv_presenter import normalize_historical_cv
 from services.opportunity_search_run import OpportunitySearchRun
 from services.ai.prompt_builder import BATCH_MAX_SIZE
+from models.system_state import SearchRunState
+from services.system_state_presenter import (
+    search_progress_message, stopped_search_message, analysis_unavailable_notice, search_notice,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -741,13 +745,11 @@ if search_run is not None:
             on_click=stop_opportunity_scan,
             args=(search_scope, search_run.scan_id),
         )
-        st.info(
-            "Searching for opportunities...\n\n"
-            f"Reviewed: {search_run.aggregate['selected']}\n\n"
-            f"Passed initial screening: {search_run.aggregate['ai_eligible']}\n\n"
-            f"Preparing deeper analysis: {len(search_run.prepared_job_ids)}/{BATCH_MAX_SIZE}\n\n"
-            "WorkPilot is still searching."
-        )
+        st.info(search_progress_message(
+            reviewed=search_run.aggregate['selected'],
+            ai_eligible=search_run.aggregate['ai_eligible'],
+            buffered=len(search_run.prepared_job_ids), batch_max=BATCH_MAX_SIZE,
+        ))
 
     aggregate = search_run.aggregate
     aggregate["target_reached"] = aggregate["opportunities_found"] >= search_run.target
@@ -758,12 +760,9 @@ if search_run is not None:
     st.session_state["last_pool_remaining"] = pool_available
     st.session_state["scan_in_progress"] = search_run.status == "running"
     if search_run.status == "stopped":
-        st.info(f"Search stopped. {aggregate['opportunities_found']} opportunities kept.")
+        st.info(stopped_search_message(opportunities_kept=aggregate['opportunities_found']))
     elif search_run.status == "failed" and not aggregate.get("provider_quota_exhausted"):
-        st.warning(
-            "Search could not finish. Already saved opportunities are kept. "
-            "You can start a new search."
-        )
+        st.warning(search_notice(SearchRunState.ERROR).message)
 
 
 scan_result = st.session_state.get(
@@ -899,11 +898,7 @@ if scan_result and not st.session_state.get("scan_in_progress", False):
     )
 
     if scan_result.get("provider_quota_exhausted"):
-        st.warning(
-            "We couldn't continue the deeper analysis right now. "
-            "Your existing results are safe, and these opportunities "
-            "can be analyzed again later."
-        )
+        st.warning(analysis_unavailable_notice().message)
     elif failed:
         st.warning(
             f"{failed} job(s) failed during analysis."

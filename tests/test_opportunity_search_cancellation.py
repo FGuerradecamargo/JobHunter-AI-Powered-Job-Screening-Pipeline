@@ -292,6 +292,8 @@ import streamlit as st
 from types import SimpleNamespace
 from unittest.mock import Mock
 from services.opportunity_search_run import OpportunitySearchRun
+from models.system_state import SearchRunState
+from services.system_state_presenter import search_progress_message, stopped_search_message, search_notice
 authenticated_user = SimpleNamespace(id="actor")
 active_user = SimpleNamespace(id="owner")
 candidate_id = "candidate"

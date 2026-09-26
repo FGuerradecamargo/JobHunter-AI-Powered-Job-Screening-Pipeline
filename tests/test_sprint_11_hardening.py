@@ -229,7 +229,7 @@ class OutcomeRepository:
 @pytest.mark.parametrize(
     ("legacy_status", "expected", "actions"),
     [
-        ("in_process", "Interview", ["final_interview", "rejected", "withdrawn"]),
+        ("in_process", "Interview", ["final_interview", "offer", "rejected", "withdrawn", "no_response"]),
         ("rejected_before_interview", "Rejected", []),
         ("rejected_after_interview", "Rejected", []),
         ("offer", "Offer", ["accepted", "declined", "withdrawn"]),
