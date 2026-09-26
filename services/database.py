@@ -648,6 +648,8 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "candidate_interview_rounds",
         "candidate_interview_round_feedback",
         "company_interview_answers",
+        "candidate_product_state",
+        "candidate_product_state_events",
     }
 )
 
@@ -2753,6 +2755,33 @@ def initialize_database() -> None:
     with get_connection() as connection:
         create_company_interview_schema(connection)
         create_interview_round_schema(connection)
+        create_product_state_schema(connection)
+
+
+def create_product_state_schema(connection) -> None:
+    """Additive V1 migration. Legacy candidates retain implicit SEARCH on reads."""
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_product_state (
+        candidate_id TEXT PRIMARY KEY REFERENCES candidates(id) ON DELETE CASCADE,
+        state_json TEXT NOT NULL
+    )""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_product_state_events (
+        candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        before_json TEXT NOT NULL, after_json TEXT NOT NULL,
+        PRIMARY KEY (candidate_id, sequence)
+    )""")
+    for table in ("candidate_product_state", "candidate_product_state_events"):
+        _enable_server_only_row_level_security(connection, table)
+        if is_postgres():
+            connection.execute(f"REVOKE ALL ON TABLE {table} FROM PUBLIC")
+            connection.execute(f"""DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                    REVOKE ALL ON TABLE {table} FROM anon;
+                END IF;
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                    REVOKE ALL ON TABLE {table} FROM authenticated;
+                END IF;
+            END $$""")
 
 
 def create_company_interview_schema(connection):
