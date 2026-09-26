@@ -46,3 +46,31 @@ writers must reload after a version conflict. Historical versions stay available
 
 Real PostgreSQL migration and provider/browser integration remain E2E checks;
 offline tests are not evidence that production has been migrated or switched.
+
+## Block 7
+
+`CandidateProfileSnapshot x MarketProfile -> CandidateMarketAssessment ->
+CandidateImprovementPlan` is the official V1 relationship contract.
+CandidateMarketService loads the authorized candidate's snapshot and the global
+segment independently. It rejects mismatched ownership/segments and missing
+snapshots instead of silently falling back to the old candidate-history market.
+The caller remains responsible for resolving the authenticated active candidate.
+
+Relationships/plans carry candidate version/memory signature and market
+version/source signature. They are deterministic projections, not new facts or
+mutable writes to either source. Historical source snapshots remain available;
+the relationship can be rebuilt from them without another AI call.
+
+BUILD requires an explicit confirmed gap in the candidate snapshot with source
+provenance. Unobserved skills remain unknown (EXPLORE); transferable or explicit
+evidence gaps produce PROVE. Contradictory capability/gap evidence stays unknown.
+Known objectives alone do not establish alignment: role-family equality using
+the existing alias normalizer is required. Other/free-text relationships stay
+unknown rather than guessing semantic equivalence. NOW/NEXT/WATCH are attention
+bands over the observed sample, never orders or candidate quality scores.
+
+The legacy CurrentMarketPosition/GapAndLeverage/ImprovementPlan UI chain is
+KEEP-for-compatibility, REPLACE-at-cutover. No second global authority is added
+to that chain. The new service is tested independently; wiring ingestion and
+the current UI to the official profiles remains an explicit integration step.
+Do not claim a production UI cutover or delete the compatibility path yet.

@@ -1,3 +1,5 @@
+"""Transitional candidate-history projection, not authoritative global MarketProfile."""
+
 from models.current_market_position import CurrentMarketPosition
 from services.career_evidence_service import CareerEvidenceService
 from services.career_objective_repository import CareerObjectiveRepository
