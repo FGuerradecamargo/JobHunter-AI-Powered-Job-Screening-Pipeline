@@ -10,6 +10,12 @@ from services.ai.voice_transcription import VoiceConfig
 from tests.company_interview_fakes import FakeReflection
 
 class Repo:
+    def get_company_draft(self, candidate_id, experience_id=None): return None
+    def begin_company_interview(self, **kw): st.session_state.started_draft = kw
+    def save_company_answer(self, **kw):
+        from models.company_interview import validate_single_answer
+        validate_single_answer(kw['answer'])
+        st.session_state.confirmed_draft_answers = [*st.session_state.get('confirmed_draft_answers', []), kw['answer']]
     def get_onboarding(self, candidate_id): return st.session_state.get('saved_onboarding')
     def list_work_experiences(self, candidate_id): return st.session_state.get('saved_experiences', [])
     def save_onboarding(self, item): st.session_state.saved_onboarding = item

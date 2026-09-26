@@ -548,7 +548,7 @@ def _render_workpilot_side_panel(step):
 
 
 from components.company_interview import render_company_interview
-from services.company_interview import start_interview
+from services.company_interview import start_interview, resume_interview
 
 
 def render_profile_onboarding(
@@ -572,6 +572,10 @@ def render_profile_onboarding(
 
     if step_key not in st.session_state:
         st.session_state[step_key] = 1
+        recovered = resume_interview(scope, candidate_id, onboarding_repository)
+        if recovered is not None:
+            st.session_state['_voice_company_draft_' + scope] = recovered
+            st.session_state[step_key] = 2
 
     step = st.session_state[step_key]
 
@@ -909,6 +913,7 @@ def render_profile_onboarding(
                                     if currently_here
                                     else f'{end_year:04d}-{end_month:02d}'
                                 ),
+                                repository=onboarding_repository,
                             )
                         except ValueError:
                             st.warning(

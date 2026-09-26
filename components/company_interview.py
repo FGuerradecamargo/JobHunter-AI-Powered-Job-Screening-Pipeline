@@ -58,7 +58,7 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
         ui.write(question)
         key = prefix + '_' + qid
         def received(mode, value=''):
-            answer(draft, scope, mode, value)
+            answer(draft, scope, mode, value, repository=repository if draft.get('durable') else None)
             event('company_question_skipped' if mode == 'skip' else 'company_question_answered',
                 qid, None if mode == 'skip' else mode)
             if kind == 'ADAPTIVE_QUESTION':
@@ -155,6 +155,11 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
                     ui.warning('Recording could not be used.')
             replacement = ui.text_area('Type instead', key=key + '_replacement', max_chars=20000)
             if ui.button('Use typed answer', key=key + '_use') and replacement.strip():
+                if draft.get('durable'):
+                    from models.company_interview import ConfirmedCompanyAnswer
+                    repository.save_company_answer(candidate_id=draft['candidate_id'], experience_id=draft['id'],
+                        answer=ConfirmedCompanyAnswer(item['question_id'], item['question_text'], 'text', replacement,
+                            False, draft['version'], draft['version'], item.get('kind', 'FIXED_QUESTION')))
                 item.update(mode='text', text=replacement, status='ready', audio=None)
                 advance_after_processing(draft)
                 ui.rerun()
@@ -183,7 +188,7 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
                 ui.caption(claim['uncertainty'])
         correction = ui.text_area(CORRECTION_QUESTION, key=prefix + '_correction', max_chars=20000)
         if ui.button('Continue', type='primary'):
-            review_reflection(draft, scope, correction)
+            review_reflection(draft, scope, correction, repository=repository if draft.get('durable') else None)
             event('company_reflection_reviewed')
             ui.rerun()
         return

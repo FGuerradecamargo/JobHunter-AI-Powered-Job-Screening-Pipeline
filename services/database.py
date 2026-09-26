@@ -2663,6 +2663,14 @@ def initialize_database() -> None:
 
 
 def create_company_interview_schema(connection):
+    for name, definition in (
+        ('onboarding_status', "TEXT NOT NULL DEFAULT 'confirmed'"),
+        ('onboarding_interview_version', 'TEXT'),
+    ):
+        if is_postgres():
+            connection.execute(f'ALTER TABLE candidate_work_experiences ADD COLUMN IF NOT EXISTS {name} {definition}')
+        elif name not in {row['name'] for row in connection.execute('PRAGMA table_info(candidate_work_experiences)').fetchall()}:
+            connection.execute(f'ALTER TABLE candidate_work_experiences ADD COLUMN {name} {definition}')
     connection.execute('''CREATE UNIQUE INDEX IF NOT EXISTS idx_work_experience_owner
         ON candidate_work_experiences(id, candidate_id)''')
     connection.execute('''CREATE TABLE IF NOT EXISTS company_interview_answers (

@@ -3,6 +3,14 @@ from dataclasses import dataclass
 
 V1_VERSION = 'company-interview-v1'
 VERSION = 'company-interview-v2'
+V2_VERSION = VERSION
+V3_VERSION = 'company-interview-v3'
+V3_QUESTIONS = (
+    'Imagine I start tomorrow in your role. What would I actually be doing?',
+    'What kinds of problems did you deal with, and what decisions were you responsible for?',
+    'What tools, systems or technologies did you actually use?',
+    'What changed because of your work, or what became different while you were there?',
+)
 V1_QUESTIONS = (
     'When you got to work, what did you usually do first?',
     'And after that? How did the day usually go?',
@@ -51,7 +59,7 @@ class ConfirmedCompanyAnswer:
     source_kind: str = 'FIXED_QUESTION'
 
 
-def validate_answers(answers):
+def _validate_historical_answers(answers):
     if not answers or not all(isinstance(a, ConfirmedCompanyAnswer) for a in answers):
         raise ValueError('Incomplete interview.')
     version = answers[0].interview_version
@@ -81,3 +89,41 @@ def validate_answers(answers):
                 or (answer.skipped and answer.confirmed_text != '')
                 or (not answer.skipped and not answer.confirmed_text.strip())):
             raise ValueError('Invalid confirmed answer.')
+
+
+def validate_single_answer(answer):
+    if not isinstance(answer, ConfirmedCompanyAnswer):
+        raise ValueError('Invalid confirmed answer.')
+    questions = {V1_VERSION: V1_QUESTIONS, V2_VERSION: QUESTIONS, V3_VERSION: V3_QUESTIONS}
+    if answer.interview_version not in questions:
+        raise ValueError('Invalid interview version.')
+    expected = {f'q{i + 1}': (text, 'FIXED_QUESTION')
+                for i, text in enumerate(questions[answer.interview_version])}
+    if answer.interview_version != V1_VERSION:
+        expected.update({'adaptive_' + key: (text, 'ADAPTIVE_QUESTION') for key, text in ADAPTIVE_QUESTIONS.items()})
+        expected['correction'] = (CORRECTION_QUESTION, 'REVIEW_CORRECTION')
+    if answer.interview_version == V2_VERSION:
+        expected['final'] = (FINAL_QUESTION, 'FINAL_OPEN')
+    if (expected.get(answer.question_id) != (answer.question_text, answer.source_kind)
+            or answer.question_version != answer.interview_version
+            or answer.answer_mode not in ('voice', 'text', 'skip')
+            or answer.skipped != (answer.answer_mode == 'skip')
+            or not isinstance(answer.confirmed_text, str) or len(answer.confirmed_text) > 20000
+            or (answer.skipped and answer.confirmed_text != '')
+            or (not answer.skipped and not answer.confirmed_text.strip())):
+        raise ValueError('Invalid confirmed answer.')
+
+
+def validate_answers(answers):
+    if not answers:
+        raise ValueError('Incomplete interview.')
+    for answer in answers:
+        validate_single_answer(answer)
+    if answers[0].interview_version != V3_VERSION:
+        return _validate_historical_answers(answers)
+    ids = [answer.question_id for answer in answers]
+    if (any(answer.interview_version != V3_VERSION for answer in answers)
+            or len(ids) != len(set(ids))
+            or not {'q1', 'q2', 'q3', 'q4'}.issubset(ids)
+            or sum(qid.startswith('adaptive_') for qid in ids) > 2):
+        raise ValueError('Incomplete interview.')
