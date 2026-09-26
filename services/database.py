@@ -643,6 +643,7 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "source_ingestion_runs",
         "candidate_profile_snapshots",
         "job_profile_snapshots",
+        "market_profile_snapshots",
         "company_interview_answers",
     }
 )
@@ -781,6 +782,15 @@ def create_preparation_generation_claim_schema(connection) -> None:
 def create_profile_interpretation_schema(connection) -> None:
     """Immutable, server-only interpretation snapshots."""
     connection.execute(
+        """CREATE TABLE IF NOT EXISTS market_profile_snapshots (
+            segment_key TEXT NOT NULL,
+            profile_version INTEGER NOT NULL CHECK (profile_version > 0),
+            profile_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (segment_key, profile_version)
+        )"""
+    )
+    connection.execute(
         """
         CREATE TABLE IF NOT EXISTS candidate_profile_snapshots (
             candidate_id TEXT NOT NULL,
@@ -825,7 +835,7 @@ def create_profile_interpretation_schema(connection) -> None:
         """
     )
     if is_postgres():
-        for table in ("candidate_profile_snapshots", "job_profile_snapshots"):
+        for table in ("candidate_profile_snapshots", "job_profile_snapshots", "market_profile_snapshots"):
             _enable_server_only_row_level_security(connection, table)
             connection.execute(f"REVOKE ALL ON TABLE {table} FROM PUBLIC")
             connection.execute(
