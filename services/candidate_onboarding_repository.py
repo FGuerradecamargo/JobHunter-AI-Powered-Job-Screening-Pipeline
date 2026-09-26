@@ -69,7 +69,7 @@ class CandidateOnboardingRepository:
             row['confirmed_text'], bool(row['skipped']), row['interview_version'], row['question_version'], row['source_kind'])
             for row in rows]
 
-    def save_company_answer(self, *, candidate_id, experience_id, answer):
+    def save_company_answer(self, *, candidate_id, experience_id, answer, expected_answer=None):
         validate_single_answer(answer)
         with get_connection() as connection:
             row = self._lock_draft(connection, candidate_id, experience_id)
@@ -77,7 +77,7 @@ class CandidateOnboardingRepository:
                 raise ValueError('Invalid interview version.')
             existing = self._read_answers(connection, candidate_id, experience_id)
             prior = next((a for a in existing if a.question_id == answer.question_id), None)
-            if prior is not None and prior != answer:
+            if prior is not None and prior != answer and prior != expected_answer:
                 raise ValueError('Answer already confirmed. Reload the draft before editing.')
             self._write_answer(connection, candidate_id, experience_id, answer)
 
@@ -95,9 +95,17 @@ class CandidateOnboardingRepository:
             result['answers'] = self._read_answers(connection, candidate_id, row['id'])
             return result
 
-    def finalize_company_interview(self, *, candidate_id, experience_id, answers=None):
+    def finalize_company_interview(self, *, candidate_id, experience_id, answers=None, expected_answers=None):
         with get_connection() as connection:
+            existing = connection.execute('SELECT onboarding_status FROM candidate_work_experiences WHERE id = ? AND candidate_id = ?',
+                                          (experience_id, candidate_id)).fetchone()
+            if existing is not None and existing['onboarding_status'] == 'confirmed':
+                return
             row = self._lock_draft(connection, candidate_id, experience_id)
+            if expected_answers is not None:
+                current = self._read_answers(connection, candidate_id, experience_id)
+                if sorted(current, key=lambda a: a.question_id) != sorted(expected_answers, key=lambda a: a.question_id):
+                    raise ValueError('Draft changed. Reload before confirming.')
             if answers is not None:
                 validate_answers(answers)
                 if any(a.interview_version != row['onboarding_interview_version'] for a in answers):

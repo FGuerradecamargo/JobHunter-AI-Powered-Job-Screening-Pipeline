@@ -6,12 +6,22 @@ from services.company_interview import (answer, process, confirmed_answers, curr
 from services.company_reflection import reflect, ReflectionUnavailable, FIELDS
 from services.ai.voice_transcription import audio_duration
 from services.onboarding_events import OnboardingEvent
+from models.company_interview import V3_VERSION, V3_QUESTIONS
+from services.company_interview import (confirm_text, confirm_voice_transcript, discard_voice,
+    finalize, save_correction, set_adaptive_dimensions, skip_question, transcribe_voice)
+from services.company_reflection import reflect_v3
 
 
 def render_company_interview(draft, scope, repository, inputs, ui=None, reflection_provider=None):
     ui = ui or st
     if draft['scope'] != scope or ui.session_state.get('_voice_owner') != scope:
         raise ValueError('Invalid interview scope.')
+    if draft['version'] == V3_VERSION:
+        try:
+            return render_v3_company_interview(draft, scope, repository, inputs, ui, reflection_provider)
+        except Exception:
+            ui.error('Your answer could not be saved. Please retry or reopen the interview.')
+            return
     prefix = '_voice_company_' + draft['id']
     reflection_available = reflection_provider is not None
     reflection_provider = reflection_provider or ReflectionUnavailable()
@@ -219,3 +229,254 @@ def render_company_interview(draft, scope, repository, inputs, ui=None, reflecti
                     del ui.session_state[key]
             ui.session_state.pop('_voice_company_draft_' + scope, None)
             ui.rerun()
+
+
+def render_v3_company_interview(
+    draft,
+    scope,
+    repository,
+    inputs,
+    ui=None,
+    reflection_provider=None,
+):
+    ui = ui or st
+    if draft["scope"] != scope:
+        raise ValueError("Invalid interview scope.")
+
+    reflection_provider = (
+        reflection_provider
+        or ReflectionUnavailable()
+    )
+    prefix = "_voice_company_" + draft["id"]
+
+    core_count = sum(
+        item.source_kind == "FIXED_QUESTION"
+        for item in draft["answers"]
+    )
+    ui.progress(min(core_count, len(V3_QUESTIONS)) / len(V3_QUESTIONS))
+
+    if draft["stage"] == "question":
+        qid, question, _ = current_question(draft)
+        ui.caption(
+            f"Core conversation: {min(core_count + 1, len(V3_QUESTIONS))} / "
+            f"{len(V3_QUESTIONS)}"
+            if core_count < len(V3_QUESTIONS)
+            else "A quick follow-up"
+        )
+        ui.write(question)
+
+        key = f"{prefix}_{qid}"
+        voice = (
+            inputs.config.onboarding_enabled
+            and not draft.get("typing", False)
+            and callable(getattr(ui, "audio_input", None))
+        )
+
+        if voice:
+            recording = ui.audio_input(
+                "Tap to start talking",
+                key=key + "_audio",
+                width="stretch",
+            )
+            if recording is not None:
+                ui.caption("Recording ready.")
+                if ui.button(
+                    "Continue with recording",
+                    key=key + "_voice_submit",
+                    type="primary",
+                ):
+                    try:
+                        with ui.spinner("Turning your answer into text..."):
+                            transcribe_voice(
+                                draft,
+                                scope,
+                                recording.getvalue(),
+                                inputs.provider,
+                                inputs.config,
+                                authorized=True,
+                            )
+                    except Exception:
+                        ui.warning(
+                            "Recording could not be transcribed. "
+                            "Try again or type instead."
+                        )
+                    else:
+                        ui.rerun()
+            if ui.button(
+                "type instead",
+                key=key + "_type",
+                type="tertiary",
+            ):
+                draft["typing"] = True
+                ui.rerun()
+        else:
+            text = ui.text_area(
+                "Your answer",
+                key=key + "_text",
+                max_chars=20000,
+            )
+            if ui.button(
+                "Save & continue",
+                key=key + "_submit",
+                type="primary",
+            ):
+                try:
+                    confirm_text(
+                        draft,
+                        scope,
+                        repository,
+                        text,
+                    )
+                except ValueError:
+                    ui.warning("Add an answer or skip.")
+                else:
+                    ui.rerun()
+
+        if ui.button(
+            "skip",
+            key=key + "_skip",
+            type="tertiary",
+        ):
+            skip_question(
+                draft,
+                scope,
+                repository,
+            )
+            ui.rerun()
+        return
+
+    if draft["stage"] == "voice_review":
+        pending = draft["pending_voice"]
+        ui.write(pending["question_text"])
+        transcript = ui.text_area(
+            "Check the transcript",
+            value=pending["transcript"],
+            key=prefix + "_" + pending["question_id"] + "_voice_review",
+            max_chars=20000,
+        )
+        ui.caption(
+            "Nothing is saved until you confirm this text."
+        )
+        if ui.button(
+            "Save & continue",
+            type="primary",
+            key=prefix + "_voice_confirm",
+        ):
+            confirm_voice_transcript(
+                draft,
+                scope,
+                repository,
+                transcript,
+            )
+            ui.rerun()
+        if ui.button(
+            "Record again",
+            type="tertiary",
+            key=prefix + "_voice_again",
+        ):
+            discard_voice(draft, scope)
+            ui.rerun()
+        return
+
+    if draft["stage"] == "reflection_pending":
+        if not ui.button('Review this experience', key=prefix + '_reflect', type='primary'):
+            return
+        try:
+            with ui.spinner("Checking if anything important is missing..."):
+                result = reflect_v3(
+                    draft,
+                    scope,
+                    reflection_provider,
+                    authorized=True,
+                )
+        except Exception:
+            draft["reflection"] = None
+            set_adaptive_dimensions(
+                draft,
+                scope,
+                [],
+            )
+        else:
+            draft["reflection"] = result
+            set_adaptive_dimensions(
+                draft,
+                scope,
+                result["material_missing_dimensions"],
+            )
+        ui.rerun()
+        return
+
+    if draft["stage"] == "review":
+        ui.subheader("Here's what I understood")
+        ui.caption('Draft interpretation, not confirmed evidence.')
+        with ui.expander('Your confirmed source answers'):
+            for source in draft['answers']:
+                ui.write(source.question_text)
+                ui.write('Not provided' if source.skipped else source.confirmed_text)
+        reflection = draft.get("reflection")
+        shown = 0
+        if reflection:
+            for field in FIELDS:
+                for claim in reflection["interpretation"][field]:
+                    ui.write("- " + claim["text"])
+                    shown += 1
+                    if shown >= 5:
+                        break
+                if shown >= 5:
+                    break
+        if not shown:
+            ui.caption(
+                "Your source answers are saved. "
+                "WorkPilot will use them when building your profile."
+            )
+
+        correction = ui.text_area(
+            CORRECTION_QUESTION,
+            key=prefix + "_correction",
+            max_chars=20000,
+        )
+
+        left, right = ui.columns(2)
+        with left:
+            if ui.button(
+                "Save correction",
+                use_container_width=True,
+                disabled=not correction.strip(),
+            ):
+                save_correction(
+                    draft,
+                    scope,
+                    repository,
+                    correction,
+                )
+                ui.success("Correction saved.")
+        with right:
+            if ui.button(
+                "Looks right",
+                type="primary",
+                use_container_width=True,
+            ):
+                if correction.strip():
+                    save_correction(
+                        draft,
+                        scope,
+                        repository,
+                        correction,
+                    )
+                finalize(
+                    draft,
+                    scope,
+                    repository,
+                )
+                for key in list(ui.session_state):
+                    if str(key).startswith(prefix):
+                        del ui.session_state[key]
+                ui.session_state.pop(
+                    "_voice_company_draft_" + scope,
+                    None,
+                )
+                ui.rerun()
+        return
+
+    if draft["stage"] == "complete":
+        ui.success("Experience saved.")

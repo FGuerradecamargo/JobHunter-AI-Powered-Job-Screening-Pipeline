@@ -3,19 +3,22 @@ from uuid import uuid4
 from models.company_interview import (QUESTIONS, VERSION, FINAL_QUESTION, CORRECTION_QUESTION,
     ADAPTIVE_QUESTIONS, ConfirmedCompanyAnswer, validate_answers, V1_VERSION, V1_QUESTIONS)
 from services.ai.voice_transcription import audio_duration
+from models.company_interview import V3_VERSION, V3_QUESTIONS, validate_single_answer
 
 
-def start_interview(scope, candidate_id, company, start_date, end_date, *, repository=None):
+def start_interview(scope, candidate_id, company, start_date, end_date, *, repository=None, version=VERSION):
     if not scope or not candidate_id or not company.strip() or (end_date and end_date < start_date):
         raise ValueError('Check company and dates.')
     draft = dict(id=uuid4().hex, scope=scope, candidate_id=candidate_id, company=company.strip(),
         start_date=start_date, end_date=end_date, version=VERSION, answers=[], stage='memory', acknowledgement='')
+    if version == V3_VERSION:
+        draft = start_v3_interview(scope, candidate_id, company, start_date, end_date)
     if repository is not None:
         existing = repository.get_company_draft(candidate_id)
         if existing is not None:
             return resume_interview(scope, candidate_id, repository)
         repository.begin_company_interview(candidate_id=candidate_id, company=company, start_date=start_date,
-            end_date=end_date, experience_id=draft['id'], interview_version=VERSION)
+            end_date=end_date, experience_id=draft['id'], interview_version=draft['version'])
         draft['durable'] = True
     return draft
 
@@ -24,7 +27,8 @@ def resume_interview(scope, candidate_id, repository):
     row = repository.get_company_draft(candidate_id)
     if row is None:
         return None
-    from models.company_interview import V3_VERSION, V3_QUESTIONS
+    if row['onboarding_interview_version'] == V3_VERSION:
+        return _resume_v3_interview(scope, row)
     saved = row['answers']
     questions = V1_QUESTIONS if row['onboarding_interview_version'] == V1_VERSION else (
         V3_QUESTIONS if row['onboarding_interview_version'] == V3_VERSION else QUESTIONS)
@@ -42,6 +46,8 @@ def resume_interview(scope, candidate_id, repository):
 
 
 def current_question(draft):
+    if draft['version'] == V3_VERSION:
+        return current_v3_question(draft)
     if draft['stage'] == 'memory':
         n = next(i for i in range(8) if f'q{i+1}' not in {a['question_id'] for a in draft['answers']})
         questions = V1_QUESTIONS if draft['version'] == V1_VERSION else QUESTIONS
@@ -130,3 +136,342 @@ def confirmed_answers(draft, scope):
         source_kind=a.get('kind', 'FIXED_QUESTION')) for a in draft['answers']]
     validate_answers(result)
     return result
+
+
+def start_v3_interview(
+    scope,
+    candidate_id,
+    company,
+    start_date,
+    end_date,
+    *,
+    experience_id=None,
+):
+    if (
+        not scope
+        or not candidate_id
+        or not company.strip()
+        or (end_date and end_date < start_date)
+    ):
+        raise ValueError("Check company and dates.")
+    return {
+        "id": experience_id or uuid4().hex,
+        "scope": scope,
+        "candidate_id": candidate_id,
+        "company": company.strip(),
+        "start_date": start_date,
+        "end_date": end_date,
+        "version": V3_VERSION,
+        "answers": [],
+        "core_index": 0,
+        "adaptive_dimensions": [],
+        "adaptive_index": 0,
+        "stage": "question",
+        "pending_voice": None,
+        "reflection": None,
+        "typing": False,
+    }
+
+
+def _resume_v3_interview(scope, record):
+    draft = start_v3_interview(
+        scope,
+        record["candidate_id"],
+        record["company"],
+        record["start_date"],
+        record["end_date"],
+        experience_id=record["id"],
+    )
+    answers = list(record.get("answers") or [])
+    draft["answers"] = answers
+    core = [
+        item
+        for item in answers
+        if item.source_kind == "FIXED_QUESTION"
+    ]
+    adaptive = [
+        item
+        for item in answers
+        if item.source_kind == "ADAPTIVE_QUESTION"
+    ]
+    ids = {item.question_id for item in core}
+    draft["core_index"] = next((i for i in range(len(V3_QUESTIONS)) if f'q{i+1}' not in ids), len(V3_QUESTIONS))
+    draft["adaptive_index"] = len(adaptive)
+
+    if len(core) < len(V3_QUESTIONS):
+        draft["stage"] = "question"
+    elif len(adaptive) >= 2:
+        draft["stage"] = "review"
+    else:
+        # Reflection is derived and need not be durable. Re-evaluate coverage
+        # from the durable source answers after a resumed session.
+        draft["stage"] = "reflection_pending"
+    return draft
+
+
+def current_v3_question(draft):
+    if draft["stage"] != "question":
+        raise ValueError("Not in a question stage.")
+
+    if draft["core_index"] < len(V3_QUESTIONS):
+        index = draft["core_index"]
+        return (
+            f"q{index + 1}",
+            V3_QUESTIONS[index],
+            "FIXED_QUESTION",
+        )
+
+    dimensions = draft.get("adaptive_dimensions", [])
+    index = draft.get("adaptive_index", 0)
+    if index < len(dimensions):
+        dimension = dimensions[index]
+        return (
+            "adaptive_" + dimension,
+            ADAPTIVE_QUESTIONS[dimension],
+            "ADAPTIVE_QUESTION",
+        )
+
+    raise ValueError("No question is pending.")
+
+
+def _persist(
+    draft,
+    scope,
+    repository,
+    *,
+    mode,
+    text="",
+):
+    if draft["scope"] != scope:
+        raise ValueError("Invalid interview state.")
+
+    qid, question, kind = current_v3_question(draft)
+    answer = ConfirmedCompanyAnswer(
+        question_id=qid,
+        question_text=question,
+        answer_mode=mode,
+        confirmed_text=text.strip() if mode != "skip" else "",
+        skipped=(mode == "skip"),
+        interview_version=V3_VERSION,
+        question_version=V3_VERSION,
+        source_kind=kind,
+    )
+    validate_single_answer(answer)
+
+    # Durability boundary: save before moving the state machine forward.
+    repository.save_company_answer(
+        candidate_id=draft["candidate_id"],
+        experience_id=draft["id"],
+        answer=answer,
+    )
+    draft["answers"].append(answer)
+
+    if kind == "FIXED_QUESTION":
+        ids = {item.question_id for item in draft["answers"]}
+        draft["core_index"] = next((i for i in range(len(V3_QUESTIONS)) if f'q{i+1}' not in ids), len(V3_QUESTIONS))
+        draft["stage"] = (
+            "question"
+            if draft["core_index"] < len(V3_QUESTIONS)
+            else "reflection_pending"
+        )
+    else:
+        draft["adaptive_index"] += 1
+        draft["stage"] = (
+            "question"
+            if draft["adaptive_index"]
+            < len(draft["adaptive_dimensions"])
+            else "review"
+        )
+    draft["typing"] = False
+    return answer
+
+
+def confirm_text(draft, scope, repository, text):
+    if not isinstance(text, str) or not text.strip() or len(text) > 20000:
+        raise ValueError("Provide an answer or skip.")
+    return _persist(
+        draft,
+        scope,
+        repository,
+        mode="text",
+        text=text,
+    )
+
+
+def skip_question(draft, scope, repository):
+    return _persist(
+        draft,
+        scope,
+        repository,
+        mode="skip",
+    )
+
+
+def transcribe_voice(
+    draft,
+    scope,
+    audio,
+    provider,
+    config,
+    *,
+    authorized=False,
+):
+    if (
+        draft["scope"] != scope
+        or draft["stage"] != "question"
+        or authorized is not True
+    ):
+        raise ValueError(
+            "Voice transcription requires explicit confirmation."
+        )
+
+    qid, question, kind = current_v3_question(draft)
+    audio_duration(audio)
+
+    if not config.transcription_enabled or not config.model:
+        raise ValueError("Voice transcription is unavailable.")
+
+    result = provider.transcribe(
+        audio,
+        {"question_id": qid},
+        allow_external_transcription=True,
+    )
+    transcript = (
+        result.transcript_text
+        if result.status == "succeeded"
+        else ""
+    )
+    if (
+        not isinstance(transcript, str)
+        or not transcript.strip()
+        or len(transcript) > 20000
+    ):
+        raise ValueError("Recording could not be transcribed.")
+
+    # Audio is not retained after transcription. The transcript is still
+    # pending and is not evidence until the user accepts it.
+    draft["pending_voice"] = {
+        "question_id": qid,
+        "question_text": question,
+        "source_kind": kind,
+        "transcript": transcript.strip(),
+    }
+    draft["stage"] = "voice_review"
+
+
+def confirm_voice_transcript(
+    draft,
+    scope,
+    repository,
+    text,
+):
+    if (
+        draft["scope"] != scope
+        or draft["stage"] != "voice_review"
+        or not draft.get("pending_voice")
+    ):
+        raise ValueError("No voice transcript is awaiting confirmation.")
+    if not isinstance(text, str) or not text.strip() or len(text) > 20000:
+        raise ValueError("Confirm or edit the transcript.")
+
+    pending = draft["pending_voice"]
+    # Restore the question stage solely for the shared persistence boundary.
+    draft["stage"] = "question"
+    qid, question, kind = current_v3_question(draft)
+    if (
+        qid != pending["question_id"]
+        or question != pending["question_text"]
+        or kind != pending["source_kind"]
+    ):
+        draft["stage"] = "voice_review"
+        raise ValueError("Voice transcript no longer matches the question.")
+
+    try:
+        answer = _persist(draft, scope, repository, mode="voice", text=text)
+    except Exception:
+        draft["stage"] = "voice_review"
+        raise
+    draft["pending_voice"] = None
+    return answer
+
+
+def discard_voice(draft, scope):
+    if draft["scope"] != scope or draft["stage"] != "voice_review":
+        raise ValueError("No voice transcript is awaiting review.")
+    draft["pending_voice"] = None
+    draft["stage"] = "question"
+
+
+def set_adaptive_dimensions(draft, scope, dimensions):
+    if draft["scope"] != scope or draft["stage"] != "reflection_pending":
+        raise ValueError("Adaptive questions are not expected now.")
+
+    already_answered = {
+        item.question_id.removeprefix("adaptive_")
+        for item in draft["answers"]
+        if item.source_kind == "ADAPTIVE_QUESTION"
+    }
+    clean = []
+    for dimension in dimensions or []:
+        if (
+            dimension in ADAPTIVE_QUESTIONS
+            and dimension not in already_answered
+            and dimension not in clean
+        ):
+            clean.append(dimension)
+
+    # V1 contract: zero to two adaptive questions total.
+    remaining = max(0, 2 - len(already_answered))
+    draft["adaptive_dimensions"] = clean[:remaining]
+    draft["adaptive_index"] = 0
+    draft["stage"] = (
+        "question"
+        if draft["adaptive_dimensions"]
+        else "review"
+    )
+
+
+def save_correction(draft, scope, repository, text):
+    if draft["scope"] != scope or draft["stage"] != "review":
+        raise ValueError("Review is required.")
+    if not isinstance(text, str) or len(text) > 20000:
+        raise ValueError("Invalid correction.")
+    if not text.strip():
+        return None
+
+    answer = ConfirmedCompanyAnswer(
+        "correction",
+        CORRECTION_QUESTION,
+        "text",
+        text.strip(),
+        False,
+        V3_VERSION,
+        V3_VERSION,
+        "REVIEW_CORRECTION",
+    )
+    validate_single_answer(answer)
+    repository.save_company_answer(
+        candidate_id=draft["candidate_id"],
+        experience_id=draft["id"],
+        answer=answer,
+        expected_answer=next((item for item in draft['answers'] if item.question_id == 'correction'), None),
+    )
+    # Replace a prior correction in the in-session view.
+    draft["answers"] = [
+        item
+        for item in draft["answers"]
+        if item.question_id != "correction"
+    ]
+    draft["answers"].append(answer)
+    return answer
+
+
+def finalize(draft, scope, repository):
+    if draft["scope"] != scope or draft["stage"] != "review":
+        raise ValueError("Review is required.")
+    repository.finalize_company_interview(
+        candidate_id=draft["candidate_id"],
+        experience_id=draft["id"],
+        expected_answers=draft['answers'],
+    )
+    draft["stage"] = "complete"

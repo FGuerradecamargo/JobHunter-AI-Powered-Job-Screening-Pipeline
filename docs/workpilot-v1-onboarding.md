@@ -26,3 +26,22 @@ leave the draft recoverable and do not advance the question.
 
 PostgreSQL uses the same transactional writes and additive column migration;
 real PostgreSQL/browser restart and voice-provider E2E remain deployment checks.
+
+## Block 5 runtime
+
+New interviews started by profile onboarding explicitly select V3: four core
+questions, zero to two material follow-ups, then source/reflection review.
+V1/V2 handlers remain only for historical/resumed sessions and their regression
+tests; they are not the default new production interview path.
+
+Voice is transcribed only after recording confirmation. Its editable transcript
+is saved only on Save & continue. Failed database writes preserve voice review;
+transcript widget keys include the question ID to prevent cross-question reuse.
+Reflection requires an explicit Review this experience action, including after
+session loss. It can fail without losing source answers or preventing completion.
+Finalization compares the reviewed answers to durable answers under the draft
+lock, so another tab's unseen correction cannot be silently confirmed.
+
+KEEP historical version readers/handlers; REPLACE the new-interview entrypoint
+with V3; MERGE all persistence into the existing experience/answer repositories.
+No new parallel experience authority or separate database was introduced.

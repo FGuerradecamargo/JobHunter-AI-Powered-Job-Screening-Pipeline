@@ -35,8 +35,8 @@ def test_draft_reused_hidden_and_restored_after_session_loss(repo):
     assert repo.list_work_experiences('a') == []
     restored = resume_interview('new-browser-scope', 'a', CandidateOnboardingRepository())
     assert restored['id'] == 'draft'
-    assert restored['answers'][0]['text'] == 'Source answer 1'
-    assert restored['stage'] == 'memory'
+    assert restored['answers'][0].confirmed_text == 'Source answer 1'
+    assert restored['stage'] == 'question'
     assert repo.get_company_draft('b', 'draft') is None
     assert resume_interview('other', 'b', repo) is None
 
@@ -107,3 +107,15 @@ def test_legacy_schema_upgrade_is_idempotent_and_keeps_confirmed_rows():
         row = connection.execute('SELECT * FROM candidate_work_experiences').fetchone()
         assert row['onboarding_status'] == 'confirmed'
         assert row['onboarding_interview_version'] is None
+
+
+def test_postgres_migration_is_additive(monkeypatch):
+    from services import database
+    connection = Mock()
+    monkeypatch.setattr(database, 'is_postgres', lambda: True)
+    monkeypatch.setattr(database, '_enable_server_only_row_level_security', Mock())
+    database.create_company_interview_schema(connection)
+    statements = [call.args[0] for call in connection.execute.call_args_list]
+    assert any("ADD COLUMN IF NOT EXISTS onboarding_status TEXT NOT NULL DEFAULT 'confirmed'" in sql for sql in statements)
+    assert any('ADD COLUMN IF NOT EXISTS onboarding_interview_version TEXT' in sql for sql in statements)
+    assert not any(sql.lstrip().upper().startswith(('DROP ', 'DELETE ', 'TRUNCATE ')) for sql in statements)

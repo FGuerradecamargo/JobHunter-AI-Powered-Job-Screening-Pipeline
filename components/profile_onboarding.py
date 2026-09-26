@@ -914,6 +914,7 @@ def render_profile_onboarding(
                                     else f'{end_year:04d}-{end_month:02d}'
                                 ),
                                 repository=onboarding_repository,
+                                version='company-interview-v3',
                             )
                         except ValueError:
                             st.warning(

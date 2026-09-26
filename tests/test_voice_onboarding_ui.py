@@ -35,7 +35,10 @@ u = AppUser('u','private@example.test','Private', 'c')
 scope = bind_scope(st.session_state, 'u','u','c')
 inputs = VoiceTextInputs(scope, config=VoiceConfig(), provider=object(), events=None)
 if not st.session_state.get('generated'):
-    render_profile_onboarding(candidate_id='c', candidate_name='Private', onboarding_repository=Repo(),
+    from unittest.mock import patch
+    from services.company_interview import start_interview as legacy_start
+    with patch('components.profile_onboarding.start_interview', lambda *args, **kw: legacy_start(*args, **dict(kw, version='company-interview-v2'))):
+        render_profile_onboarding(candidate_id='c', candidate_name='Private', onboarding_repository=Repo(),
         profile_generation_service=Generator(), authenticated_user=u, active_user=u, voice_inputs=inputs,
         reflection_provider=FakeReflection())
 '''
