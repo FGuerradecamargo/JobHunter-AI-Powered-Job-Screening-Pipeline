@@ -645,6 +645,8 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "job_profile_snapshots",
         "market_profile_snapshots",
         "company_profile_snapshots",
+        "candidate_interview_rounds",
+        "candidate_interview_round_feedback",
         "company_interview_answers",
     }
 )
@@ -726,6 +728,63 @@ def create_company_registry_schema(connection) -> None:
                 END $$""")
     from services.source_run_schema import create_source_run_schema
     create_source_run_schema(connection)
+
+
+def create_interview_round_schema(connection) -> None:
+    # Existing PostgreSQL outcomes schema must also exist on fresh SQLite databases.
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_application_outcomes (
+        candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+        job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        final_status TEXT NOT NULL DEFAULT '',
+        interview_stage TEXT NOT NULL DEFAULT '',
+        rejection_reason TEXT NOT NULL DEFAULT '',
+        recruiter_feedback TEXT NOT NULL DEFAULT '',
+        candidate_notes TEXT NOT NULL DEFAULT '',
+        offer_salary TEXT NOT NULL DEFAULT '',
+        offer_currency TEXT NOT NULL DEFAULT '',
+        lessons_learned TEXT NOT NULL DEFAULT '',
+        outcome_date TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(candidate_id, job_id)
+    )""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_interview_rounds (
+        interview_id TEXT PRIMARY KEY,
+        candidate_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        scheduled_at TEXT NOT NULL DEFAULT '',
+        interviewer_names_json TEXT NOT NULL DEFAULT '[]',
+        interviewer_roles_json TEXT NOT NULL DEFAULT '[]',
+        interview_type TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(candidate_id, job_id, sequence),
+        UNIQUE(interview_id, candidate_id, job_id),
+        FOREIGN KEY(candidate_id, job_id) REFERENCES candidate_job_analyses(candidate_id, job_id) ON DELETE CASCADE
+    )""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_interview_round_feedback (
+        interview_id TEXT PRIMARY KEY,
+        candidate_id TEXT NOT NULL,
+        job_id TEXT NOT NULL,
+        feedback_text TEXT NOT NULL DEFAULT '',
+        next_steps TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(interview_id, candidate_id, job_id)
+            REFERENCES candidate_interview_rounds(interview_id, candidate_id, job_id) ON DELETE CASCADE
+    )""")
+    if is_postgres():
+        for table in ("candidate_interview_rounds", "candidate_interview_round_feedback"):
+            _enable_server_only_row_level_security(connection, table)
+            connection.execute(f"REVOKE ALL ON TABLE {table} FROM PUBLIC")
+            for role in ("anon", "authenticated"):
+                connection.execute(f"""DO $$ BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+                        EXECUTE 'REVOKE ALL ON TABLE {table} FROM {role}';
+                    END IF;
+                END $$""")
 
 
 def create_interview_details_schema(connection) -> None:
@@ -2693,6 +2752,7 @@ def initialize_database() -> None:
         initialize_sqlite_database()
     with get_connection() as connection:
         create_company_interview_schema(connection)
+        create_interview_round_schema(connection)
 
 
 def create_company_interview_schema(connection):

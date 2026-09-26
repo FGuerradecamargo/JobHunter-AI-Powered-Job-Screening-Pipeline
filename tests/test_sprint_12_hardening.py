@@ -312,6 +312,7 @@ def test_interview_table_writes_are_confined_to_repositories_and_schema():
         ROOT / "services" / "database.py",
         ROOT / "services" / "interview_details_repository.py",
         ROOT / "services" / "interview_feedback_repository.py",
+        ROOT / "services" / "interview_round_repository.py",
     }
     offenders = []
     for directory in (ROOT / "services", ROOT):

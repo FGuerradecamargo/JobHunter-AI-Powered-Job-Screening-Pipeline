@@ -46,6 +46,11 @@ class ApplicationOutcomeRepository:
     def save(self, outcome: ApplicationOutcome) -> ApplicationOutcome:
         values = asdict(outcome)
         with get_connection() as connection:
+            # Coordinate terminal outcomes with interview-round creation.
+            connection.execute(
+                "UPDATE candidate_job_analyses SET status = status WHERE candidate_id = ? AND job_id = ?",
+                (outcome.candidate_id, outcome.job_id),
+            )
             relationship = connection.execute(
                 """
                 SELECT 1

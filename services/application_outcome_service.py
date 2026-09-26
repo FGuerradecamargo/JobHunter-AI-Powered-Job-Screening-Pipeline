@@ -9,12 +9,13 @@ from models.application_outcome import (
     ApplicationOutcomeResult,
 )
 from services.application_outcome_repository import ApplicationOutcomeRepository
+from models.application_tracking import TERMINAL_APPLICATION_STAGES
 
 
 INTERVIEW = "interview"
 FINAL_INTERVIEW = "final_interview"
 OFFER = "offer"
-TERMINAL_STATUSES = {"rejected", "accepted", "declined", "withdrawn"}
+TERMINAL_STATUSES = {stage.value for stage in TERMINAL_APPLICATION_STAGES}
 
 
 def _utc_now() -> str:
@@ -65,6 +66,9 @@ class ApplicationOutcomeService:
 
     def mark_withdrawn(self, candidate_id: str, job_id: str, **details):
         return self._transition(candidate_id, job_id, "withdrawn", **details)
+
+    def mark_no_response(self, candidate_id: str, job_id: str, **details):
+        return self._transition(candidate_id, job_id, "no_response", **details)
 
     def _transition(
         self,
@@ -133,9 +137,9 @@ class ApplicationOutcomeService:
         if current == target:
             return True
         return target in {
-            "applied": {INTERVIEW, "rejected", "withdrawn"},
-            INTERVIEW: {FINAL_INTERVIEW, "rejected", "withdrawn"},
-            FINAL_INTERVIEW: {OFFER, "rejected", "withdrawn"},
+            "applied": {INTERVIEW, "rejected", "withdrawn", "no_response"},
+            INTERVIEW: {FINAL_INTERVIEW, OFFER, "rejected", "withdrawn", "no_response"},
+            FINAL_INTERVIEW: {INTERVIEW, OFFER, "rejected", "withdrawn", "no_response"},
             OFFER: {"accepted", "declined", "withdrawn"},
         }.get(current, set())
 

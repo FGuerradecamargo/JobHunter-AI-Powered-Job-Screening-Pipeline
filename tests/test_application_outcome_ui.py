@@ -83,11 +83,11 @@ def _outcome(*, stage="", final_status=""):
 @pytest.mark.parametrize(
     ("outcome", "status", "label", "actions"),
     [
-        (None, "applied", "Applied", ["interview", "rejected", "withdrawn"]),
+        (None, "applied", "Applied", ["interview", "rejected", "withdrawn", "no_response"]),
         (_outcome(stage="interview"), "applied", "Interview",
-         ["final_interview", "rejected", "withdrawn"]),
+         ["final_interview", "offer", "rejected", "withdrawn", "no_response"]),
         (_outcome(stage="final_interview"), "applied", "Final interview",
-         ["offer", "rejected", "withdrawn"]),
+         ["interview", "offer", "rejected", "withdrawn", "no_response"]),
         (_outcome(stage="final_interview", final_status="offer"), "applied",
          "Offer", ["accepted", "declined", "withdrawn"]),
     ],

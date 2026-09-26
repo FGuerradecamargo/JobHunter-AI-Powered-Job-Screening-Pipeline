@@ -317,6 +317,7 @@ def build_outcome_evidence(
         )
         candidate_actions = {"accepted", "declined", "withdrawn"}
         outcome_actor = (
+            "unknown" if final_status.casefold() == "no_response" else
             "candidate"
             if final_status.casefold() in candidate_actions
             else "employer"

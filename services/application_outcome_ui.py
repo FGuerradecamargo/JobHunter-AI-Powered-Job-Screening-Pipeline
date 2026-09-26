@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from models.application_outcome import ApplicationOutcome, ApplicationOutcomeResult
 from services.application_outcome_repository import ApplicationOutcomeRepository
-from services.application_outcome_service import ApplicationOutcomeService
+from services.application_outcome_service import ApplicationOutcomeService, TERMINAL_STATUSES
 
 
 @dataclass(frozen=True)
@@ -22,10 +22,11 @@ class ApplicationOutcomeView:
 
     @property
     def is_terminal(self) -> bool:
-        return self.state in {"accepted", "declined", "rejected", "withdrawn"}
+        return self.state in TERMINAL_STATUSES
 
 
 STATUS_LABELS = {
+    "no_response": "No response",
     "applied": "Applied",
     "interview": "Interview",
     "final_interview": "Final interview",
@@ -37,6 +38,7 @@ STATUS_LABELS = {
 }
 
 ACTION_LABELS = {
+    "no_response": "No response",
     "interview": "Interview",
     "final_interview": "Final interview",
     "offer": "Offer",
@@ -47,9 +49,9 @@ ACTION_LABELS = {
 }
 
 VALID_ACTIONS = {
-    "applied": ("interview", "rejected", "withdrawn"),
-    "interview": ("final_interview", "rejected", "withdrawn"),
-    "final_interview": ("offer", "rejected", "withdrawn"),
+    "applied": ("interview", "rejected", "withdrawn", "no_response"),
+    "interview": ("final_interview", "offer", "rejected", "withdrawn", "no_response"),
+    "final_interview": ("interview", "offer", "rejected", "withdrawn", "no_response"),
     "offer": ("accepted", "declined", "withdrawn"),
 }
 
