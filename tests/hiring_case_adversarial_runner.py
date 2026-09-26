@@ -67,7 +67,10 @@ def observe(case, *, semantic_fixture=None):
                       "evidence_refs": ["checkpoint:v1"] if case.reply.checkpoint_ref else [evidence_ref] if need.source_available else [],
                       "confidence": "high", "reason_code": "direct_support", "needs_evidence": False})
     if case.hard_blocker:
-        hard_records.append(HardJobFact("eligibility", "license", case.company, "synthetic-job-source", hard_blocker=True))
+        from models.profile_interpretation import JobRequirementStatus, RequirementSubstitutability
+        hard_records.append(HardJobFact("eligibility", "licence", "Legal licence", "synthetic-job-source",
+            requirement_status=JobRequirementStatus.REQUIRED,
+            substitutability=RequirementSubstitutability.NON_SUBSTITUTABLE))
     hard_records.append(HardJobFact("offer", "opportunity_context", case.company, "synthetic-job-source"))
     hard = JobHardFacts(job_id, digest([asdict(item) for item in hard_records]), tuple(hard_records))
     registry.extend(RegisteredSourceRef(item.fact_id, Ref.JOB_HARD_FACT, job_id, "job_description") for item in hard_records)
@@ -102,6 +105,11 @@ def observe(case, *, semantic_fixture=None):
     if any(result.validation_status is ValidationStatus.REJECTED for result in (cresult, jresult)):
         return rejected
     candidate, job = candidate_snapshot(cr, cresult), job_snapshot(jr, jresult)
+    if case.hard_blocker:
+        from models.profile_interpretation import CandidateFactCoverage, CoverageState
+        # AV20's frozen candidate facts explicitly confirm the licence absence.
+        candidate = replace(candidate, fact_coverage=CandidateFactCoverage(
+            licences=CoverageState.CONFIRMED_COMPLETE))
     pr = Input(Op.ANALYZE_HIRING_CASE, candidate_id, job_id, source_registry=registry,
                candidate_profile=candidate, job_profile=job, hard_facts=hard,
                seniority_context_mismatch=case.scope_mismatch, source_repair_need_ids=tuple(repairs))

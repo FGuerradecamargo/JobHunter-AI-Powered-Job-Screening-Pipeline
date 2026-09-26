@@ -38,11 +38,18 @@ def reconstructed_response(case_id, request, pairs):
 def replay(case_id, pairs, *, value_context=None, blocker=False):
     request, _ = selected_batch_002_case(case_id)
     if blocker:
+        from models.profile_interpretation import (
+            CandidateFactCoverage, CoverageState, JobRequirementStatus, RequirementSubstitutability,
+        )
         context = request.context
         hard = replace(context.hard_facts, facts=(*context.hard_facts.facts,
-            HardJobFact('synthetic-blocker','eligibility','Synthetic hard blocker','job-source',hard_blocker=True)))
+            HardJobFact('synthetic-blocker','licence','Synthetic mandatory licence','job-source',
+                requirement_status=JobRequirementStatus.REQUIRED,
+                substitutability=RequirementSubstitutability.NON_SUBSTITUTABLE)))
         from models.structured_interpretation import RegisteredSourceRef, SourceRefClass
         request = replace(request, context=replace(context, hard_facts=hard,
+            candidate_profile=replace(context.candidate_profile, licences=(),
+                fact_coverage=CandidateFactCoverage(licences=CoverageState.CONFIRMED_COMPLETE)),
             source_registry=(*context.source_registry, RegisteredSourceRef('synthetic-blocker', SourceRefClass.JOB_HARD_FACT,'job','job_description'))))
     raw = reconstructed_response(case_id,request,pairs)
     semantic = validate_semantic_support(request,raw)

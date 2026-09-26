@@ -3,12 +3,16 @@
 These fixtures specify links and value signals only. No final category is stored.
 Projection of input facts below does not perform semantic matching.
 """
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import hashlib
 import json
 
 from models.hiring_case import OpportunitySignalKind as Kind
 from models.profile_interpretation import HardJobFact, JobHardFacts
+from models.profile_interpretation import (
+    CandidateFactCoverage, CandidatePreference, CandidatePreferenceSemantic,
+    CoverageState, JobRequirementStatus, RequirementSubstitutability,
+)
 from models.structured_interpretation import (
     FactState, InterpretationOperation as Op, OpportunityFact,
     RegisteredSourceRef, SourceRefClass as Ref, StructuredInterpretationInput,
@@ -167,9 +171,14 @@ def fixture_requests(case_id, facts, candidate_id, job_id):
         hard_records.append(HardJobFact(fact_id, need.parsed_slot or "stated_requirement", need.text, f"job:{job_id}:{need.key}"))
         needs.append({"need_id": need.key, "label": need.text, "importance": "core" if index == 0 else extra_importance,
                       "authority": "explicit", "hard_fact_refs": [fact_id]})
-    if facts.company.eligibility_blocker:
-        hard_records.append(HardJobFact("eligibility", "eligibility", facts.company.eligibility_blocker,
-                                       f"job:{job_id}:eligibility", hard_blocker=True))
+    constraint_kind = {
+        "Mandatory relocation conflicts with confirmed inability to relocate.": "relocation",
+        "Mandatory night shift conflicts with a confirmed non-negotiable scheduling constraint.": "night_work",
+    }.get(facts.company.eligibility_blocker)
+    if constraint_kind:
+        hard_records.append(HardJobFact("eligibility", constraint_kind, "required",
+            f"job:{job_id}:eligibility", requirement_status=JobRequirementStatus.REQUIRED,
+            substitutability=RequirementSubstitutability.NON_SUBSTITUTABLE))
     # Source dimensions retain the supplied facts, not inferred sentiment.
     opp = facts.opportunity
     dimension_facts = {
@@ -221,6 +230,12 @@ def fixture_requests(case_id, facts, candidate_id, job_id):
                                                 fixture_key(job_request): job_response}, clock=clock)
     cr, jr = interpreter.interpret(candidate_request), interpreter.interpret(job_request)
     candidate, job = candidate_snapshot(candidate_request, cr), job_snapshot(job_request, jr)
+    if constraint_kind:
+        # Project both sides of the frozen, explicitly confirmed incompatibility.
+        candidate = replace(candidate,
+            structured_preferences=(CandidatePreference(constraint_kind, "not_allowed",
+                CandidatePreferenceSemantic.CONSTRAINT, candidate.source_refs),),
+            fact_coverage=CandidateFactCoverage(constraints=CoverageState.CONFIRMED_COMPLETE))
     pair_request = StructuredInterpretationInput(
         Op.ANALYZE_HIRING_CASE, candidate_id, job_id, source_registry=registry,
         candidate_profile=candidate, job_profile=job, hard_facts=hard,

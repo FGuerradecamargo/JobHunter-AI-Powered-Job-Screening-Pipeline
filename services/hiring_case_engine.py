@@ -182,4 +182,8 @@ def build_hiring_case(data: HiringCaseInput) -> HiringCase:
         how_to_prove=proof,
         add_evidence=add_evidence,
         hard_eligibility_blockers=list(data.hard_eligibility_blockers),
+        candidate_profile_version=data.candidate_profile_version,
+        job_profile_version=data.job_profile_version,
+        candidate_signature=data.candidate_signature,
+        job_signature=data.job_signature,
     )

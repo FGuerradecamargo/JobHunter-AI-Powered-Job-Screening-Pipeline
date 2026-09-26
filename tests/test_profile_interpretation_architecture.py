@@ -275,7 +275,7 @@ def test_unconfirmed_ai_gap_is_missing_but_confirmed_gap_remains_gap():
     assert result.requirements[0].evidence_state is RequirementEvidenceState.GAP
 
 
-def test_hard_assessment_beats_ai_and_explicit_blocker_wins():
+def test_hard_assessment_beats_ai_but_job_fact_alone_does_not_block_candidate():
     candidate, job, hard = profiles()
     hard = replace(hard, facts=hard.facts + (HardJobFact("block", "eligibility", "Required license absent", "job:block", hard_blocker=True),))
     interpretation = HiringCaseInterpretation(
@@ -292,7 +292,8 @@ def test_hard_assessment_beats_ai_and_explicit_blocker_wins():
     )
     case = build_hiring_case(data)
     assert data.requirements[0].evidence_state is RequirementEvidenceState.PROVEN
-    assert case.classification.value == "ineligible"
+    assert case.classification.value != "ineligible"
+    assert case.hard_eligibility_blockers == []
 
 
 def test_snapshot_repository_is_candidate_scoped_and_historical(tmp_path):

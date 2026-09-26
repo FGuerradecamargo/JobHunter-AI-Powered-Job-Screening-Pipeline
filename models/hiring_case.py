@@ -259,6 +259,10 @@ class HiringCaseInput:
     opportunity_signals: list[OpportunitySignal] = field(default_factory=list)
     hard_eligibility_blockers: list[str] = field(default_factory=list)
     seniority_context_mismatch: bool = False
+    candidate_profile_version: int | None = None
+    job_profile_version: int | None = None
+    candidate_signature: str = ""
+    job_signature: str = ""
 
 
 @dataclass(frozen=True)
@@ -272,5 +276,9 @@ class HiringCase:
     how_to_prove: HowToProveContract
     add_evidence: list[AddEvidenceContract] = field(default_factory=list)
     hard_eligibility_blockers: list[str] = field(default_factory=list)
+    candidate_profile_version: int | None = None
+    job_profile_version: int | None = None
+    candidate_signature: str = ""
+    job_signature: str = ""
     schema_version: str = HIRING_CASE_SCHEMA_VERSION
     authority: str = "deterministic_hiring_case"

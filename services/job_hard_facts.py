@@ -4,7 +4,9 @@ import hashlib
 import json
 
 from models.job_profile import JobProfile
-from models.profile_interpretation import HardJobFact, JobHardFacts
+from models.profile_interpretation import (
+    HardJobFact, JobHardFacts, JobRequirementStatus, RequirementSubstitutability,
+)
 
 
 def build_job_hard_facts(
@@ -12,7 +14,11 @@ def build_job_hard_facts(
     *,
     explicit_blockers: tuple[str, ...] = (),
 ) -> JobHardFacts:
-    """Project existing parsed fields into explicit, source-related facts."""
+    """Project vacancy requirements, never candidate-specific incompatibilities.
+
+    Legacy explicit_blockers mark mandatory non-substitutable requirements only;
+    they cannot independently establish a HiringCase eligibility blocker.
+    """
     categories = (
         ("responsibility", profile.key_responsibilities),
         ("must_have_capability", profile.must_have_capabilities),
@@ -34,9 +40,16 @@ def build_job_hard_facts(
         facts.append(HardJobFact(
             fact_id=f"job-fact-{digest}", kind=kind, value=value,
             source_ref=f"job:{profile.job_id}:parsed:{kind}:{index}", hard_blocker=blocker,
+            requirement_status=(JobRequirementStatus.REQUIRED if blocker or kind in {
+                "must_have_capability", "must_have_experience", "qualification", "structural_requirement",
+            } else JobRequirementStatus.PREFERRED if kind == "nice_to_have" else JobRequirementStatus.UNKNOWN),
+            substitutability=(RequirementSubstitutability.NON_SUBSTITUTABLE if blocker
+                              else RequirementSubstitutability.UNKNOWN),
         ))
     payload = [
-        {"kind": item.kind, "value": item.value, "hard_blocker": item.hard_blocker}
+        {"kind": item.kind, "value": item.value, "hard_blocker": item.hard_blocker,
+         "requirement_status": item.requirement_status.value,
+         "substitutability": item.substitutability.value}
         for item in facts
     ]
     signature = hashlib.sha256(
