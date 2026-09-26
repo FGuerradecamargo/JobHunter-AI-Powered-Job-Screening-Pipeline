@@ -644,6 +644,7 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "candidate_profile_snapshots",
         "job_profile_snapshots",
         "market_profile_snapshots",
+        "company_profile_snapshots",
         "company_interview_answers",
     }
 )
@@ -699,8 +700,30 @@ def create_company_registry_schema(connection) -> None:
         )
         """
     )
-    for table in ("companies", "candidate_monitored_companies", "company_job_sources"):
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS company_profile_snapshots (
+            company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            profile_version INTEGER NOT NULL CHECK (profile_version > 0),
+            schema_version TEXT NOT NULL,
+            source_signature TEXT NOT NULL,
+            supersedes_version INTEGER,
+            profile_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (company_id, profile_version)
+        )"""
+    )
+    for table in ("companies", "candidate_monitored_companies", "company_job_sources", "company_profile_snapshots"):
         _enable_server_only_row_level_security(connection, table)
+    if is_postgres():
+        for role in ("PUBLIC", "anon", "authenticated"):
+            if role == "PUBLIC":
+                connection.execute("REVOKE ALL ON TABLE company_profile_snapshots FROM PUBLIC")
+            else:
+                connection.execute(f"""DO $$ BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+                        EXECUTE 'REVOKE ALL ON TABLE company_profile_snapshots FROM {role}';
+                    END IF;
+                END $$""")
     from services.source_run_schema import create_source_run_schema
     create_source_run_schema(connection)
 
