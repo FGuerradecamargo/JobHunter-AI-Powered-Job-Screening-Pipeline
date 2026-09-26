@@ -106,18 +106,23 @@ def test_actual_page_renderer_uses_normalized_content_for_screen_and_exports():
     assert all(cv["key_skills"] == ["SQL"] for cv in exported)
 
 
-@pytest.mark.parametrize("target,title,expected", [
-    ("Business Analyst", "Business Analyst - Trade Finance", True),
-    ("Fraud Operations Analyst", "Fraud Operations Analyst", True),
-    ("Risk Operations", "Risk Operations Analyst", True),
-    ("Business Analyst", "Mechanical Engineering Analyst", False),
-    ("Business Analyst", "Investment Analyst", False),
-    ("analyst", "PMO Analyst", False),
-    ("analyst", "Contract Analyst II", False),
+@pytest.mark.parametrize("target,title", [
+    ("Business Analyst", "Business Analyst - Trade Finance"),
+    ("Fraud Operations Analyst", "Fraud Operations Analyst"),
+    ("Risk Operations", "Risk Operations Analyst"),
+    ("Business Analyst", "Mechanical Engineering Analyst"),
+    ("Business Analyst", "Investment Analyst"),
+    ("analyst", "PMO Analyst"),
+    ("analyst", "Contract Analyst II"),
 ])
-def test_direction_diagnostics_preserve_specific_and_conservative_matching(target, title, expected):
+def test_direction_is_deferred_to_relationship_analysis(target, title):
+    from models.job import Job
     analyzer = HardFilterAnalyzer(CandidateProfile(target_roles=[target]))
-    assert analyzer._role_matches_direction(JobProfile(job_id="fixture", canonical_role=title)) is expected
+    result = analyzer.analyze(
+        Job(id="fixture", raw_text=title, url="https://example.test/job", title=title),
+        JobProfile(job_id="fixture", canonical_role=title),
+    )
+    assert result == {"rejected": False, "reasons": []}
 
 
 @pytest.mark.parametrize("fit,growth", [(30,95),(65,40),(85,80)])
