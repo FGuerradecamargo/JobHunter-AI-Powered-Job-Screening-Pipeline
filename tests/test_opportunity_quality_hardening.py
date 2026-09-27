@@ -19,6 +19,17 @@ from services.analyzers.hard_filter_analyzer import HardFilterAnalyzer
 from services.ai.response_parser import parse_response
 
 
+def official_analysis(candidate_id, job_id, *, transferable=False):
+    from models.hiring_case import (HiringCaseInput, RequirementAssessment, RequirementEvidenceState as Evidence,
+        RequirementImportance as Importance, OpportunitySignal, OpportunitySignalKind, OpportunitySignalState)
+    from services.hiring_case_engine import build_hiring_case
+    from services.hiring_case_compatibility import hiring_case_analysis
+    return hiring_case_analysis(build_hiring_case(HiringCaseInput(candidate_id, job_id,
+        [RequirementAssessment("need", "Support", Importance.CORE,
+            Evidence.TRANSFERABLE if transferable else Evidence.PROVEN, ["fixture-evidence"])],
+        [OpportunitySignal(OpportunitySignalKind.CAREER_DIRECTION, OpportunitySignalState.POSITIVE, Importance.CORE)])))
+
+
 def test_test_database_cannot_use_ambient_postgres(monkeypatch, tmp_path):
     assert database.DATABASE_FILE.is_relative_to(tmp_path)
     assert not os.environ.get("DATABASE_URL")
@@ -35,7 +46,7 @@ def test_fixture_job_and_analysis_never_reach_separate_application_db(tmp_path, 
     CandidateRepository().save(Candidate("synthetic", "Synthetic", "Operations", "mid", "Fixture"))
     database.ensure_candidate_job_analysis("synthetic", "fixture")
     database.save_candidate_job_analysis(candidate_id="synthetic", job_id="fixture",
-        analysis={"recommendation":"best_match","bucket":"best_match"},
+        analysis=official_analysis("synthetic", "fixture"),
         job_signature="fixture", candidate_signature="fixture", analysis_version="test",
         opportunity_state="active")
     assert len(database.list_candidate_jobs("synthetic", "in_review")) == 1
@@ -56,7 +67,7 @@ def test_opportunity_query_keeps_candidate_analysis_separate():
     for candidate_id, bucket in (("owner", "potential"), ("other", "best_match")):
         database.ensure_candidate_job_analysis(candidate_id, "shared")
         database.save_candidate_job_analysis(candidate_id=candidate_id, job_id="shared",
-            analysis={"recommendation":bucket,"bucket":bucket,"current_fit":60,"growth_value":50},
+            analysis=official_analysis(candidate_id, "shared", transferable=bucket == "potential"),
             job_signature="job", candidate_signature=candidate_id, analysis_version="test",
             opportunity_state="active")
     owner = database.list_candidate_jobs("owner", "in_review")

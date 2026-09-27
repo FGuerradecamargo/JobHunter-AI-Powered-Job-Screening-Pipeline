@@ -89,11 +89,38 @@ def test_real_search_persists_only_hiring_case_classification(repo, unknown):
     assert payload["classification"] == ("not_surfaced" if unknown else "best_match")
     assert row["recommendation"] == ("reject" if unknown else "best_match")
     assert result["ai_approved"] == (0 if unknown else 1)
+    ready = database.list_inactive_approved_candidate_jobs("a", limit=1)
+    assert len(ready) == (0 if unknown else 1)
+    activated = database.activate_candidate_opportunities("a", [job().id])
+    assert activated == ([] if unknown else [job().id])
+    assert len(database.list_candidate_jobs("a", "in_review")) == (0 if unknown else 1)
+    assert database.count_candidate_jobs_by_status("a")["in_review"] == (0 if unknown else 1)
     if unknown:
         assert row["status"] == "in_review"
         assert row["opportunity_state"] == "none"
         assert result["ai_rejected"] == 0
         assert result["not_surfaced"] == 1
+
+
+def test_legacy_bucket_cannot_activate_without_an_official_case(repo):
+    service = search_service(repo, RelationshipClient())
+    with database.get_connection() as connection:
+        connection.execute("UPDATE candidate_job_analyses SET analysis_state='analyzed', recommendation='best_match', "
+                           "status='in_review', analysis_json='{}' WHERE candidate_id=?", ("a",))
+    assert database.list_inactive_approved_candidate_jobs("a") == []
+    assert database.activate_candidate_opportunities("a", [job().id]) == []
+
+
+def test_other_candidates_case_cannot_activate_for_current_owner(repo):
+    client = RelationshipClient()
+    service = search_service(repo, client)
+    service.analyze_pending("a", limit=1)
+    with database.get_connection() as connection:
+        row = connection.execute("SELECT analysis_json FROM candidate_job_analyses WHERE candidate_id=?", ("a",)).fetchone()
+        payload = json.loads(row["analysis_json"])
+        payload["hiring_case"]["candidate_id"] = "b"
+        connection.execute("UPDATE candidate_job_analyses SET analysis_json=? WHERE candidate_id=?", (json.dumps(payload), "a"))
+    assert database.activate_candidate_opportunities("a", [job().id]) == []
 
 
 def test_legacy_preference_defaults_cannot_become_hard_incompatibility(repo):

@@ -46,6 +46,10 @@ def decode_structure(value, annotation):
         if not isinstance(value, (list, tuple)) or len(args) != 2 or args[1] is not Ellipsis:
             fail(Issue.INVALID_SCHEMA)
         return tuple(decode_structure(item, args[0]) for item in value)
+    if origin is list:
+        if type(value) is not list or len(args) != 1:
+            fail(Issue.INVALID_SCHEMA)
+        return [decode_structure(item, args[0]) for item in value]
     if is_dataclass(annotation):
         if type(value) is not dict:
             fail(Issue.INVALID_SCHEMA)

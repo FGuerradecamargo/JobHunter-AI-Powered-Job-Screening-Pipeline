@@ -171,10 +171,14 @@ def test_revalidation_hard_reject_is_removed_before_refill(search):
 
 def test_target_five_activates_only_five_after_ten_eligible(search, monkeypatch):
     search.add(12)
-    monkeypatch.setattr(analysis_module, "hiring_case_analysis", lambda result: {
-        "job_id": result.job_id, "recommendation": "best_match",
-        "current_fit": 90, "growth_value": 80,
-    })
+    from dataclasses import replace
+    from services.ai.ai_recommendation_service import AIRecommendationService
+    from services.hiring_case_compatibility import hiring_case_analysis
+    from tests.test_v1_runtime_hiring_case_batch import Client, inputs, response
+    req = inputs()[0]
+    case = AIRecommendationService(Client([response(req)])).analyze_hiring_cases_batch([req])[0]
+    monkeypatch.setattr(analysis_module, "hiring_case_analysis", lambda result: hiring_case_analysis(
+        replace(case, candidate_id=result.candidate_id, job_id=result.job_id)))
     for _ in range(11):
         search.step()
     assert search.run.status == "complete"

@@ -2,6 +2,23 @@ from dataclasses import asdict, dataclass
 
 from models.hiring_case import HiringCaseClassification
 from models.hiring_case import HiringCase, RequirementEvidenceState
+from models.hiring_case import HIRING_CASE_SCHEMA_VERSION
+from services.structured_interpretation_validation import decode_structure
+import json
+
+
+def read_hiring_case(analysis, *, candidate_id, job_id):
+    """Fail closed for legacy, corrupt or differently scoped persisted analyses."""
+    try:
+        if isinstance(analysis, str):
+            analysis = json.loads(analysis)
+        case = decode_structure(analysis["hiring_case"], HiringCase)
+        if (case.authority != "deterministic_hiring_case" or case.schema_version != HIRING_CASE_SCHEMA_VERSION
+                or case.candidate_id != candidate_id or case.job_id != job_id):
+            return None
+        return case
+    except (ValueError, TypeError, KeyError):
+        return None
 
 
 def hiring_case_analysis(case: HiringCase) -> dict:

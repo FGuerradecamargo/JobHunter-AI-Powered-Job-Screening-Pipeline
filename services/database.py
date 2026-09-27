@@ -3064,6 +3064,12 @@ def list_candidate_jobs(
             item.pop("analysis_json")
         )
 
+        if status == "in_review":
+            from services.hiring_case_compatibility import read_hiring_case, hiring_case_analysis
+            case = read_hiring_case(item["analysis"], candidate_id=candidate_id, job_id=item["id"])
+            if case is None or not case.surfaced:
+                continue
+            item["recommendation"] = hiring_case_analysis(case)["recommendation"]
         results.append(item)
 
     return results
@@ -3123,6 +3129,7 @@ def count_candidate_jobs_by_status(
             row["total"]
         )
 
+    counts["in_review"] = len(list_candidate_jobs(candidate_id, "in_review"))
     return counts
 
 
@@ -3204,13 +3211,11 @@ def list_inactive_approved_candidate_jobs(
             candidate_job_analyses.growth_value DESC,
             candidate_job_analyses.updated_at ASC
 
-        LIMIT ?
     """
 
     params = [
         candidate_id,
         *approved,
-        limit,
     ]
 
     with get_connection() as connection:
@@ -3219,10 +3224,15 @@ def list_inactive_approved_candidate_jobs(
             tuple(params),
         ).fetchall()
 
-    return [
-        dict(row)
-        for row in rows
-    ]
+    from services.hiring_case_compatibility import read_hiring_case
+    eligible = []
+    for row in rows:
+        case = read_hiring_case(row["analysis_json"], candidate_id=candidate_id, job_id=row["id"])
+        if case is not None and case.surfaced:
+            eligible.append(dict(row))
+        if len(eligible) >= limit:
+            break
+    return eligible
 
 
 def activate_candidate_opportunities(
@@ -3260,7 +3270,8 @@ def activate_candidate_opportunities(
                     recommendation,
                     analysis_state,
                     opportunity_state,
-                    status
+                    status,
+                    analysis_json
 
                 FROM candidate_job_analyses
 
@@ -3275,6 +3286,11 @@ def activate_candidate_opportunities(
             ).fetchone()
 
             if row is None:
+                continue
+
+            from services.hiring_case_compatibility import read_hiring_case
+            case = read_hiring_case(row["analysis_json"], candidate_id=candidate_id, job_id=job_id)
+            if case is None or not case.surfaced:
                 continue
 
             if row["analysis_state"] != "analyzed":
@@ -3304,11 +3320,16 @@ def activate_candidate_opportunities(
                     candidate_id = ?
                     AND job_id = ?
                     AND opportunity_state = 'none'
+                    AND status = 'in_review'
+                    AND analysis_json = ?
+                    AND EXISTS (SELECT 1 FROM jobs WHERE jobs.id = candidate_job_analyses.job_id
+                                AND jobs.archived_at IS NULL)
                 """,
                 (
                     utc_now(),
                     candidate_id,
                     job_id,
+                    row["analysis_json"],
                 ),
             )
 
