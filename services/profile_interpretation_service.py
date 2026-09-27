@@ -116,3 +116,7 @@ class ProfileInterpretationService:
         )
         self.repository.save_job(profile)
         return profile
+
+    def job_profile_from_observation(self, *, job_id, source_repository, user_id=None):
+        hard_facts = source_repository.load_job_hard_facts(job_id, user_id=user_id)
+        return self.job_profile(hard_facts=hard_facts)

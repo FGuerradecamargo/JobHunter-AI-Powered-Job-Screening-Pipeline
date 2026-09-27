@@ -1,5 +1,5 @@
 from functools import lru_cache
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from models.job import Job
 
 import json
@@ -650,6 +650,8 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "company_interview_answers",
         "candidate_product_state",
         "candidate_product_state_events",
+        "job_observations",
+        "job_content_authority",
     }
 )
 
@@ -2756,6 +2758,33 @@ def initialize_database() -> None:
         create_company_interview_schema(connection)
         create_interview_round_schema(connection)
         create_product_state_schema(connection)
+        create_job_observation_schema(connection)
+
+
+def create_job_observation_schema(connection) -> None:
+    """Additive migration: legacy content is deliberately not assigned authority."""
+    connection.execute("""CREATE TABLE IF NOT EXISTS job_observations (
+        observation_id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        source_type TEXT NOT NULL, external_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    )""")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_job_observations_owner ON job_observations(user_id, job_id)")
+    connection.execute("""CREATE TABLE IF NOT EXISTS job_content_authority (
+        job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+        observation_id TEXT NOT NULL REFERENCES job_observations(observation_id) ON DELETE CASCADE
+    )""")
+    for table in ("job_observations", "job_content_authority"):
+        _enable_server_only_row_level_security(connection, table)
+        if is_postgres():
+            connection.execute(f"REVOKE ALL ON TABLE {table} FROM PUBLIC")
+            for role in ("anon", "authenticated"):
+                connection.execute(f"""DO $$ BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+                        REVOKE ALL ON TABLE {table} FROM {role};
+                    END IF;
+                END $$""")
 
 
 def create_product_state_schema(connection) -> None:
@@ -2824,131 +2853,6 @@ def create_company_interview_schema(connection):
         END $$''')
 
 
-def upsert_recommendation(
-    item: dict[str, Any],
-) -> None:
-    job = item.get("job", {})
-    analysis = item.get("analysis", {})
-
-    job_id = str(
-        job.get("id", "")
-    ).strip()
-
-    if not job_id:
-        return
-
-    now = utc_now()
-
-    category_service = JobCategoryService()
-
-    job_category = category_service.classify(
-        title=job.title or "",
-        description=getattr(
-            job,
-            "description",
-            "",
-        ) or "",
-        raw_text=job.raw_text or "",
-    )
-
-    with get_connection() as connection:
-        connection.execute(
-            """
-            INSERT INTO jobs (
-                id,
-                raw_text,
-                title,
-                company,
-                location,
-                url,
-                remote,
-                salary,
-                easy_apply,
-                category,
-                sub_category,
-                analysis_json,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-
-            ON CONFLICT(id) DO UPDATE SET
-                title = excluded.title,
-                company = excluded.company,
-                location = excluded.location,
-                url = excluded.url,
-                recommendation = excluded.recommendation,
-                competitive_status = excluded.competitive_status,
-                current_fit = excluded.current_fit,
-                growth_value = excluded.growth_value,
-                analysis_json = excluded.analysis_json,
-                updated_at = excluded.updated_at
-            """,
-            (
-                job_id,
-                job.get(
-                    "title",
-                    "Untitled role",
-                ),
-                job.get("company"),
-                job.get("location"),
-                job.get("url"),
-                "in_review",
-                analysis.get(
-                    "recommendation"
-                ),
-                analysis.get(
-                    "competitive_status"
-                ),
-                analysis.get(
-                    "current_fit"
-                ),
-                analysis.get(
-                    "growth_value"
-                ),
-                json.dumps(
-                    analysis,
-                    ensure_ascii=False,
-                ),
-                now,
-                now,
-            ),
-        )
-
-
-def import_recommendations(
-    recommendations: list[dict[str, Any]],
-) -> int:
-    imported = 0
-
-    for item in recommendations:
-        analysis = item.get(
-            "analysis",
-            {},
-        )
-
-        recommendation = analysis.get(
-            "recommendation"
-        )
-
-        hard_conflicts = analysis.get(
-            "hard_conflicts",
-            [],
-        )
-
-        if recommendation not in {
-            "recommended_apply",
-            "worth_second_look",
-        }:
-            continue
-
-        if hard_conflicts:
-            continue
-
-        upsert_recommendation(item)
-        imported += 1
-
-    return imported
 
 
 def list_jobs(
@@ -3529,12 +3433,14 @@ def update_candidate_job_notes(
 
 def upsert_raw_job(
     job: Job,
+    *,
+    _connection=None,
 ) -> str:
     """
     Insere uma vaga nova no pool compartilhado.
 
-    Se a vaga já existir, atualiza apenas quando o novo
-    raw_text possui mais informações.
+    Existing content is immutable here. Only provenance-authorized observation
+    writes may replace canonical content; text length is never authority.
     """
     job_id = str(job.id).strip()
 
@@ -3557,7 +3463,7 @@ def upsert_raw_job(
         raw_text=job.raw_text or "",
     )
 
-    with get_connection() as connection:
+    with (nullcontext(_connection) if _connection is not None else get_connection()) as connection:
         existing_row = connection.execute(
             """
             SELECT
@@ -3616,58 +3522,7 @@ def upsert_raw_job(
 
             return "created"
 
-        current_raw_text = (
-            existing_row["raw_text"]
-            or ""
-        )
-
-        new_raw_text = job.raw_text or ""
-
-        if len(new_raw_text) <= len(
-            current_raw_text
-        ):
-            return "unchanged"
-
-        connection.execute(
-            """
-            UPDATE jobs
-            SET
-                raw_text = ?,
-                description = COALESCE(?, description),
-                title = COALESCE(?, title),
-                company = COALESCE(?, company),
-                location = COALESCE(?, location),
-                url = COALESCE(?, url),
-                remote = COALESCE(?, remote),
-                salary = COALESCE(?, salary),
-                easy_apply = ?,
-                category = ?,
-                sub_category = ?,
-                updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                new_raw_text,
-                job.description,
-                job.title,
-                job.company,
-                job.location,
-                job.url,
-                (
-                    None
-                    if job.remote is None
-                    else int(job.remote)
-                ),
-                job.salary,
-                int(job.easy_apply),
-                job_category.category,
-                job_category.sub_category,
-                now,
-                job_id,
-            ),
-        )
-
-        return "updated"
+        return "unchanged"
 
 
 def ensure_candidate_job_analysis(
@@ -4590,21 +4445,8 @@ def list_candidate_jobs_for_reanalysis(
 def update_shared_job_analysis_data(
     job: Job,
 ) -> None:
-    with get_connection() as connection:
-        connection.execute(
-            """
-            UPDATE jobs
-            SET
-                description = ?,
-                updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                job.description,
-                utc_now(),
-                str(job.id),
-            ),
-        )
+    from services.job_source_repository import JobSourceRepository
+    JobSourceRepository().record_fetched_description(job)
 
 
 def _save_candidate_job_analysis_on_connection(

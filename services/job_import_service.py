@@ -1,10 +1,4 @@
-from dataclasses import replace
-
-from services.job_observation import normalize_observation, is_personal_source
-from services.database import (
-    get_connection,
-    upsert_raw_job,
-)
+from services.job_observation import is_personal_source
 from services.job_source_repository import (
     JobSourceRepository,
 )
@@ -61,21 +55,12 @@ class JobImportService:
         }
 
         for job in jobs:
-            job = normalize_observation(job, source_type).job
-            if user_id is None:
-                job = replace(job, id=self._canonical_global_id(job))
-            status = upsert_raw_job(
-                job
+            job_id, status = self.source_repository.record_observation(
+                job, source_type, user_id=user_id, trusted_public=user_id is None,
             )
 
             if status in result:
                 result[status] += 1
-
-            self.source_repository.add_source(
-                job_id=job.id,
-                source_type=source_type,
-                user_id=user_id,
-            )
 
             # Search-taxonomy evidence is global.
             # Never persist candidate/user-specific discovery
@@ -87,61 +72,11 @@ class JobImportService:
                 and discovery_query
             ):
                 self.source_repository.add_discovery_signal(
-                    job_id=job.id,
+                    job_id=job_id,
                     source_type=source_type,
                     category=discovery_category,
                     sub_category=discovery_sub_category,
                     search_query=discovery_query,
                 )
 
-            if user_id is None:
-                with get_connection() as connection:
-                    connection.execute(
-                        """
-                        UPDATE jobs
-                        SET archived_at = NULL
-                        WHERE
-                            id = ?
-                            AND archived_at IS NOT NULL
-                        """,
-                        (job.id,),
-                    )
-
         return result
-
-    @staticmethod
-    def _canonical_global_id(job):
-        with get_connection() as connection:
-            existing = connection.execute(
-                "SELECT id FROM jobs WHERE id = ?", (job.id,),
-            ).fetchone()
-            if existing is not None:
-                personal = connection.execute(
-                    "SELECT 1 FROM job_sources WHERE job_id = ? AND user_id IS NOT NULL",
-                    (job.id,),
-                ).fetchone()
-                if personal:
-                    raise ValueError("Global import cannot promote a personal record.")
-                return job.id
-            if not job.url or not job.company or not job.location:
-                return job.id
-            matches = connection.execute(
-                """
-                SELECT jobs.id FROM jobs
-                WHERE jobs.url = ?
-                    AND LOWER(TRIM(jobs.title)) = LOWER(TRIM(?))
-                    AND LOWER(TRIM(jobs.company)) = LOWER(TRIM(?))
-                    AND LOWER(TRIM(jobs.location)) = LOWER(TRIM(?))
-                    AND EXISTS (
-                        SELECT 1 FROM job_sources s
-                        WHERE s.job_id = jobs.id AND s.user_id IS NULL
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1 FROM job_sources s
-                        WHERE s.job_id = jobs.id AND s.user_id IS NOT NULL
-                    )
-                LIMIT 2
-                """,
-                (job.url, job.title, job.company, job.location),
-            ).fetchall()
-        return matches[0]["id"] if len(matches) == 1 else job.id

@@ -228,10 +228,10 @@ def test_provider_identifiers_are_namespaced(db):
     assert import_job(job("7", ""), "beta")["created"] == 1
 
 
-def test_launch_overlap_tracking_query_stays_separate(db):
+def test_launch_overlap_tracking_query_reuses_public_identity(db):
     import_job(job())
     other = job("beta:7", job().url + "?utm_source=other")
-    assert import_job(other, "beta")["created"] == 1
+    assert import_job(other, "beta")["unchanged"] == 1
 
 
 def test_launch_overlap_changed_provider_id_reuses_exact_job(db):
@@ -266,7 +266,9 @@ def test_private_source_scope_and_global_search(db):
     assert len(JobSearchRepository().list_user_jobs(users[0].id)) == 1
     assert JobSearchRepository().list_user_jobs(users[1].id) == []
     assert JobSourceRepository().list_sources_for_job("manual:1") == []
-    assert len(JobSourceRepository().list_sources_for_job("manual:1", users[0].id)) == 1
+    private_id = JobSourceRepository().list_by_user(users[0].id)[0]
+    assert private_id.startswith("private:")
+    assert len(JobSourceRepository().list_sources_for_job(private_id, users[0].id)) == 1
     assert JobSourceRepository().list_sources_for_job("manual:1", users[1].id) == []
     assert import_job(job())["created"] == 1
     assert len(JobSearchRepository().list_global_jobs()) == 1
@@ -377,7 +379,8 @@ def test_candidate_discovery_only_includes_global_and_own_personal_jobs(db):
     repo = JobSearchRepository()
     own = repo.list_jobs_to_analyze_for_candidate("a", "v1", "signature")
     other = repo.list_jobs_to_analyze_for_candidate("b", "v1", "signature")
-    assert {row["id"] for row in own} == {"manual:private", "alpha:public"}
+    private_id = JobSourceRepository().list_by_user("a")[0]
+    assert {row["id"] for row in own} == {private_id, "alpha:public"}
     assert {row["id"] for row in other} == {"alpha:public"}
     assert repo.count_jobs_to_analyze_for_candidate("a", "v1", "signature") == len(own)
     assert repo.count_jobs_to_analyze_for_candidate("b", "v1", "signature") == len(other)
@@ -520,7 +523,8 @@ def test_gmail_processor_keeps_personal_provenance(db, monkeypatch):
     assert result.jobs_created == 1
     assert len(calls) == 1
     assert JobSearchRepository().list_global_jobs() == []
-    row = JobSourceRepository().list_sources_for_job("email-job", user.id)[0]
+    job_id = JobSourceRepository().list_by_user(user.id)[0]
+    row = JobSourceRepository().list_sources_for_job(job_id, user.id)[0]
     assert row["source_type"] == "gmail_linkedin"
     assert "private-message" not in repr(dict(row))
 

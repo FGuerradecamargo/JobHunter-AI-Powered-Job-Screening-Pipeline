@@ -17,7 +17,6 @@ from models.job import Job
 from services.system_state_presenter import gmail_notice
 from services.database import (
     initialize_database,
-    upsert_raw_job,
 )
 from services.job_source_repository import JobSourceRepository
 from services.gmail_message_repository import GmailMessageRepository
@@ -628,12 +627,8 @@ if manual_submit:
                 description=description,
             )
 
-            upsert_raw_job(
-                manual_job
-            )
-
-            job_source_repository.add_source(
-                job_id=job_id,
+            job_source_repository.record_observation(
+                job=manual_job,
                 user_id=selected_user.id,
                 source_type="manual",
             )

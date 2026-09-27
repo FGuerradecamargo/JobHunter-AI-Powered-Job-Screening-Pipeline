@@ -1,13 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from models.job import Job
 
 
 def is_personal_source(source_type: str) -> bool:
-    return source_type in {"gmail", "manual", "import", "manual_import"} or source_type.startswith("gmail_")
+    return source_type in {"gmail", "manual", "import", "manual_import", "private", "user"} or source_type.startswith(("gmail_", "gmail:", "manual:", "private:", "user:"))
+
+
+def canonical_observation_url(url: str) -> str:
+    if not url:
+        return ""
+    parsed = urlsplit(url.strip())
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("Job observation URL is invalid.")
+    query = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+             if not k.casefold().startswith("utm_") and k.casefold() not in {"gclid", "fbclid"}]
+    # Fragments can identify distinct vacancies in client-routed ATS pages.
+    return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path,
+                       urlencode(sorted(query)), parsed.fragment))
 
 
 @dataclass(frozen=True)
@@ -24,12 +37,7 @@ def normalize_observation(job: Job, source_type: str) -> JobObservation:
     if not source_type or not external_id or not title:
         raise ValueError("Job observation requires source, identifier and title.")
     url = str(job.url or "").strip()
-    if url:
-        parsed = urlsplit(url)
-        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("Job observation URL is invalid.")
-        # Preserve path and query: these can contain the actual vacancy ID.
-        url = urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, parsed.fragment))
+    url = canonical_observation_url(url)
     job_id = external_id if external_id.startswith(source_type + ":") else source_type + ":" + external_id
     normalized = replace(
         job, id=job_id, title=title, url=url,
