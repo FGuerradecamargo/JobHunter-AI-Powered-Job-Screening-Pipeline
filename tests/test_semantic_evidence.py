@@ -159,7 +159,8 @@ def test_av05_av06_av27_with_explicit_semantic_interpretation(case_id, relations
     case = next(c for c in adversarial_cases() if c.case_id == case_id)
     result = observe_adversarial(case, semantic_fixture=semantic_fixture(relations))
     assert result["states"] == states
-    assert (result["strength"], result["value"], result["classification"]) == ("viable", "high", "worth_a_try")
+    expected = ("viable", "high", "worth_a_try") if case_id == "AV06" else ("unknown", "high", "not_surfaced")
+    assert (result["strength"], result["value"], result["classification"]) == expected
 
 
 def test_legitimate_reuse_is_allowed_per_need_not_globally_banned():

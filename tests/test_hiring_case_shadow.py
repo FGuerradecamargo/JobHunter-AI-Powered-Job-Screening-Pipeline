@@ -36,8 +36,8 @@ from tests.hiring_case_shadow_fixtures import comparison_fixtures, fixture_sourc
 @pytest.mark.parametrize("index,classification,strength,proven,missing,gaps", [
     (0, Classification.BEST_MATCH, Strength.STRONG, 1, 0, 0),
     (1, Classification.YOURE_STRONG_BUT, Strength.STRONG, 1, 0, 0),
-    (2, Classification.WORTH_A_TRY, Strength.WEAK, 0, 0, 1),
-    (3, Classification.WORTH_A_TRY, Strength.VIABLE, 0, 1, 0),
+    (2, Classification.NOT_SURFACED, Strength.UNKNOWN, 0, 0, 1),
+    (3, Classification.NOT_SURFACED, Strength.UNKNOWN, 0, 1, 0),
     (4, Classification.WORTH_A_TRY, Strength.VIABLE, 0, 0, 0),
     (5, Classification.INELIGIBLE, Strength.INELIGIBLE, 1, 0, 0),
 ])
@@ -49,7 +49,7 @@ def test_shadow_scenarios(index, classification, strength, proven, missing, gaps
     assert result.evidence_missing_count == missing
     assert result.needs_evidence_count == missing
     assert result.core_gap_count == gaps
-    assert result.schema_version == "hiring-case-v1"
+    assert result.schema_version == "hiring-case-v2"
     assert result.authoritative is False
 
 
@@ -270,8 +270,8 @@ def test_comparison_maps_legacy_labels_before_comparing():
     missing = comparison_fixtures()[3]
     result = evaluate_hiring_case_shadow(missing)
     assert result.legacy_value is LegacyHiringClassification.POTENTIAL
-    assert result.shadow_classification is Classification.WORTH_A_TRY
-    assert result.comparison is ShadowComparisonState.SAME
+    assert result.shadow_classification is Classification.NOT_SURFACED
+    assert result.comparison is ShadowComparisonState.DIFFERENT
 
 
 def test_diagnostics_and_comparison_never_contain_private_content(caplog):
@@ -301,8 +301,8 @@ def test_local_comparison_harness_is_deterministic_and_content_free():
     result = compare_hiring_case_fixtures(sources)
     assert result == compare_hiring_case_fixtures(reversed(sources))
     assert result["total"] == 8
-    assert result["same"] == 3
-    assert result["changed"] == 4
+    assert result["same"] == 1
+    assert result["changed"] == 6
     assert result["unmapped"] == 1
     assert result["evidence_missing_total"] == 1
     assert result["core_gap_total"] == 1

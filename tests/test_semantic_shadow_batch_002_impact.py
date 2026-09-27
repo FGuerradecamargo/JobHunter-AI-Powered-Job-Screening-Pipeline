@@ -19,15 +19,15 @@ def test_reported_pairs_and_agreement_not_model_accuracy():
     assert {r['case_id'] for r in result['rows'] if r['changed']} == {'SE14','SE18','SE19','SE44','AV02'}
 
 
-def test_se18_changes_satisfaction_and_proof_action_not_strength_or_category():
+def test_se18_missing_support_now_abstains_under_sufficiency_gate():
     row = next(r for r in compare_all() if r['case_id'] == 'SE18')
     a,b = row['reference'],row['observed_real_ai']
     assert a['requirements']['need']['assessment'] == 'transferable'
     assert a['requirements']['need']['satisfied'] is True
     assert b['requirements']['need']['assessment'] == 'evidence_missing'
     assert b['requirements']['need']['satisfied'] is False
-    assert a['strength'] == b['strength'] == 'viable'
-    assert a['category'] == b['category'] == 'skip_for_now'
+    assert a['strength'] == 'viable' and b['strength'] == 'unknown'
+    assert a['category'] == 'skip_for_now' and b['category'] == 'not_surfaced'
     assert a['how_to_prove'] != b['how_to_prove']
     assert not a['add_evidence'] and b['add_evidence']
     assert row['impact'] == 'PRODUCT_DECISION_CHANGE'
@@ -51,6 +51,9 @@ def test_no_optimistic_promotion_and_context_controls(value,blocker):
     for row in compare_all(value_context=value,blocker=blocker):
         a,b = row['reference'],row['observed_real_ai']
         for key in ('strength','eligibility','blockers','category','value','value_confidence'):
+            if not blocker and row['case_id'] == 'SE18' and key in ('strength', 'category'):
+                assert b[key] == ('unknown' if key == 'strength' else 'not_surfaced')
+                continue
             assert a[key] == b[key]
         if blocker:
             assert b['strength'] == b['category'] == 'ineligible'

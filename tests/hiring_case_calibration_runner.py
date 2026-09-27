@@ -10,14 +10,13 @@ from models.candidate_priority import CandidatePriority
 from models.career_objective import CareerObjective
 from models.career_update import CareerUpdate
 from models.hiring_case import (
-    HiringCaseClassification, HiringCaseStrength, OpportunityValue,
+    HiringCaseClassification,
     RequirementEvidenceState, RequirementImportance,
 )
 from models.hiring_case_shadow import ConfirmedCapabilityGap, HiringCaseShadowSource
 from models.job_profile import JobProfile
 from models.professional_experience_profile import ProfessionalExperienceProfile
 from services.hiring_case_compatibility import read_legacy_classification
-from services.hiring_case_engine import classify_hiring_case
 from services.hiring_case_shadow_service import evaluate_profile_hiring_case_shadow
 from services.profile_hiring_case_adapter import build_profile_hiring_case_input
 from tests.hiring_case_calibration_cases import RootCause, calibration_cases
@@ -206,9 +205,9 @@ def evaluate_case(case):
         "importance_mismatches": importances, "any_mismatch": any_mismatch,
         "primary_root_cause": root,
         "proof_review": proof_reviews(case), "evidence_missing_review": evidence_missing,
-        "quadrant_given_reference_dimensions": classify_hiring_case(
-            HiringCaseStrength(case.expected.strength), OpportunityValue(case.expected.value),
-        ).value,
+        # Reference strength/value alone cannot establish v2 evidence sufficiency.
+        "quadrant_given_reference_dimensions": None,
+        "reference_quadrant_unavailable_reason": "grounded_evaluation_required",
     }
 
 

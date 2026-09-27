@@ -40,11 +40,15 @@ def test_review_changed_only_three_judgments_and_all_cases_are_frozen():
 
 def test_reviewed_calibration_and_provenance_metadata():
     result = run_calibration()
-    assert result["all"]["shadow_exact_matches"] == 40
-    assert result["all"]["strength_mismatches"] == result["all"]["value_mismatches"] == 0
+    # Keep the historical human judgments frozen; v2 abstains on these three cases.
+    assert result["all"]["shadow_exact_matches"] == 37
+    assert result["all"]["strength_mismatches"] == 3
+    assert result["all"]["value_mismatches"] == 0
     assert result["all"]["evidence_state_mismatches"] == 0
     assert result["all"]["confidence_matches"] == result["all"]["confidence_reviewed"] == 1
     rows = {row["case_id"]: row for row in result["cases"]}
+    assert all(row["quadrant_given_reference_dimensions"] is None for row in rows.values())
+    assert {key for key, row in rows.items() if row["shadow_classification"] == "not_surfaced"} == {"HC01b", "HC07b", "HC12b"}
     missing = rows["HC12b"]["semantic_links"][0]
     assert missing["reason_code"] == "source_reference_unavailable"
     assert missing["needs_source_repair"] and not missing["needs_evidence"]

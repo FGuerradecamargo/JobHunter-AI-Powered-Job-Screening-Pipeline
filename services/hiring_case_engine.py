@@ -29,6 +29,9 @@ def determine_hiring_case_strength(data: HiringCaseInput) -> HiringCaseStrength:
         item for item in data.requirements
         if item.importance is RequirementImportance.IMPORTANT
     ]
+    evaluated, positive = _grounded_requirements(data)
+    if not evaluated:
+        return HiringCaseStrength.UNKNOWN
     if any(item.evidence_state is RequirementEvidenceState.GAP for item in core):
         return HiringCaseStrength.WEAK
     if data.seniority_context_mismatch:
@@ -54,7 +57,19 @@ def determine_hiring_case_strength(data: HiringCaseInput) -> HiringCaseStrength:
     if any(item.evidence_requirement is EvidenceRequirement.DIRECT_REQUIRED
            and not item.constraint_satisfied for item in important):
         return HiringCaseStrength.VIABLE
+    if not any(item.evidence_state is RequirementEvidenceState.PROVEN for item in positive):
+        return HiringCaseStrength.VIABLE
     return HiringCaseStrength.STRONG
+
+
+def _grounded_requirements(data):
+    relevant = [item for item in data.requirements
+                if item.importance in {RequirementImportance.CORE, RequirementImportance.IMPORTANT}]
+    evaluated = [item for item in relevant if item.evidence_refs
+                 and item.evidence_state is not RequirementEvidenceState.EVIDENCE_MISSING]
+    positive = [item for item in evaluated if item.evidence_state in {
+        RequirementEvidenceState.PROVEN, RequirementEvidenceState.TRANSFERABLE}]
+    return evaluated, positive
 
 
 def assess_opportunity_value(data: HiringCaseInput) -> OpportunityAssessment:
@@ -90,9 +105,14 @@ def assess_opportunity_value(data: HiringCaseInput) -> OpportunityAssessment:
 def classify_hiring_case(
     strength: HiringCaseStrength,
     opportunity_value: OpportunityValue,
+    *,
+    evaluated_requirement_count: int = 0,
+    positive_requirement_count: int = 0,
 ) -> HiringCaseClassification:
     if strength is HiringCaseStrength.INELIGIBLE:
         return HiringCaseClassification.INELIGIBLE
+    if not evaluated_requirement_count or not positive_requirement_count:
+        return HiringCaseClassification.NOT_SURFACED
     if strength is HiringCaseStrength.STRONG:
         if opportunity_value is OpportunityValue.HIGH:
             return HiringCaseClassification.BEST_MATCH
@@ -149,6 +169,16 @@ def _proof_item(item) -> ProofItem:
 def build_hiring_case(data: HiringCaseInput) -> HiringCase:
     strength = determine_hiring_case_strength(data)
     opportunity = assess_opportunity_value(data)
+    evaluated, positive = _grounded_requirements(data)
+    classification = classify_hiring_case(
+        strength, opportunity.value, evaluated_requirement_count=len(evaluated),
+        positive_requirement_count=len(positive),
+    )
+    reason = ("hard_incompatibility" if data.hard_eligibility_blockers else
+              "insufficient_evidence" if not evaluated else
+              "no_grounded_positive_support" if not positive else
+              "insufficient_candidate_value" if classification is HiringCaseClassification.SKIP_FOR_NOW else
+              "grounded_relationship")
     relevant = [
         item for item in data.requirements
         if item.importance is not RequirementImportance.NICE_TO_HAVE
@@ -178,7 +208,10 @@ def build_hiring_case(data: HiringCaseInput) -> HiringCase:
         requirements=list(data.requirements),
         hiring_case_strength=strength,
         opportunity=opportunity,
-        classification=classify_hiring_case(strength, opportunity.value),
+        classification=classification,
+        surfacing_reason=reason,
+        evaluated_requirement_count=len(evaluated),
+        positive_requirement_count=len(positive),
         how_to_prove=proof,
         add_evidence=add_evidence,
         hard_eligibility_blockers=list(data.hard_eligibility_blockers),

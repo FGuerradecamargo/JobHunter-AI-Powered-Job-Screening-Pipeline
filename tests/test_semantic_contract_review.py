@@ -140,7 +140,8 @@ def test_reviewed_adversarial_semantics_preserve_product_meaning(case_id, relati
         fixtures[1]["links"][0].update(evidence_ref="e:1", candidate_capability_id="n1")
     actual = observe_adversarial(case, semantic_fixture=fixtures)
     assert actual["states"] == states
-    assert (actual["strength"], actual["value"], actual["classification"]) == ("viable", "high", "worth_a_try")
+    expected = ("unknown", "high", "not_surfaced") if case_id == "AV26" else ("viable", "high", "worth_a_try")
+    assert (actual["strength"], actual["value"], actual["classification"]) == expected
     if case_id == "AV02":
         assert actual["constraints"][1] == ("direct_required", False, "direct_evidence_required")
     if case_id == "AV26":

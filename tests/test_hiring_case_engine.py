@@ -73,11 +73,11 @@ def case(*requirements, signals=None, blockers=None, seniority_mismatch=False):
         # A: direct proof plus high candidate value.
         ([requirement()], [signal()], HiringCaseStrength.STRONG, OpportunityValue.HIGH, HiringCaseClassification.BEST_MATCH),
         # B: growth value cannot hide a material core gap.
-        ([requirement(RequirementEvidenceState.GAP, evidence=False)], [signal()], HiringCaseStrength.WEAK, OpportunityValue.HIGH, HiringCaseClassification.WORTH_A_TRY),
+        ([requirement(RequirementEvidenceState.GAP, evidence=False)], [signal()], HiringCaseStrength.UNKNOWN, OpportunityValue.HIGH, HiringCaseClassification.NOT_SURFACED),
         # C: a strong company case remains distinct from low candidate value.
         ([requirement()], [signal(OpportunitySignalState.NEGATIVE)], HiringCaseStrength.STRONG, OpportunityValue.LOW, HiringCaseClassification.YOURE_STRONG_BUT),
         # D: neither dimension justifies attention.
-        ([requirement(RequirementEvidenceState.GAP, evidence=False)], [signal(OpportunitySignalState.NEGATIVE)], HiringCaseStrength.WEAK, OpportunityValue.LOW, HiringCaseClassification.SKIP_FOR_NOW),
+        ([requirement(RequirementEvidenceState.GAP, evidence=False)], [signal(OpportunitySignalState.NEGATIVE)], HiringCaseStrength.UNKNOWN, OpportunityValue.LOW, HiringCaseClassification.NOT_SURFACED),
         # F: transferable core evidence is viable, never direct proof.
         ([requirement(RequirementEvidenceState.TRANSFERABLE)], [signal()], HiringCaseStrength.VIABLE, OpportunityValue.HIGH, HiringCaseClassification.WORTH_A_TRY),
         # G: nice-to-have gaps do not destroy an otherwise strong case.
@@ -98,7 +98,7 @@ def test_evidence_missing_is_not_gap_and_exposes_evidence_need():
         requirement(RequirementEvidenceState.EVIDENCE_MISSING, evidence=False),
         signals=[signal()],
     )
-    assert result.hiring_case_strength is HiringCaseStrength.VIABLE
+    assert result.hiring_case_strength is HiringCaseStrength.UNKNOWN
     assert result.requirements[0].evidence_state is RequirementEvidenceState.EVIDENCE_MISSING
     assert result.how_to_prove.items[0].needs_evidence is True
     assert result.how_to_prove.items[0].evidence_we_have == []

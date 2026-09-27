@@ -154,9 +154,12 @@ def evaluate(case):
     expected = asdict(case.expected)
     dimensions = ("classification", "strength", "value", "states", "confidence")
     mismatches = [key for key in dimensions if actual[key] != expected[key]]
+    taxonomy = case.taxonomy
+    if mismatches and taxonomy == "none":
+        taxonomy = "evidence_sufficiency_v2" if actual["classification"] == "not_surfaced" else "unclassified_contract_change"
     return {"case_id": case.case_id, "scenario": case.scenario, "expected": expected,
             "actual": actual, "mismatches": mismatches,
-            "root_cause": case.taxonomy if mismatches else None}
+            "root_cause": taxonomy if mismatches else None}
 
 
 def run_adversarial():

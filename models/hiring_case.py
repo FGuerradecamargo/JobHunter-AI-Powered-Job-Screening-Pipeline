@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
-HIRING_CASE_SCHEMA_VERSION = "hiring-case-v1"
+HIRING_CASE_SCHEMA_VERSION = "hiring-case-v2"
 EVIDENCE_WARNING = (
     "This may be added to Career Memory and reused in future matches, CVs and "
     "interview preparation. Only add real experience you can explain and defend."
@@ -49,6 +49,7 @@ class EvidenceConstraintReason(str, Enum):
 
 
 class HiringCaseStrength(str, Enum):
+    UNKNOWN = "unknown"
     STRONG = "strong"
     VIABLE = "viable"
     WEAK = "weak"
@@ -86,6 +87,7 @@ class OpportunitySignalKind(str, Enum):
 
 
 class HiringCaseClassification(str, Enum):
+    NOT_SURFACED = "not_surfaced"
     BEST_MATCH = "best_match"
     WORTH_A_TRY = "worth_a_try"
     YOURE_STRONG_BUT = "youre_strong_but"
@@ -282,3 +284,14 @@ class HiringCase:
     job_signature: str = ""
     schema_version: str = HIRING_CASE_SCHEMA_VERSION
     authority: str = "deterministic_hiring_case"
+    surfacing_reason: str = ""
+    evaluated_requirement_count: int = 0
+    positive_requirement_count: int = 0
+
+    @property
+    def surfaced(self) -> bool:
+        return self.classification in {
+            HiringCaseClassification.BEST_MATCH,
+            HiringCaseClassification.WORTH_A_TRY,
+            HiringCaseClassification.YOURE_STRONG_BUT,
+        }
