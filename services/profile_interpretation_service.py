@@ -7,7 +7,10 @@ from models.profile_interpretation import (
     CandidateProfileSnapshot,
     JobHardFacts,
     SourceEvidence,
+    CoverageState,
 )
+from dataclasses import asdict
+from services.candidate_profile_source import load_confirmed_candidate_profile_input
 from services.database import utc_now
 from services.profile_interpreter import ProfileInterpreter
 from services.profile_snapshot_repository import ProfileSnapshotRepository
@@ -17,6 +20,14 @@ class ProfileInterpretationService:
     def __init__(self, repository: ProfileSnapshotRepository, interpreter: ProfileInterpreter) -> None:
         self.repository = repository
         self.interpreter = interpreter
+
+    def candidate_profile_from_onboarding(self, *, candidate_id, onboarding_repository):
+        snapshot, sources = load_confirmed_candidate_profile_input(candidate_id, onboarding_repository)
+        if not sources:
+            raise ValueError("Confirmed candidate source evidence is not available.")
+        return self.candidate_profile(candidate_id=candidate_id,
+            memory_signature=snapshot.source_signature, memory_payload=snapshot.payload,
+            source_evidence=sources)
 
     def candidate_profile(
         self,
@@ -40,6 +51,11 @@ class ProfileInterpretationService:
             source_evidence=source_evidence,
             previous_checkpoint=(previous.checkpoint if previous else None),
         )
+        if memory_payload.get("source_schema") == "confirmed-onboarding-v1" and any(
+            state is CoverageState.CONFIRMED_COMPLETE for state in asdict(draft.fact_coverage).values()
+        ):
+            # Four narrative questions never certify an exhaustive finite fact set.
+            raise ValueError("Narrative onboarding cannot confirm complete finite-fact coverage.")
         available_refs = tuple(item.ref for item in source_evidence)
         profile = CandidateProfileSnapshot(
             candidate_id=candidate_id,
