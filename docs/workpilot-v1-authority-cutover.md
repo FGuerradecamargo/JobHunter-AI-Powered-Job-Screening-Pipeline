@@ -253,8 +253,45 @@ The shared Job Analysis component renders this same stored case, including
 unknown evidence and confidence, without accepting the outer legacy bucket as
 authority. Older payloads are explicitly labelled historical.
 
-Still pending: historical selector/activation cutover, official snapshot change
-invalidation across all callers, Apply/ApplicationContext, Market/Improvements,
-Company/InterviewBrief, product modes, remaining legacy deletion and E2E gates.
+The selector/activation and CV/ApplicationContext cutovers subsequently passed
+their offline gates. Official snapshot change invalidation across all callers,
+Market/Improvements, product modes, remaining legacy deletion and E2E gates remain.
 No production backfill, database connection, external AI or provider execution was
 used to validate these changes. Tests use SQLite and injected clients.
+
+## Application and interview runtime
+
+The only current Applied transition is in_review/ready_to_apply plus an explicit
+user confirmation. The repository enforces that condition in the UPDATE, including
+concurrent/stale-tab calls. Repeating confirmation after Applied is idempotent.
+Opening an external HTTP(S) link never writes an application status. The current
+Opportunities screen exposes Ready after successful current-evidence CV export
+validation; Applications displays that state and accepts explicit confirmation.
+
+Applications reads candidate-scoped relationships together with explicit outcomes
+and persisted rounds. Ready, Applied, Interview, Offer, Closed and No Response
+are separate groups. Closed retains its actual outcome (including Rejected).
+Age is presentation only. There is no age-based transition or inferred rejection.
+
+InterviewRoundRepository owns all new runtime interview records and feedback.
+Creation requires an active applied/in_process relationship and atomically records
+the interview event. Sequence numbers are unbounded; no final round is assumed.
+Stable form request IDs support retries, and relationship locking serializes
+sequence allocation against terminal outcomes. Repeated identical feedback saves
+preserve timestamps. Historical unsequenced details/feedback remain readable,
+but are not promoted into invented rounds or fed into later-round briefs.
+
+InterviewPreparationService.build_brief reloads the official application sources
+(CandidateProfile, JobProfile and the same HiringCase), maps requirement evidence
+by references rather than matching narrative text, and includes only verified
+earlier rounds' feedback. Exact company registry lookup may attach an existing
+public CompanyProfile; missing company or interviewer research stays unavailable.
+No research/AI is triggered by opening a brief. Feedback is source-reported context,
+not a new Candidate fact. Stale profile evidence fails safely without erasing rounds.
+
+Legacy stage-based builder/service APIs remain for historical compatibility tests;
+the current Applications renderer no longer writes legacy details or feedback.
+The legacy final_interview outcome remains readable but is not a normal UI action.
+No schema migration or production data write is required for this checkpoint.
+Real browser/mobile E2E and a disposable PostgreSQL integration run remain release
+checks; offline SQLite/double tests do not prove those environments.

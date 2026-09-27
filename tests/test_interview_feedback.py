@@ -359,8 +359,10 @@ def test_feedback_has_no_career_evidence_ai_api_or_network_path():
 def test_dashboard_uses_explicit_feedback_save_without_outcome_transition():
     source = Path("app.py").read_text(encoding="utf-8")
     section = source[source.index("def render_interview_preparation"):source.index("def render_job")]
-    assert '"Save interview feedback"' in section
-    assert "handle_interview_feedback_save(" in section
+    assert "render_interview_rounds(" in section
+    section = Path("services/interview_preparation_ui.py").read_text(encoding="utf-8")
+    assert '"Save round feedback"' in section
+    assert "if save:" in section and "repository.save_feedback(" in section
     assert "mark_interview" not in section
     assert "mark_final_interview" not in section
     assert "mark_offer" not in section

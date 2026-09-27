@@ -49,7 +49,7 @@ class ApplicationLifecycleService:
         if current["status"] == "applied":
             return self._result("already_applied", current)
 
-        if current["status"] not in {"in_review", "user_rejected"}:
+        if current["status"] != "in_review" or current["opportunity_state"] != "ready_to_apply":
             return self._invalid_transition(candidate_id, job_id, current)
 
         updated = self.repository.mark_applied(
@@ -58,8 +58,12 @@ class ApplicationLifecycleService:
             self.clock(),
         )
         if updated is None:
-            return self._missing(candidate_id, job_id)
-
+            latest = self.repository.get(candidate_id, job_id)
+            if latest is None:
+                return self._missing(candidate_id, job_id)
+            if latest["status"] == "applied":
+                return self._result("already_applied", latest)
+            return self._invalid_transition(candidate_id, job_id, latest)
         return self._result("applied", updated)
 
     def mark_user_rejected(

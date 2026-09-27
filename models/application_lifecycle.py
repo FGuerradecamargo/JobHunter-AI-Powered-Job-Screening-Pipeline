@@ -13,6 +13,7 @@ class ApplicationLifecycleResult:
     @property
     def succeeded(self) -> bool:
         return self.status in {
+            "ready_to_apply",
             "applied",
             "already_applied",
             "user_rejected",

@@ -103,6 +103,18 @@ class InterviewRoundRepository:
                     item.updated_at,
                 ),
             )
+            # Creating a real round is an explicit interview event, not an age inference.
+            connection.execute(
+                """INSERT INTO candidate_application_outcomes
+                   (candidate_id, job_id, interview_stage, created_at, updated_at, outcome_date)
+                   VALUES (?, ?, 'interview', ?, ?, ?)
+                   ON CONFLICT(candidate_id, job_id) DO UPDATE SET
+                     interview_stage = 'interview', updated_at = excluded.updated_at,
+                     outcome_date = excluded.outcome_date
+                   WHERE candidate_application_outcomes.final_status = ''
+                     AND candidate_application_outcomes.interview_stage = ''""",
+                (candidate_id, job_id, now, now, now),
+            )
 
         return item
 
@@ -143,7 +155,9 @@ class InterviewRoundRepository:
                        next_steps = excluded.next_steps,
                        updated_at = excluded.updated_at
                    WHERE candidate_interview_round_feedback.candidate_id = excluded.candidate_id
-                     AND candidate_interview_round_feedback.job_id = excluded.job_id""",
+                     AND candidate_interview_round_feedback.job_id = excluded.job_id
+                     AND (candidate_interview_round_feedback.feedback_text <> excluded.feedback_text
+                          OR candidate_interview_round_feedback.next_steps <> excluded.next_steps)""",
                 (feedback.interview_id, feedback.candidate_id, feedback.job_id,
                  feedback.feedback_text, feedback.next_steps, now, now),
             )

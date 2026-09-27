@@ -336,9 +336,10 @@ def test_prepared_cv_is_not_required_by_ui_boundary():
 
 def test_dashboard_uses_deterministic_ui_boundary_and_explicit_save():
     source = Path("app.py").read_text(encoding="utf-8")
-    assert "load_interview_preparation_view(" in source
-    assert "handle_interview_details_save(" in source
-    assert '"Save interview details"' in source
+    assert "render_interview_rounds(" in source
+    ui_source = Path("services/interview_preparation_ui.py").read_text(encoding="utf-8")
+    assert "repository.create(" in ui_source and "if create:" in ui_source
+    assert '"Add interview round"' in ui_source
     assert "analysis.get(\n                \"interview_prep\"" not in source
     assert "mark_final_interview" not in source[source.index("def render_interview_preparation"):source.index("def render_job")]
 

@@ -71,8 +71,9 @@ def _service(repository):
     )
 
 
-def test_explicit_mark_applied_succeeds_without_prepared_cv():
+def test_explicit_mark_applied_requires_ready_state():
     repository = FakeRepository(_row())
+    repository.row["opportunity_state"] = "ready_to_apply"
 
     result = _service(repository).mark_applied("candidate-a", "job-1")
 
@@ -84,6 +85,7 @@ def test_explicit_mark_applied_succeeds_without_prepared_cv():
 
 def test_repeated_mark_applied_is_idempotent_and_keeps_timestamp():
     repository = FakeRepository(_row())
+    repository.row["opportunity_state"] = "ready_to_apply"
     service = _service(repository)
 
     first = service.mark_applied("candidate-a", "job-1")
@@ -132,8 +134,15 @@ def test_user_rejected_to_applied_requires_explicit_mark_action():
     )
 
     assert no_action is None
-    assert result is not None and result.status == "applied"
-    assert len(repository.applied_calls) == 1
+    assert result is not None and result.error_code == "invalid_transition"
+    assert repository.applied_calls == []
+
+
+def test_in_review_cannot_skip_ready_to_apply():
+    repository = FakeRepository(_row())
+    result = _service(repository).mark_applied("candidate-a", "job-1")
+    assert result.error_code == "invalid_transition"
+    assert repository.applied_calls == []
 
 
 @pytest.mark.parametrize(
@@ -256,7 +265,9 @@ def test_repository_preserves_analysis_cv_and_other_candidate(
     _create_schema(database_path)
     _install_sqlite_connection(monkeypatch, database_path)
 
-    result = _service(ApplicationLifecycleRepository()).mark_applied(
+    service = _service(ApplicationLifecycleRepository())
+    service.mark_ready_to_apply("candidate-a", "job-1")
+    result = service.mark_applied(
         "candidate-a",
         "job-1",
     )

@@ -85,7 +85,7 @@ def _outcome(*, stage="", final_status=""):
     [
         (None, "applied", "Applied", ["interview", "rejected", "withdrawn", "no_response"]),
         (_outcome(stage="interview"), "applied", "Interview",
-         ["final_interview", "offer", "rejected", "withdrawn", "no_response"]),
+         ["offer", "rejected", "withdrawn", "no_response"]),
         (_outcome(stage="final_interview"), "applied", "Final interview",
          ["interview", "offer", "rejected", "withdrawn", "no_response"]),
         (_outcome(stage="final_interview", final_status="offer"), "applied",

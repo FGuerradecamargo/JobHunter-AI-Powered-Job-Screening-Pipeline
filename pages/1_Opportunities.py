@@ -1510,6 +1510,11 @@ def render_job(
                         key=f"download_prepared_cv_{candidate_id}_{job_id}",
                         use_container_width=True,
                     )
+                    if st.button("Ready to apply", key=f"ready_{candidate_id}_{job_id}"):
+                        ready = application_lifecycle_service.mark_ready_to_apply(candidate_id, job_id)
+                        if ready.succeeded:
+                            st.rerun()
+                        st.warning("This opportunity changed. Refresh before continuing.")
             elif prepared_result is not None:
                 st.error(prepared_application_error_message(prepared_result))
 
@@ -1574,6 +1579,7 @@ def render_job(
                 "Mark as Applied",
                 key=f"analysis_apply_{candidate_id}_{job_id}",
                 type="primary",
+                disabled=job.get("opportunity_state") != "ready_to_apply",
                 use_container_width=True,
             )
             apply_result = handle_mark_applied_action(

@@ -50,7 +50,7 @@ ACTION_LABELS = {
 
 VALID_ACTIONS = {
     "applied": ("interview", "rejected", "withdrawn", "no_response"),
-    "interview": ("final_interview", "offer", "rejected", "withdrawn", "no_response"),
+    "interview": ("offer", "rejected", "withdrawn", "no_response"),
     "final_interview": ("interview", "offer", "rejected", "withdrawn", "no_response"),
     "offer": ("accepted", "declined", "withdrawn"),
 }

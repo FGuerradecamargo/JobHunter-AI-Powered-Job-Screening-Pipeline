@@ -8,6 +8,47 @@ from services.database import get_connection
 
 
 class ApplicationOutcomeRepository:
+    def list_applications(self, candidate_id: str) -> list[dict[str, Any]]:
+        """Read lifecycle and explicit outcomes together; age never changes an outcome."""
+        from services.application_outcome_service import ApplicationOutcomeService
+        import json
+
+        with get_connection() as connection:
+            rows = connection.execute(
+                """SELECT j.id, j.title, j.company, j.location, j.url,
+                          a.status, a.opportunity_state, a.notes, a.analysis_json, a.applied_at,
+                          o.final_status, o.interview_stage,
+                          (SELECT COUNT(*) FROM candidate_interview_rounds r
+                           WHERE r.candidate_id = a.candidate_id AND r.job_id = a.job_id) AS round_count
+                   FROM candidate_job_analyses a JOIN jobs j ON j.id = a.job_id
+                   LEFT JOIN candidate_application_outcomes o
+                     ON o.candidate_id = a.candidate_id AND o.job_id = a.job_id
+                   WHERE a.candidate_id = ? AND
+                     ((a.status = 'in_review' AND a.opportunity_state = 'ready_to_apply')
+                      OR a.status IN ('applied', 'in_process', 'offer',
+                                      'rejected_before_interview', 'rejected_after_interview'))
+                   ORDER BY a.updated_at DESC, j.id""", (candidate_id,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["analysis"] = json.loads(item.pop("analysis_json") or "{}")
+            except (ValueError, TypeError):
+                item["analysis"] = {}
+            state = item["final_status"] or item["interview_stage"]
+            if not state:
+                state = ("ready_to_apply" if item["status"] == "in_review" else
+                         "interview" if item["round_count"] and item["status"] in {"applied", "in_process"} else
+                         ApplicationOutcomeService.current_state(None, item["status"]))
+            item["application_stage"] = state
+            item["application_group"] = (
+                "closed" if state in {"accepted", "declined", "rejected", "withdrawn"} else
+                "interview" if state == "final_interview" else state
+            )
+            result.append(item)
+        return result
+
     def get_application(
         self,
         candidate_id: str,

@@ -176,6 +176,8 @@ def _interview_instructions(context: InterviewContext) -> list[str]:
 def build_interview_preparation(
     context: InterviewContext,
     feedback: InterviewFeedback | None = None,
+    *,
+    hiring_case=None,
 ) -> InterviewPreparation:
     if (
         not context.candidate_id
@@ -205,6 +207,36 @@ def build_interview_preparation(
         _area_for_topic(topic, "core_requirement", context, evidence_by_text)
         for topic in _unique_text(context.core_requirements)
     )
+
+    if hiring_case is not None:
+        from models.hiring_case import RequirementEvidenceState
+        if (hiring_case.candidate_id != context.candidate_id or hiring_case.job_id != context.job_id):
+            raise PermissionError("HiringCase belongs to another interview relationship.")
+        authorized = {item.evidence_ref for item in context.authorized_evidence}
+        areas = [item for item in areas if item.source_type != "core_requirement"]
+        for requirement in hiring_case.requirements:
+            refs = list(requirement.evidence_refs)
+            if not set(refs) <= authorized:
+                raise ValueError("Interview requirement references unavailable evidence.")
+            proven = requirement.evidence_state is RequirementEvidenceState.PROVEN
+            transferable = requirement.evidence_state is RequirementEvidenceState.TRANSFERABLE
+            supported = bool(refs) and (proven or transferable)
+            caution = (
+                "Keep every claim within the scope of the linked evidence." if proven and supported else
+                "This evidence is transferable, not proven direct experience for this requirement." if transferable and supported else
+                "Evidence is missing or incomplete; do not interpret unknown as absence or claim unsupported experience."
+            )
+            areas.append(PreparationArea(
+                topic=requirement.requirement, source_type="core_requirement", priority="high",
+                what_they_seek="The official JobProfile identifies this requirement.",
+                what_to_demonstrate=("Explain the linked experience accurately." if supported else
+                                     "Clarify whether you have a defensible example for this requirement."),
+                example_direction="Use only the confirmed source evidence.",
+                emphasis="Explain the actual scope, actions and outcomes without expanding the evidence.",
+                caution=caution, evidence_refs=refs,
+                gap_type="" if proven and supported else "transferable" if supported else "unknown",
+                gap_text="" if supported else requirement.requirement,
+            ))
 
     valid_refs = {item.evidence_ref for item in context.authorized_evidence}
     for theme in sorted(context.positioning_themes, key=lambda item: _key(item.theme)):
@@ -277,6 +309,7 @@ def build_interview_preparation(
         {
             "schema_version": INTERVIEW_PREPARATION_SCHEMA_VERSION,
             "context_signature": context.source_signature,
+            "hiring_case": asdict(hiring_case) if hiring_case is not None else None,
             "stage": context.interview_stage,
             "context_material": {
                 "requirements": context.core_requirements,

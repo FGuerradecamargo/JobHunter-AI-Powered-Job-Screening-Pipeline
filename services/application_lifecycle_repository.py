@@ -51,6 +51,7 @@ class ApplicationLifecycleRepository:
                     updated_at = ?,
                     applied_at = COALESCE(applied_at, ?)
                 WHERE candidate_id = ? AND job_id = ?
+                  AND status = 'in_review' AND opportunity_state = 'ready_to_apply'
                 """,
                 (applied_at, applied_at, candidate_id, job_id),
             )
@@ -89,6 +90,7 @@ class ApplicationLifecycleRepository:
                     opportunity_state = 'user_rejected',
                     updated_at = ?
                 WHERE candidate_id = ? AND job_id = ?
+                  AND status = 'in_review'
                 """,
                 (updated_at, candidate_id, job_id),
             )

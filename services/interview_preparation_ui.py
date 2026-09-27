@@ -1,5 +1,116 @@
 from __future__ import annotations
 
+
+def render_interview_rounds(st, *, candidate_id, job_id, repository=None, preparation_service=None):
+    """Current application UI: round-scoped writes, with historical records read-only."""
+    from datetime import datetime, timezone
+    from uuid import uuid4
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    from models.application_tracking import InterviewRoundFeedback
+    from services.interview_round_repository import InterviewRoundRepository
+    from services.application_outcome_repository import ApplicationOutcomeRepository
+    from services.interview_preparation_service import InterviewPreparationService
+
+    repository = repository or InterviewRoundRepository()
+    outcomes = ApplicationOutcomeRepository()
+    relationship = outcomes.get_application(candidate_id, job_id)
+    if relationship is None or relationship["status"] not in {
+        "applied", "in_process", "offer", "rejected_before_interview", "rejected_after_interview",
+    }:
+        return
+    outcome = outcomes.get(candidate_id, job_id)
+    active = relationship["status"] in {"applied", "in_process"} and not (outcome and outcome.final_status)
+    rounds = repository.list(candidate_id, job_id)
+    st.subheader("Interviews")
+    if active:
+        token_key = f"round_request:{candidate_id}:{job_id}"
+        if token_key not in st.session_state:
+            st.session_state[token_key] = uuid4().hex
+        with st.form(f"new_round:{candidate_id}:{job_id}"):
+            scheduled = st.checkbox("Date and time confirmed")
+            day = st.date_input("Interview date", value=datetime.now(timezone.utc).date())
+            time = st.time_input("Interview time")
+            zone = st.text_input("Time zone", value="Europe/Dublin")
+            names = st.text_area("Interviewer names (optional)")
+            roles = st.text_area("Interviewer roles (optional)")
+            kind = st.text_input("Interview type")
+            notes = st.text_area("Notes")
+            create = st.form_submit_button("Add interview round")
+        if create:
+            try:
+                scheduled_at = datetime.combine(day, time, ZoneInfo(zone)).isoformat() if scheduled else ""
+                repository.create(candidate_id=candidate_id, job_id=job_id, scheduled_at=scheduled_at,
+                    interviewer_names=names.splitlines(), interviewer_roles=roles.splitlines(),
+                    interview_type=kind, notes=notes, interview_id=st.session_state[token_key])
+            except (ValueError, PermissionError, ZoneInfoNotFoundError):
+                st.error("The interview could not be saved. Check its date, time zone and application status.")
+            else:
+                st.session_state.pop(token_key, None)
+                st.rerun()
+    for item in rounds:
+        st.markdown(f"#### Interview {item.sequence}")
+        st.write(item.scheduled_at or "Date and time not confirmed")
+        for value in (*item.interviewer_names, *item.interviewer_roles, item.interview_type, item.notes):
+            if value:
+                st.write(value)
+        feedback = repository.feedback_for(item.interview_id, candidate_id, job_id)
+        with st.form(f"round_feedback:{candidate_id}:{job_id}:{item.interview_id}"):
+            text = st.text_area("Feedback", value=feedback.feedback_text if feedback else "")
+            next_steps = st.text_area("Next steps", value=feedback.next_steps if feedback else "")
+            save = st.form_submit_button("Save round feedback")
+        if save:
+            try:
+                repository.save_feedback(InterviewRoundFeedback(item.interview_id, candidate_id, job_id, text, next_steps))
+            except (ValueError, PermissionError):
+                st.error("Feedback could not be saved. Refresh and try again.")
+            else:
+                st.rerun()
+        if st.button("View interview brief", key=f"brief:{candidate_id}:{job_id}:{item.interview_id}"):
+            try:
+                brief = (preparation_service or InterviewPreparationService()).build_brief(candidate_id, job_id, item.interview_id)
+            except (ValueError, PermissionError):
+                st.warning("Current evidence needs review before this brief can be prepared. Your interview history is preserved.")
+            else:
+                st.write(brief.about_role)
+                if not brief.company_context:
+                    st.caption("Public company context is not available.")
+                else:
+                    st.caption("Public source-reported company context")
+                for value in brief.company_context:
+                    st.write(value)
+                for value in brief.company_uncertainties:
+                    st.caption(value)
+                if not brief.interviewer_contexts:
+                    st.caption("Public interviewer research is not available.")
+                for area in (*brief.strongest_evidence, *brief.likely_areas):
+                    st.markdown(f"**{area.topic}**")
+                    st.write(area.guidance)
+                    if area.caution:
+                        st.caption(area.caution)
+                if brief.previous_round_feedback:
+                    st.markdown("**Recorded feedback from earlier rounds**")
+                    for value in brief.previous_round_feedback:
+                        st.write(value)
+                for value in brief.next_stage_context:
+                    st.write(value)
+                for value in brief.questions_to_ask:
+                    st.write(value)
+    # Never assign unsequenced historical feedback to an invented round.
+    from services.interview_details_repository import InterviewDetailsRepository
+    from services.interview_feedback_repository import InterviewFeedbackRepository
+    historical = InterviewDetailsRepository().get(candidate_id, job_id)
+    old_feedback = InterviewFeedbackRepository().get(candidate_id, job_id)
+    if historical or old_feedback:
+        st.caption("Historical interview records (not assigned to a round)")
+        if historical:
+            for value in (historical.scheduled_at, historical.interviewer, historical.instructions):
+                if value:
+                    st.write(value)
+        if old_feedback:
+            for value in (old_feedback.recruiter_feedback, old_feedback.candidate_notes, old_feedback.next_stage_instructions):
+                if value:
+                    st.write(value)
+
 from dataclasses import dataclass, field
 from typing import MutableMapping
 

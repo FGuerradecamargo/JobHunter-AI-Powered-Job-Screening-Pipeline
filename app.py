@@ -17,17 +17,11 @@ from services.application_outcome_ui import (
     load_application_outcome_view,
     outcome_result_message,
 )
-from models.interview_context import InterviewDetails
-from services.interview_context_service import InterviewContextService
-from services.interview_details_repository import InterviewDetailsRepository
-from services.interview_feedback_repository import InterviewFeedbackRepository
-from services.interview_feedback_service import InterviewFeedbackService
-from services.interview_preparation_service import InterviewPreparationService
-from services.interview_preparation_ui import (
-    handle_interview_details_save,
-    handle_interview_feedback_save,
-    load_interview_preparation_view,
-)
+from services.application_lifecycle_service import ApplicationLifecycleService
+from services.application_lifecycle_ui import handle_mark_applied_action
+from services.external_application import external_application_url
+from services.system_state_presenter import application_age_state
+from datetime import datetime, timezone
 from services.database import (
     count_candidate_jobs_by_status,
     initialize_database,
@@ -300,254 +294,9 @@ def render_application_outcome(
             st.error(message)
 
 
-def render_interview_preparation(
-    candidate_id: str,
-    job_id: str,
-    status: str,
-) -> None:
-    details_repository = InterviewDetailsRepository()
-    feedback_repository = InterviewFeedbackRepository()
-    context_service = InterviewContextService(
-        details_repository=details_repository,
-    )
-    preparation_service = InterviewPreparationService(
-        context_service=context_service,
-        feedback_repository=feedback_repository,
-    )
-    feedback_service = InterviewFeedbackService(
-        context_service=context_service,
-        repository=feedback_repository,
-    )
-    result = load_interview_preparation_view(
-        candidate_id=candidate_id,
-        job_id=job_id,
-        lifecycle_status=status,
-        context_service=context_service,
-        preparation_service=preparation_service,
-        details_repository=details_repository,
-        feedback_repository=feedback_repository,
-    )
-    if result.error_message:
-        st.error(result.error_message)
-        return
-    if not result.visible or result.view is None or result.details is None:
-        return
-
-    view = result.view
-    details = result.details
-    feedback = result.feedback
-    st.divider()
-    st.subheader(view.title)
-    identity = " · ".join(value for value in (view.role, view.company) if value)
-    if identity:
-        st.markdown(f"**{identity}**")
-    metadata = [
-        value
-        for value in (
-            view.stage,
-            view.interview_type,
-            view.interview_format,
-            view.interviewer,
-            view.duration,
-            view.scheduled_at,
-        )
-        if value
-    ]
-    if metadata:
-        st.caption(" · ".join(metadata))
-    if view.summary_guidance:
-        st.info(view.summary_guidance)
-
-    if view.interview_instructions:
-        st.markdown("**Interview instructions**")
-        for instruction in view.interview_instructions:
-            st.write(instruction)
-
-    if view.recruiter_feedback:
-        st.markdown("**Explicit recruiter feedback to address**")
-        for item in view.recruiter_feedback:
-            st.write(item)
-    if view.candidate_self_reports:
-        st.markdown("**Your notes from the previous interview**")
-        for item in view.candidate_self_reports:
-            st.write(item)
-    if view.previously_discussed_topics:
-        st.markdown("**Previously discussed**")
-        st.write(" · ".join(view.previously_discussed_topics))
-    if view.review_topics:
-        st.markdown("**Review before the next stage**")
-        st.write(" · ".join(view.review_topics))
-    if view.next_stage_instructions:
-        st.markdown("**Instructions for the next stage**")
-        for item in view.next_stage_instructions:
-            st.write(item)
-
-    for area in view.preparation_areas:
-        st.markdown(f"#### {area.topic}")
-        st.caption(area.priority_label)
-        if area.source_label:
-            st.markdown(f"**{area.source_label}**")
-        if area.what_to_demonstrate:
-            st.markdown("**What to demonstrate**")
-            st.write(area.what_to_demonstrate)
-        if area.example_direction:
-            st.markdown("**Look for a real example where**")
-            st.write(area.example_direction)
-        if area.emphasis:
-            st.markdown("**Emphasize**")
-            st.write(area.emphasis)
-        if area.caution:
-            st.markdown("**Be careful**")
-            st.warning(area.caution)
-
-    if view.rehearsal_prompts:
-        st.markdown("**Think through**")
-        for prompt in view.rehearsal_prompts:
-            st.write(f"- {prompt}")
-    if view.questions_to_ask_the_company:
-        st.markdown("**Questions to ask the company**")
-        for question in view.questions_to_ask_the_company:
-            st.write(f"- {question}")
-
-    edit_details = st.toggle(
-        "Edit interview details",
-        key=f"edit_interview_details_{candidate_id}_{job_id}",
-    )
-    if edit_details:
-        with st.form(f"interview_details_{candidate_id}_{job_id}"):
-            interview_type = st.text_input(
-                "Interview type",
-                value=details.interview_type,
-            )
-            interview_format = st.text_input(
-                "Format",
-                value=details.interview_format,
-            )
-            interviewer = st.text_input(
-                "Interviewer",
-                value=details.interviewer,
-            )
-            duration_minutes = st.number_input(
-                "Duration in minutes",
-                min_value=0,
-                step=5,
-                value=details.duration_minutes or 0,
-            )
-            scheduled_at = st.text_input(
-                "Scheduled time",
-                value=details.scheduled_at,
-            )
-            instructions = st.text_area(
-                "Instructions from the recruiter",
-                value=details.instructions,
-            )
-            explicit_topics = st.text_area(
-                "Topics explicitly mentioned",
-                value="\n".join(details.explicit_topics),
-                placeholder="One topic per line",
-            )
-            save_requested = st.form_submit_button(
-                "Save interview details",
-                type="primary",
-            )
-
-        if save_requested:
-            updated = InterviewDetails(
-                candidate_id=candidate_id,
-                job_id=job_id,
-                interview_type=interview_type,
-                interview_format=interview_format,
-                interviewer=interviewer,
-                duration_minutes=(int(duration_minutes) or None),
-                scheduled_at=scheduled_at,
-                instructions=instructions,
-                explicit_topics=[
-                    value.strip()
-                    for value in explicit_topics.splitlines()
-                    if value.strip()
-                ],
-            )
-            save_result = handle_interview_details_save(
-                st.session_state,
-                candidate_id=candidate_id,
-                job_id=job_id,
-                lifecycle_status=status,
-                save_requested=True,
-                details=updated,
-                details_repository=details_repository,
-                context_service=context_service,
-                preparation_service=preparation_service,
-                feedback_repository=feedback_repository,
-            )
-            if save_result.saved:
-                st.toast("Interview details saved.")
-                st.rerun()
-            else:
-                st.error(save_result.error_message)
-
-    edit_feedback = st.toggle(
-        "Add interview feedback",
-        key=f"edit_interview_feedback_{candidate_id}_{job_id}",
-    )
-    if edit_feedback and feedback is not None:
-        with st.form(f"interview_feedback_{candidate_id}_{job_id}"):
-            recruiter_feedback = st.text_area(
-                "Recruiter feedback",
-                value=feedback.recruiter_feedback,
-            )
-            candidate_notes = st.text_area(
-                "Your notes about what happened",
-                value=feedback.candidate_notes,
-            )
-            discussed_topics = st.text_area(
-                "Topics discussed",
-                value="\n".join(feedback.discussed_topics),
-                placeholder="One topic per line",
-            )
-            difficult_topics = st.text_area(
-                "Topics to review",
-                value="\n".join(feedback.difficult_topics),
-                placeholder="One topic per line",
-            )
-            next_stage_instructions = st.text_area(
-                "Instructions for the next stage",
-                value=feedback.next_stage_instructions,
-            )
-            save_feedback_requested = st.form_submit_button(
-                "Save interview feedback",
-                type="primary",
-            )
-        if save_feedback_requested:
-            save_result = handle_interview_feedback_save(
-                st.session_state,
-                candidate_id=candidate_id,
-                job_id=job_id,
-                lifecycle_status=status,
-                save_requested=True,
-                recruiter_feedback=recruiter_feedback,
-                candidate_notes=candidate_notes,
-                discussed_topics=[
-                    value.strip()
-                    for value in discussed_topics.splitlines()
-                    if value.strip()
-                ],
-                difficult_topics=[
-                    value.strip()
-                    for value in difficult_topics.splitlines()
-                    if value.strip()
-                ],
-                next_stage_instructions=next_stage_instructions,
-                feedback_service=feedback_service,
-                feedback_repository=feedback_repository,
-                context_service=context_service,
-                preparation_service=preparation_service,
-                details_repository=details_repository,
-            )
-            if save_result.saved:
-                st.toast("Interview feedback saved.")
-                st.rerun()
-            else:
-                st.error(save_result.error_message)
+def render_interview_preparation(candidate_id: str, job_id: str, status: str) -> None:
+    from services.interview_preparation_ui import render_interview_rounds
+    render_interview_rounds(st, candidate_id=candidate_id, job_id=job_id)
 
 
 def render_job(
@@ -652,15 +401,24 @@ def render_job(
         expanded=False,
     ):
 
-        status_label = STATUS_LABELS.get(
-            status,
-            status,
-        )
+        status_label = item.get("application_stage", status).replace("_", " ").title()
 
         render_job_analysis(
             item,
             status_label=status_label,
         )
+
+        age = application_age_state(applied_at=item.get("applied_at"), now=datetime.now(timezone.utc).isoformat())
+        if age:
+            st.caption(age.title)
+        if item.get("application_stage") == "ready_to_apply":
+            confirmed = st.button("Yes, I applied", key=f"confirm_applied:{candidate_id}:{job_id}")
+            result = handle_mark_applied_action(action_requested=confirmed, candidate_id=candidate_id,
+                job_id=job_id, lifecycle_service=ApplicationLifecycleService())
+            if result is not None:
+                if result.succeeded:
+                    st.rerun()
+                st.warning("This application changed. Refresh before continuing.")
 
         render_interview_preparation(
             candidate_id=candidate_id,
@@ -699,10 +457,14 @@ def render_job(
                 candidate_id=candidate_id,
             )
 
-        if url:
+        try:
+            safe_url = external_application_url(url) if url else ""
+        except ValueError:
+            safe_url = ""
+        if safe_url:
             st.link_button(
                 "Open job",
-                url,
+                safe_url,
             )
 
 
@@ -800,114 +562,21 @@ def main() -> None:
         )
         return
 
-    counts = count_candidate_jobs_by_status(
-        selected_candidate_id
-    )
-
-    rejected_total = (
-        counts["rejected_before_interview"]
-        + counts["rejected_after_interview"]
-    )
-
-    metric_columns = st.columns(
-        4,
-        gap="medium",
-    )
-
-    with metric_columns[0]:
-        render_dashboard_stat(
-            "Applied",
-            counts["applied"],
-        )
-
-    with metric_columns[1]:
-        render_dashboard_stat(
-            "In process",
-            counts["in_process"],
-        )
-
-    with metric_columns[2]:
-        render_dashboard_stat(
-            "Rejected",
-            rejected_total,
-        )
-
-    with metric_columns[3]:
-        render_dashboard_stat(
-            "Offers",
-            counts["offer"],
-        )
-
-    st.html(
-        """
-        <div class="wp-dashboard-section">
-            Applications
-        </div>
-        <div class="wp-dashboard-section-copy">
-            Follow each application from submission
-            through interview, rejection or offer.
-        </div>
-        """
-    )
-
-    tabs = st.tabs(
-        [
-            f"Applied ({counts['applied']})",
-            f"In process ({counts['in_process']})",
-            f"Rejected ({rejected_total})",
-            f"Offers ({counts['offer']})",
-        ]
-    )
-
-    with tabs[0]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
-            status="applied",
-        )
-
-    with tabs[1]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
-            status="in_process",
-        )
-
-    with tabs[2]:
-        if counts["rejected_before_interview"]:
-            st.subheader(
-                "Rejected before interview"
-            )
-
-            render_job_section(
-                candidate_id=selected_candidate_id,
-                status="rejected_before_interview",
-            )
-
-        if (
-            counts["rejected_before_interview"]
-            and counts["rejected_after_interview"]
-        ):
-            st.divider()
-
-        if counts["rejected_after_interview"]:
-            st.subheader(
-                "Rejected after interview"
-            )
-
-            render_job_section(
-                candidate_id=selected_candidate_id,
-                status="rejected_after_interview",
-            )
-
-        if not rejected_total:
-            st.info(
-                "No rejected applications."
-            )
-
-    with tabs[3]:
-        render_job_section(
-            candidate_id=selected_candidate_id,
-            status="offer",
-        )
+    applications = ApplicationOutcomeRepository().list_applications(selected_candidate_id)
+    groups = [
+        ("ready_to_apply", "Ready to apply"), ("applied", "Applied"),
+        ("interview", "Interview"), ("offer", "Offer"),
+        ("closed", "Closed"), ("no_response", "No Response"),
+    ]
+    grouped = {key: [item for item in applications if item["application_group"] == key] for key, _ in groups}
+    st.subheader("Applications")
+    tabs = st.tabs([f"{label} ({len(grouped[key])})" for key, label in groups])
+    for tab, (key, label) in zip(tabs, groups):
+        with tab:
+            if not grouped[key]:
+                st.info(f"No applications: {label}.")
+            for item in grouped[key]:
+                render_job(selected_candidate_id, item)
 
 
 if __name__ == "__main__":
