@@ -140,7 +140,7 @@ def validate_inputs(request, registry):
         if profile.candidate_id != request.candidate_id:
             fail(Issue.INVALID_SCOPE)
         unique([item.capability_id for item in profile.capabilities])
-        registry.evidence(profile.source_refs)
+        registry.require(profile.source_refs, {RefClass.CANDIDATE_EVIDENCE, RefClass.CAREER_MEMORY_SOURCE})
         for capability in profile.capabilities:
             registry.evidence(capability.evidence_refs)
     if request.hard_facts and request.hard_facts.job_id != request.job_id:

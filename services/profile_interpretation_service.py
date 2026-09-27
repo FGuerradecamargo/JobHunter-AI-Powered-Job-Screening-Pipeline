@@ -21,9 +21,9 @@ class ProfileInterpretationService:
         self.repository = repository
         self.interpreter = interpreter
 
-    def candidate_profile_from_onboarding(self, *, candidate_id, onboarding_repository):
-        snapshot, sources = load_confirmed_candidate_profile_input(candidate_id, onboarding_repository)
-        if not sources:
+    def candidate_profile_from_onboarding(self, *, candidate_id, onboarding_repository, career_update_repository=None):
+        snapshot, sources = load_confirmed_candidate_profile_input(candidate_id, onboarding_repository, career_update_repository)
+        if not any(item.source_type in {"professional_experience", "career_update"} for item in sources):
             raise ValueError("Confirmed candidate source evidence is not available.")
         return self.candidate_profile(candidate_id=candidate_id,
             memory_signature=snapshot.source_signature, memory_payload=snapshot.payload,
@@ -57,6 +57,10 @@ class ProfileInterpretationService:
             # Four narrative questions never certify an exhaustive finite fact set.
             raise ValueError("Narrative onboarding cannot confirm complete finite-fact coverage.")
         available_refs = tuple(item.ref for item in source_evidence)
+        capability_refs = {item.ref for item in source_evidence
+                           if item.source_type in {"professional_experience", "career_update"}}
+        if any(not set(cap.evidence_refs).issubset(capability_refs) for cap in draft.capabilities):
+            raise ValueError("Capability interpretation requires professional evidence from the source snapshot.")
         profile = CandidateProfileSnapshot(
             candidate_id=candidate_id,
             profile_version=(previous.profile_version + 1 if previous else 1),

@@ -37,7 +37,7 @@ def build_candidate_profile_source_evidence(
     return tuple(sorted(result, key=lambda item: item.ref))
 
 
-def load_confirmed_candidate_profile_input(candidate_id, repository):
+def load_confirmed_candidate_profile_input(candidate_id, repository, career_update_repository=None):
     """V1 source boundary: confirmed user records, never generated Candidate text.
 
     The caller supplies the authorized candidate. Skips remain in the input
@@ -71,6 +71,25 @@ def load_confirmed_candidate_profile_input(candidate_id, repository):
                     sources.append(SourceEvidence(f"professional_experience:{experience.id}:{field}",
                                                   "professional_experience", text))
         payload["experiences"].append(record)
+    onboarding = repository.get_onboarding(candidate_id)
+    if onboarding is not None:
+        if onboarding.candidate_id != candidate_id:
+            raise PermissionError("Onboarding belongs to another candidate.")
+        payload["onboarding"] = asdict(onboarding)
+        for kind, value in payload["onboarding"].items():
+            if kind == "candidate_id" or not value:
+                continue
+            sources.append(SourceEvidence(f"candidate_preference:{candidate_id}:{kind}",
+                "candidate_preference", json.dumps({kind: value}, ensure_ascii=True)))
+    if career_update_repository is not None:
+        updates = career_update_repository.list_for_candidate(candidate_id)
+        payload["career_updates"] = []
+        for update in sorted(updates, key=lambda item: item.id):
+            if update.candidate_id != candidate_id:
+                raise PermissionError("Career update belongs to another candidate.")
+            payload["career_updates"].append(asdict(update))
+            if update.description.strip():
+                sources.append(SourceEvidence(f"career_update:{update.id}", "career_update", update.description))
     sources = tuple(sorted(sources, key=lambda item: item.ref))
     encoded = json.dumps({"candidate_id": candidate_id, "payload": payload},
                          sort_keys=True, ensure_ascii=False, separators=(",", ":"))

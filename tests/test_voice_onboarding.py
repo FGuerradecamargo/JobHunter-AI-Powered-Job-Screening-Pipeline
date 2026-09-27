@@ -177,12 +177,13 @@ def test_native_sdk_adapter_uses_transcription_not_translation(monkeypatch):
 
 def test_generation_uses_repository_answers_not_session_drafts():
     from services.candidate_profile_generation_service import CandidateProfileGenerationService
-    from services.ai.candidate_profile_parser import REQUIRED_FIELDS
+    from models.candidate import Candidate
+    from services.candidate_repository import CandidateRepository
     from models.candidate_onboarding import CandidateOnboarding
     from models.work_experience import WorkExperience
     calls, saved = [], []
-    output = {key: [] for key in REQUIRED_FIELDS}
-    output.update(current_role='Support',current_level='Entry',professional_summary='Synthetic profile')
+    output = {"capabilities": [], "checkpoint": {"current_position": "Synthetic profile"}}
+    CandidateRepository().save(Candidate('c', 'Synthetic', '', '', ''))
     def generate(prompt):
         calls.append(prompt)
         return json.dumps(output)
