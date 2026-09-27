@@ -20,12 +20,11 @@ from services.ai.openai_client import OpenAIClient
 from services.analysis_signatures import (
     build_job_signature as build_shared_job_signature,
 )
-from services.analyzers.candidate_fit_analyzer import (
-    CandidateFitAnalyzer,
-)
 from services.analyzers.hard_filter_analyzer import (
     HardFilterAnalyzer,
 )
+# Compatibility test seam only. The V1 runtime does not derive its
+# authoritative CandidateProfile through this adapter.
 from services.candidate_adapter import (
     candidate_to_profile,
 )
@@ -55,16 +54,6 @@ from services.job_profile_manager import (
     JobProfileManager,
 )
 from services.ai.job_profile_service import JobProfileService
-from services.job_matcher import JobMatcher
-from services.job_bucket_classifier import (
-    classify_job_bucket,
-    BEST_MATCH,
-    TRADEOFF,
-    REJECT,
-)
-from services.recommenders.recommendation_engine import (
-    RecommendationEngine,
-)
 
 
 from services.ai_usage_budget import AIUsageBudget
@@ -930,12 +919,6 @@ class CandidateJobAnalysisService:
         )
 
         self.enricher = JobEnricher()
-        self.matcher = JobMatcher()
-        self.fit_analyzer = CandidateFitAnalyzer()
-
-        self.recommendation_engine = (
-            RecommendationEngine()
-        )
 
         self.ai_service = AIRecommendationService(
             OpenAIClient()
