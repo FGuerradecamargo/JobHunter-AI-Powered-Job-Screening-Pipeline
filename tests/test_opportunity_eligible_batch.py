@@ -32,11 +32,14 @@ def search(monkeypatch, discovery_pool, page_unit):
     service.job_profile_manager = JobProfileManager(profile_ai, source_repository=SimpleNamespace(
         load_job_hard_facts=lambda job_id, **kw: JobHardFacts(job_id, job_id, ())))
     rejected = set()
+    service._prepare_hiring_case = lambda cid, job: {
+        "rejected": job.id in rejected, "reasons": ["Fixture constraint"],
+    }
     monkeypatch.setattr(analysis_module, "HardFilterAnalyzer", lambda profile: SimpleNamespace(
         analyze=lambda job, jp: {"rejected": job.id in rejected, "reasons": ["Fixture constraint"]},
     ))
     ai = Mock()
-    ai.analyze_batch.side_effect = lambda **kw: [FakeAIResult(job.id) for job, _ in kw["items"]]
+    ai.analyze_hiring_cases_batch.side_effect = lambda requests: [FakeAIResult(req.job_id, req.candidate_id) for req in requests]
     service.ai_service = ai
     env = page_unit
     env.update(candidate_id="a", repository=JobSearchRepository(), analysis_service=service,
@@ -80,15 +83,15 @@ def test_ten_inspected_seven_survivors_wait_then_send_ten(search):
     assert search.run.aggregate["selected"] == 10
     assert search.run.aggregate["hard_rejected"] == 3
     assert len(search.run.prepared_job_ids) == 7
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     for _ in range(5):
         search.step()
     assert len(search.run.prepared_job_ids) == 10
     assert not search.rejected.intersection(search.run.prepared_job_ids)
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     search.step()
-    search.ai.analyze_batch.assert_called_once()
-    assert len(search.ai.analyze_batch.call_args.kwargs["items"]) == 10
+    search.ai.analyze_hiring_cases_batch.assert_called_once()
+    assert len(search.ai.analyze_hiring_cases_batch.call_args.args[0]) == 10
     assert not search.run.prepared_job_ids
     assert search.run.unavailable_job_ids == set()
     assert search.run.aggregate["selected"] == 15
@@ -100,12 +103,12 @@ def test_exhausted_pool_flushes_six_once(search):
     search.add(6)
     for _ in range(6):
         search.step()
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     search.step()
-    assert len(search.ai.analyze_batch.call_args.kwargs["items"]) == 6
+    assert len(search.ai.analyze_hiring_cases_batch.call_args.args[0]) == 6
     search.step()
     assert search.run.status == "complete"
-    search.ai.analyze_batch.assert_called_once()
+    search.ai.analyze_hiring_cases_batch.assert_called_once()
 
 
 def test_stop_keeps_preparation_without_paid_flush_and_new_search_reuses_it(search):
@@ -114,13 +117,13 @@ def test_stop_keeps_preparation_without_paid_flush_and_new_search_reuses_it(sear
         search.step()
     search.run.stop(search.run.scope, search.run.scan_id)
     search.step()
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     search.env["search_run"] = OpportunitySearchRun(
         *search.run.scope, target=5, aggregate=search.env["empty_scan_result"](), initialized=True,
     )
     for _ in range(7):
         search.step()
-    search.ai.analyze_batch.assert_called_once()
+    search.ai.analyze_hiring_cases_batch.assert_called_once()
     assert search.profile_ai.build_job_profile.call_count == 6
 
 
@@ -141,11 +144,11 @@ def test_partial_claim_race_refills_before_recommendation(search, monkeypatch):
     search.step()
     assert len(search.run.prepared_job_ids) == 8
     assert search.run.unavailable_job_ids == lost
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     for _ in range(3):
         search.step()
-    search.ai.analyze_batch.assert_called_once()
-    assert len(search.ai.analyze_batch.call_args.kwargs["items"]) == 10
+    search.ai.analyze_hiring_cases_batch.assert_called_once()
+    assert len(search.ai.analyze_hiring_cases_batch.call_args.args[0]) == 10
     assert search.run.unavailable_job_ids == lost
 
 
@@ -158,17 +161,17 @@ def test_revalidation_hard_reject_is_removed_before_refill(search):
     search.step()
     assert len(search.run.prepared_job_ids) == 9
     assert search.run.unavailable_job_ids == set()
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     search.step()
     search.step()
-    assert len(search.ai.analyze_batch.call_args.kwargs["items"]) == 10
-    assert rejected_id not in {job.id for job, _ in search.ai.analyze_batch.call_args.kwargs["items"]}
+    assert len(search.ai.analyze_hiring_cases_batch.call_args.args[0]) == 10
+    assert rejected_id not in {req.job_id for req in search.ai.analyze_hiring_cases_batch.call_args.args[0]}
     assert search.run.unavailable_job_ids == set()
 
 
 def test_target_five_activates_only_five_after_ten_eligible(search, monkeypatch):
     search.add(12)
-    monkeypatch.setattr(analysis_module, "asdict", lambda result: {
+    monkeypatch.setattr(analysis_module, "hiring_case_analysis", lambda result: {
         "job_id": result.job_id, "recommendation": "best_match",
         "current_fit": 90, "growth_value": 80,
     })
@@ -176,8 +179,8 @@ def test_target_five_activates_only_five_after_ten_eligible(search, monkeypatch)
         search.step()
     assert search.run.status == "complete"
     assert search.run.aggregate["opportunities_found"] == 5
-    search.ai.analyze_batch.assert_called_once()
-    assert len(search.ai.analyze_batch.call_args.kwargs["items"]) == 10
+    search.ai.analyze_hiring_cases_batch.assert_called_once()
+    assert len(search.ai.analyze_hiring_cases_batch.call_args.args[0]) == 10
     with database.get_connection() as connection:
         assert connection.execute(
             "SELECT COUNT(*) FROM candidate_job_analyses WHERE candidate_id='a' AND opportunity_state='active'",
@@ -189,7 +192,7 @@ def test_preparation_exception_releases_claim_and_stops_without_ai(search):
     search.profile_ai.build_job_profile.side_effect = RuntimeError("fixture")
     search.run.advance(search.run.scope, search.env["advance_opportunity_search"])
     assert search.run.status == "failed"
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     with database.get_connection() as connection:
         assert connection.execute(
             "SELECT COUNT(*) FROM candidate_job_analyses WHERE analysis_claim_token IS NOT NULL",
@@ -207,7 +210,7 @@ def test_active_buffer_claims_are_not_stolen_or_held_while_refilling(search):
     assert len(claimed) == 2
     search.run.advance(search.run.scope, search.env["advance_opportunity_search"])
     assert len(search.run.prepared_job_ids) == 8
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
     with database.get_connection() as connection:
         assert connection.execute(
             "SELECT COUNT(*) FROM candidate_job_analyses WHERE analysis_claim_token = 'other-worker'",
@@ -218,8 +221,8 @@ def test_active_buffer_claims_are_not_stolen_or_held_while_refilling(search):
     database.release_candidate_job_analysis_claims(candidate_id="a", job_ids=busy, claim_token="other-worker")
     for _ in range(3):
         search.step()
-    search.ai.analyze_batch.assert_called_once()
-    assert len(search.ai.analyze_batch.call_args.kwargs["items"]) == 10
+    search.ai.analyze_hiring_cases_batch.assert_called_once()
+    assert len(search.ai.analyze_hiring_cases_batch.call_args.args[0]) == 10
 
 
 def test_full_buffer_insufficient_budget_stops_without_partial_paid_batch(search):
@@ -230,20 +233,20 @@ def test_full_buffer_insufficient_budget_stops_without_partial_paid_batch(search
         search.step()
     assert search.run.status == "complete"
     assert search.run.aggregate["usage_limit_reached"]
-    search.ai.analyze_batch.assert_not_called()
+    search.ai.analyze_hiring_cases_batch.assert_not_called()
 
 
 def test_recommendation_quota_failure_stops_once_and_releases_claims(search):
     from services.provider_failure import ProviderRateLimit
     search.add(10)
-    search.ai.analyze_batch.side_effect = ProviderRateLimit()
+    search.ai.analyze_hiring_cases_batch.side_effect = ProviderRateLimit()
     for _ in range(10):
         search.step()
     search.run.advance(search.run.scope, search.env["advance_opportunity_search"])
     assert search.run.status == "failed"
     assert search.run.aggregate["provider_quota_exhausted"]
     search.run.advance(search.run.scope, search.env["advance_opportunity_search"])
-    search.ai.analyze_batch.assert_called_once()
+    search.ai.analyze_hiring_cases_batch.assert_called_once()
     with database.get_connection() as connection:
         assert connection.execute(
             "SELECT COUNT(*) FROM candidate_job_analyses WHERE analysis_claim_token IS NOT NULL",

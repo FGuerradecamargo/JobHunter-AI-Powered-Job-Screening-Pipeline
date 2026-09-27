@@ -160,7 +160,7 @@ def test_malformed_persisted_memory_fails_safe():
 
 
 
-def test_analyze_pending_forwards_same_candidates_memory_to_batch(
+def test_analyze_pending_reads_scoped_memory_but_only_passes_official_requests_to_batch(
     monkeypatch,
 ):
     from models.candidate_profile import (
@@ -272,22 +272,8 @@ def test_analyze_pending_forwards_same_candidates_memory_to_batch(
 
 
     class CapturingAIService:
-        def analyze_batch(
-            self,
-            *,
-            items,
-            candidate_profile,
-            career_memory,
-        ):
-            captured["items"] = items
-
-            captured[
-                "candidate_profile"
-            ] = candidate_profile
-
-            captured[
-                "career_memory"
-            ] = career_memory
+        def analyze_hiring_cases_batch(self, requests):
+            captured["requests"] = requests
 
             # Stop immediately after proving the
             # production handoff. analyze_pending()
@@ -328,6 +314,11 @@ def test_analyze_pending_forwards_same_candidates_memory_to_batch(
     service.ai_service = (
         CapturingAIService()
     )
+    def scoped_requests(candidate_id, batch):
+        assert candidate_id == "candidate-a"
+        return [{"candidate_id": candidate_id, "job_id": item["job"].id} for item in batch]
+    service._build_hiring_requests = scoped_requests
+    service._prepare_hiring_case = lambda cid, job: {"rejected": False, "reasons": []}
 
     # Description is already present, so enrichment
     # and network-related behavior are never needed.
@@ -428,56 +419,8 @@ def test_analyze_pending_forwards_same_candidates_memory_to_batch(
         ]
     )
 
-    # The exact candidate-scoped persisted memory
-    # reaches the production batch call.
-    assert (
-        captured[
-            "career_memory"
-        ][
-            "continuity_note"
-        ]
-        == "MEMORY_A_PIPELINE"
-    )
-
-    assert (
-        "MEMORY_A_PIPELINE"
-        in str(
-            captured[
-                "career_memory"
-            ]
-        )
-    )
-
-    assert (
-        len(
-            captured["items"]
-        )
-        == 1
-    )
-
-    assert (
-        captured[
-            "items"
-        ][0][0].id
-        == "job-a-1"
-    )
-
-    # Candidate Profile remains a separate object.
-    assert isinstance(
-        captured[
-            "candidate_profile"
-        ],
-        CandidateProfile,
-    )
-
-    assert (
-        "MEMORY_A_PIPELINE"
-        not in str(
-            captured[
-                "candidate_profile"
-            ]
-        )
-    )
+    assert captured["requests"] == [{"candidate_id": "candidate-a", "job_id": "job-a-1"}]
+    assert "MEMORY_A_PIPELINE" not in str(captured["requests"])
 
     # Fake AI stops after capture. The production
     # service should contain that batch failure rather

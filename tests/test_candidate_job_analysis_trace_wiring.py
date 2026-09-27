@@ -1,4 +1,5 @@
 import services.candidate_job_analysis_service as module
+from types import SimpleNamespace
 
 from services.candidate_job_analysis_service import (
     CandidateJobAnalysisService,
@@ -49,8 +50,10 @@ class FakeAIResult:
     def __init__(
         self,
         job_id,
+        candidate_id="candidate-a",
     ):
         self.job_id = job_id
+        self.candidate_id = candidate_id
 
 
 def _build_service(
@@ -149,29 +152,15 @@ def _build_service(
             }
 
     class AIService:
-        def analyze_batch(
-            self,
-            *,
-            items,
-            candidate_profile,
-            career_memory,
-        ):
-            assert candidate_profile is profile
-
-            assert dict(
-                career_memory
-            ) == {
-                "continuity_note": (
-                    "TRACE_MEMORY"
-                ),
-            }
+        def analyze_hiring_cases_batch(self, requests):
+            assert requests[0].candidate_id == "candidate-a"
 
             if ai_error is not None:
                 raise ai_error
 
             return [
                 FakeAIResult(
-                    items[0][0].id
+                    requests[0].job_id
                 ),
             ]
 
@@ -196,6 +185,12 @@ def _build_service(
     )
 
     service.ai_service = AIService()
+    service._prepare_hiring_case = lambda cid, job: {
+        "rejected": hard_rejected, "reasons": ["Hard constraint"] if hard_rejected else [],
+    }
+    service._build_hiring_requests = lambda candidate_id, batch: [
+        SimpleNamespace(candidate_id=candidate_id, job_id=item["job"].id) for item in batch
+    ]
 
     monkeypatch.setattr(
         module,
@@ -243,7 +238,7 @@ def _build_service(
 
     monkeypatch.setattr(
         module,
-        "asdict",
+        "hiring_case_analysis",
         lambda ai_result: {
             "job_id": ai_result.job_id,
             "recommendation": "reject",

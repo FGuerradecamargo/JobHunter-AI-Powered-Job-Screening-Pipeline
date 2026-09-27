@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from models.hiring_case import OpportunitySignalKind
+from models.structured_interpretation import (
+    StructuredInterpretationInput, InterpretationOperation, RegisteredSourceRef,
+    SourceRefClass, OpportunityFact, FactState,
+)
 from services.job_evidence_constraints import validate_evidence_requirement
 from services.temporal_applicability import resolve_temporal_applicability
 
@@ -17,6 +22,39 @@ from models.profile_interpretation import (
     RequirementSubstitutability,
     CandidatePreferenceSemantic,
 )
+
+
+def build_hiring_interpretation_request(*, candidate_profile, source_evidence, job_profile, hard_facts):
+    """Trusted refs and literal candidate preferences, not generated memory claims."""
+    registry = tuple(RegisteredSourceRef(source.ref, SourceRefClass.CAREER_MEMORY_SOURCE,
+        candidate_profile.candidate_id, source.source_type,
+        source.source_type in {"professional_experience", "career_update"}) for source in source_evidence)
+    registry += tuple(RegisteredSourceRef(fact.fact_id, SourceRefClass.JOB_HARD_FACT,
+        hard_facts.job_id, fact.kind) for fact in hard_facts.facts)
+    preference_fields = {
+        OpportunitySignalKind.CAREER_DIRECTION: {"desired_next_work"},
+        OpportunitySignalKind.ROLE_CONTENT: {"enjoyed_work", "avoid_work"},
+        OpportunitySignalKind.GROWTH: {"development_interests"},
+        OpportunitySignalKind.STRATEGIC_VALUE: {"career_priorities"},
+    }
+    job_refs = tuple(fact.fact_id for fact in hard_facts.facts)
+    job_values = tuple(f"{fact.kind}: {fact.value}" for fact in hard_facts.facts)
+    values = []
+    for kind in OpportunitySignalKind:
+        preferences = [source for source in source_evidence if source.source_type == "candidate_preference"
+                       and source.ref.rsplit(":", 1)[-1] in preference_fields.get(kind, set())]
+        known = bool(preferences and job_refs)
+        values.append(OpportunityFact(kind, FactState.KNOWN if known else FactState.UNKNOWN,
+            tuple(source.ref for source in preferences) + job_refs if known else (),
+            tuple(source.summary for source in preferences) + job_values if known else ()))
+    return StructuredInterpretationInput(
+        operation=InterpretationOperation.ANALYZE_HIRING_CASE,
+        candidate_id=candidate_profile.candidate_id, job_id=job_profile.job_id,
+        memory_signature=candidate_profile.memory_signature,
+        memory_projection={"sources": [{"ref": source.ref, "text": source.summary} for source in source_evidence]},
+        source_registry=registry, candidate_profile=candidate_profile,
+        job_profile=job_profile, hard_facts=hard_facts, opportunity_facts=tuple(values),
+    )
 
 
 def _finite_requirement_state(

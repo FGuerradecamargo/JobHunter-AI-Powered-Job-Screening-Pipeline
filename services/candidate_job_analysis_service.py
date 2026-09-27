@@ -68,8 +68,17 @@ from services.recommenders.recommendation_engine import (
 
 
 from services.ai_usage_budget import AIUsageBudget
+from services.candidate_onboarding_repository import CandidateOnboardingRepository
+from services.candidate_profile_source import load_confirmed_candidate_profile_input
+from services.profile_snapshot_repository import ProfileSnapshotRepository
+from services.profile_hiring_case_adapter import build_hiring_interpretation_request
+from services.hiring_case_compatibility import hiring_case_analysis
+from models.profile_interpretation import CANDIDATE_PROFILE_SCHEMA_VERSION
+from models.profile_interpretation import HiringCaseInterpretation
+from services.profile_hiring_case_adapter import build_profile_hiring_case_input
+from services.hiring_case_engine import build_hiring_case
 
-ANALYSIS_VERSION = "candidate-job-analysis-v15"
+ANALYSIS_VERSION = "candidate-job-analysis-v16-hiring-case"
 REQUEST_DELAY_SECONDS = 2
 ANALYSIS_CLAIM_TTL_SECONDS = 1800
 
@@ -866,6 +875,44 @@ def _resolve_persistence_lifecycle(
 
 
 class CandidateJobAnalysisService:
+    def _prepare_hiring_case(self, candidate_id, job):
+        request = self._build_hiring_requests(candidate_id, [{"job": job}])[0]
+        data = build_profile_hiring_case_input(
+            candidate_profile=request.candidate_profile, job_profile=request.job_profile,
+            hard_facts=request.hard_facts, interpretation=HiringCaseInterpretation(()),
+        )
+        # Closure is an objective vacancy fact, not a default candidate preference.
+        text = "\n".join(fact.value for fact in request.hard_facts.facts).casefold()
+        if HardFilterAnalyzer._matches(text, HardFilterAnalyzer.CLOSED_PATTERNS):
+            data.hard_eligibility_blockers.append("Job appears to be closed or unavailable.")
+        case = build_hiring_case(data)
+        return {"rejected": bool(case.hard_eligibility_blockers),
+                "reasons": list(case.hard_eligibility_blockers), "hiring_case": case}
+
+    def _build_hiring_requests(self, candidate_id, batch):
+        source, evidence = load_confirmed_candidate_profile_input(
+            candidate_id, CandidateOnboardingRepository(), self.career_update_repository,
+        )
+        candidate = ProfileSnapshotRepository().candidate_for_signature(
+            candidate_id, source.source_signature, CANDIDATE_PROFILE_SCHEMA_VERSION,
+        )
+        if candidate is None:
+            raise ValueError("CandidateProfile needs confirmation or regeneration before analysis.")
+        requests = []
+        for item in batch:
+            job_id = item["job"].id
+            facts = self.job_profile_manager.sources.load_job_hard_facts(job_id, candidate_id=candidate_id)
+            profile = self.job_profile_manager.snapshots.job_for_signature(
+                job_id, facts.job_signature, JOB_PROFILE_VERSION,
+            )
+            if profile is None:
+                raise ValueError("JobProfile changed after preparation; prepare this job again.")
+            requests.append(build_hiring_interpretation_request(
+                candidate_profile=candidate, source_evidence=evidence,
+                job_profile=profile, hard_facts=facts,
+            ))
+        return requests
+
     def __init__(self) -> None:
         self.candidate_repository = (
             CandidateRepository()
@@ -1247,12 +1294,6 @@ class CandidateJobAnalysisService:
             .list_for_candidate(candidate_id)
         )
 
-        profile = candidate_to_profile(
-            candidate,
-            career_objective,
-            career_updates,
-        )
-
         # Career Memory is candidate-specific historical
         # context. Read it once per scan and keep it fixed
         # across every batch in this analyze_pending call.
@@ -1263,10 +1304,6 @@ class CandidateJobAnalysisService:
             self._load_candidate_career_memory(
                 candidate_id
             )
-        )
-
-        hard_filter = HardFilterAnalyzer(
-            profile
         )
 
         candidate_signature = (
@@ -1339,6 +1376,7 @@ class CandidateJobAnalysisService:
             "ai_analyses_created": 0,
             "ai_approved": 0,
             "ai_rejected": 0,
+            "not_surfaced": 0,
             "best_match": 0,
             "potential": 0,
             "good_opportunity": 0,
@@ -1424,10 +1462,7 @@ class CandidateJobAnalysisService:
                 row_stage = "hard_filter"
 
                 hard_filter_result = (
-                    hard_filter.analyze(
-                        job,
-                        job_profile,
-                    )
+                    self._prepare_hiring_case(candidate_id, job)
                 )
 
                 if hard_filter_result["rejected"]:
@@ -1491,6 +1526,9 @@ class CandidateJobAnalysisService:
                             "hard_filter"
                         ),
                     }
+                    if hard_filter_result.get("hiring_case") is not None:
+                        analysis = hiring_case_analysis(hard_filter_result["hiring_case"])
+                        analysis["rule_rejection_type"] = "hard_filter"
 
                     (
                         persistence_status,
@@ -1728,20 +1766,10 @@ class CandidateJobAnalysisService:
                 + uuid4().hex
             )
 
-            batch_items = [
-                (
-                    item["job"],
-                    item["job_profile"],
-                )
-                for item in batch
-            ]
-
             try:
                 ai_analyses = (
-                    self.ai_service.analyze_batch(
-                        items=batch_items,
-                        candidate_profile=profile,
-                        career_memory=career_memory,
+                    self.ai_service.analyze_hiring_cases_batch(
+                        self._build_hiring_requests(candidate_id, batch)
                     )
                 )
 
@@ -1750,6 +1778,10 @@ class CandidateJobAnalysisService:
                         "Validated AI batch size does not "
                         "match requested batch size."
                     )
+
+                if any(case.candidate_id != candidate_id or str(case.job_id) != str(item["job"].id)
+                       for item, case in zip(batch, ai_analyses)):
+                    raise ValueError("Hiring Case batch scope mismatch.")
 
                 # The candidate-specific AI analyses were
                 # successfully created. Meter analyses,
@@ -1921,9 +1953,7 @@ class CandidateJobAnalysisService:
                             "does not match batch job ID."
                         )
 
-                    analysis = asdict(
-                        ai_analysis
-                    )
+                    analysis = hiring_case_analysis(ai_analysis)
 
                     bucket = analysis.get(
                         "recommendation",
@@ -2013,9 +2043,10 @@ class CandidateJobAnalysisService:
                         ] += 1
 
                     else:
-                        analysis_status = (
-                            "system_rejected"
-                        )
+                        insufficient = analysis.get("classification") == "not_surfaced"
+                        # Retain unknown cases in the reanalysis lifecycle; absence
+                        # of evidence is not a user decision or permanent rejection.
+                        analysis_status = "in_review" if insufficient else "system_rejected"
 
                         analysis[
                             "tailored_cv"
@@ -2025,9 +2056,7 @@ class CandidateJobAnalysisService:
                             "interview_prep"
                         ] = None
 
-                        result[
-                            "ai_rejected"
-                        ] += 1
+                        result["not_surfaced" if insufficient else "ai_rejected"] += 1
 
                     (
                         persistence_status,

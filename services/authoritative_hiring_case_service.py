@@ -5,6 +5,7 @@ from models.profile_interpretation import (
     AIJobProfileSnapshot,
     CandidateProfileSnapshot,
     JobHardFacts,
+    HiringCaseInterpretation,
 )
 from services.hiring_case_engine import build_hiring_case
 from services.profile_hiring_case_adapter import build_profile_hiring_case_input
@@ -44,6 +45,21 @@ class AuthoritativeHiringCaseService:
             candidate_profile=candidate_profile,
             job_profile=job_profile,
         )
+
+        return self.evaluate_interpretation(
+            candidate_profile=candidate_profile, job_profile=job_profile,
+            hard_facts=hard_facts, interpretation=interpretation,
+            hard_assessments=hard_assessments,
+        )
+
+    @staticmethod
+    def evaluate_interpretation(
+        *, candidate_profile: CandidateProfileSnapshot,
+        job_profile: AIJobProfileSnapshot, hard_facts: JobHardFacts,
+        interpretation: HiringCaseInterpretation,
+        hard_assessments: tuple[RequirementAssessment, ...] = (),
+    ) -> HiringCase:
+        """Classify an already validated interpretation without another AI call."""
 
         data = build_profile_hiring_case_input(
             candidate_profile=candidate_profile,

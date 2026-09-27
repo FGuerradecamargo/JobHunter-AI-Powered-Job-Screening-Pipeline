@@ -3,6 +3,51 @@ import html
 import streamlit as st
 
 
+HIRING_CASE_LABELS = {
+    "best_match": "Best Match", "worth_a_try": "Worth a Try",
+    "youre_strong_but": "You're Strong, But", "not_surfaced": "More evidence needed",
+    "skip_for_now": "Skip for now", "ineligible": "Ineligible",
+}
+
+
+def _render_hiring_case(case: dict, item: dict, status_label: str | None) -> None:
+    if (not isinstance(case, dict) or case.get("authority") != "deterministic_hiring_case"
+            or case.get("schema_version") != "hiring-case-v2"
+            or case.get("classification") not in HIRING_CASE_LABELS
+            or str(case.get("job_id", "")) != str(item.get("id", item.get("job_id", "")))):
+        st.warning("This analysis needs to be refreshed before it can be displayed.")
+        return
+    st.subheader(HIRING_CASE_LABELS[case["classification"]])
+    if status_label:
+        st.caption(status_label)
+    if case["classification"] == "not_surfaced":
+        st.info("There is not enough grounded evidence to recommend this opportunity yet.")
+    opportunity = case.get("opportunity", {})
+    columns = st.columns(3)
+    columns[0].metric("Evidence-backed fit", str(case.get("hiring_case_strength", "unknown")).replace("_", " ").title())
+    columns[1].metric("Value to you", str(opportunity.get("value", "unknown")).title())
+    columns[2].metric("Confidence", str(opportunity.get("confidence", "unknown")).title())
+    for requirement in case.get("requirements", []):
+        st.markdown("**" + html.escape(str(requirement.get("requirement", ""))) + "**")
+        st.caption(str(requirement.get("evidence_state", "evidence_missing")).replace("_", " ").title())
+        if requirement.get("rationale"):
+            st.text(requirement["rationale"])
+    for blocker in case.get("hard_eligibility_blockers", []):
+        st.warning(str(blocker))
+    questions = case.get("add_evidence", [])
+    if questions:
+        st.subheader("Open evidence questions")
+        for question in questions:
+            st.text(str(question.get("question", "")))
+    proof = case.get("how_to_prove", {}).get("items", [])
+    if proof:
+        st.subheader("How to demonstrate your experience")
+        for item in proof:
+            st.text(str(item.get("what_they_need", "")))
+            st.text(str(item.get("what_to_demonstrate", "")))
+    st.caption("Candidate profile v" + str(case.get("candidate_profile_version", "?"))
+               + " | Job profile v" + str(case.get("job_profile_version", "?")))
+
 RECOMMENDATION_LABELS = {
     "best_match": "Best Match",
     "strong_match": "Best Match",
@@ -142,6 +187,11 @@ def render_job_analysis(
         "analysis",
         {},
     ) or {}
+
+    if "hiring_case" in analysis:
+        _render_hiring_case(analysis["hiring_case"], item, status_label)
+        return
+    st.caption("Historical analysis. Refresh it to use the current evidence-based assessment.")
 
     location = (
         item.get("location")

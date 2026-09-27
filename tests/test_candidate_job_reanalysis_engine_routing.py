@@ -537,29 +537,16 @@ def test_reanalysis_ai_reject_preserves_active_lifecycle(
             job_id,
         ):
             self.job_id = job_id
+            self.candidate_id = "candidate-a"
 
 
     class AIService:
-        def analyze_batch(
-            self,
-            *,
-            items,
-            candidate_profile,
-            career_memory,
-        ):
-            assert candidate_profile is profile
-
-            assert career_memory == {
-                "continuity_note": (
-                    "ACTIVE_REANALYSIS_MEMORY"
-                ),
-            }
-
-            assert len(items) == 1
+        def analyze_hiring_cases_batch(self, requests):
+            assert len(requests) == 1
 
             return [
                 FakeAIResult(
-                    items[0][0].id
+                    requests[0].id
                 ),
             ]
 
@@ -581,6 +568,8 @@ def test_reanalysis_ai_reject_preserves_active_lifecycle(
     )
 
     service.ai_service = AIService()
+    service._prepare_hiring_case = lambda cid, job: {"rejected": False, "reasons": []}
+    service._build_hiring_requests = lambda candidate_id, batch: [item["job"] for item in batch]
 
     service._load_candidate_career_memory = (
         lambda candidate_id: {
@@ -641,11 +630,10 @@ def test_reanalysis_ai_reject_preserves_active_lifecycle(
         lambda job: "job-signature",
     )
 
-    # The production Engine calls dataclasses.asdict().
-    # We only need a controlled validated-AI payload here.
+    # Lifecycle tests use a controlled HiringCase display projection.
     monkeypatch.setattr(
         module,
-        "asdict",
+        "hiring_case_analysis",
         lambda ai_result: {
             "job_id": ai_result.job_id,
             "recommendation": "reject",

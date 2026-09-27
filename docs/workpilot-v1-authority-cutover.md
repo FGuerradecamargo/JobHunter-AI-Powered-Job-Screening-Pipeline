@@ -231,3 +231,30 @@ are not accepted as source evidence on this path. Narrative answers cannot certi
 complete finite-fact coverage or authoritative absence. This entry point is not
 yet wired into every production caller; the runtime cutover and release gates above
 remain outstanding.
+
+## Runtime profile and relationship checkpoints
+
+The live preparation runner now resolves official, signature-current snapshots
+from confirmed onboarding and eligible Job observations. Candidate generation is
+explicit; search does not regenerate a missing/stale CandidateProfile implicitly.
+The existing max-10 eligible buffer, claims, cancellation and atomic batch response
+validation remain in place. One provider request returns evidence links and value
+signals, not scores or recommendation buckets. The existing structured validator
+and deterministic HiringCase engine produce the result before persistence.
+
+The persisted analysis contains the full versioned HiringCase. Legacy bucket
+columns are one-way compatibility projections only; numeric scores are NULL rather
+than fabricated. NOT_SURFACED remains in_review/none so enrichment can reanalyze
+the relationship; it is not a hard rejection. Raw legacy preference defaults no
+longer create hard blockers in this runner. The official finite-fact gate and
+literal vacancy closure check run before recommendation AI.
+
+The shared Job Analysis component renders this same stored case, including
+unknown evidence and confidence, without accepting the outer legacy bucket as
+authority. Older payloads are explicitly labelled historical.
+
+Still pending: historical selector/activation cutover, official snapshot change
+invalidation across all callers, Apply/ApplicationContext, Market/Improvements,
+Company/InterviewBrief, product modes, remaining legacy deletion and E2E gates.
+No production backfill, database connection, external AI or provider execution was
+used to validate these changes. Tests use SQLite and injected clients.
