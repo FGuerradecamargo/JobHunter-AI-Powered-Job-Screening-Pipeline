@@ -27,6 +27,10 @@ from services.session_auth import (
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context
+from services.candidate_product_state_repository import (
+    CandidateProductStateRepository,
+)
+from services.product_mode_policy import product_mode_policy
 from services.provider_failure import log_failure
 from components.profile_onboarding import render_profile_onboarding
 
@@ -93,6 +97,17 @@ if not AccessPolicy.can_access_candidate(
     candidate_id,
 ):
     st.error("Access denied.")
+    st.stop()
+
+product_state = CandidateProductStateRepository().get(
+    candidate_id
+)
+
+if not product_mode_policy(product_state).can_mutate:
+    st.info(
+        "WorkPilot is currently read-only. "
+        "Your professional profile is preserved but cannot be edited."
+    )
     st.stop()
 
 generated_candidate = candidate_repository.get(

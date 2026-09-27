@@ -9,6 +9,13 @@ from services.admin_reauthentication_service import (
     AdminReauthenticationService,
 )
 from services.candidate_repository import CandidateRepository
+from services.candidate_product_state_repository import (
+    CandidateProductStateRepository,
+)
+from services.candidate_product_state_service import (
+    HiredTransitionService,
+)
+from services.product_mode_policy import product_mode_policy
 from services.session_auth import get_authenticated_user
 from services.user_context_runtime import (
     get_active_user_context,
@@ -556,54 +563,130 @@ else:
         and candidate.current_role.strip()
     )
 
+    product_state = (
+        CandidateProductStateRepository().get(candidate.id)
+        if candidate is not None
+        else None
+    )
+
+    product_policy = (
+        product_mode_policy(product_state)
+        if product_state is not None
+        else None
+    )
+
     if not profile_ready:
-        navigation = st.navigation(
-            [
-                st.Page(
-                    "pages/3_Profile.py",
-                    title="Create your profile",
-                    icon=":material/person_add:",
-                    default=True,
-                ),
-                password_reset_page,
-            email_verification_page,
-            ]
-        )
+        if (
+            product_policy is not None
+            and not product_policy.can_mutate
+        ):
+            navigation = st.navigation(
+                [
+                    st.Page(
+                        "app.py",
+                        title="Dashboard",
+                        icon=":material/dashboard:",
+                        default=True,
+                    ),
+                    password_reset_page,
+                    email_verification_page,
+                ]
+            )
+        else:
+            navigation = st.navigation(
+                [
+                    st.Page(
+                        "pages/3_Profile.py",
+                        title="Create your profile",
+                        icon=":material/person_add:",
+                        default=True,
+                    ),
+                    password_reset_page,
+                    email_verification_page,
+                ]
+            )
 
     else:
-        navigation = st.navigation(
-            [
-                st.Page(
-                    "app.py",
-                    title="Dashboard",
-                    icon=":material/dashboard:",
-                    default=True,
-                ),
+        if product_state.subscription_end_requested:
+            st.sidebar.caption(
+                "Subscription end requested"
+            )
+
+        if product_policy.can_return_to_search:
+            st.sidebar.caption("CAREER MODE")
+
+            if (
+                active_user.id == authenticated_user.id
+                and st.sidebar.button(
+                    "Return to job search",
+                    key="return_to_search_mode",
+                    use_container_width=True,
+                )
+            ):
+                HiredTransitionService(
+                    repository=CandidateProductStateRepository(),
+                ).return_to_search(
+                    candidate_id=candidate.id,
+                )
+                st.rerun()
+
+        elif not product_policy.can_mutate:
+            st.sidebar.caption("READ-ONLY MODE")
+
+        private_pages = [
+            st.Page(
+                "app.py",
+                title="Dashboard",
+                icon=":material/dashboard:",
+                default=True,
+            ),
+        ]
+
+        if product_policy.can_search:
+            private_pages.append(
                 st.Page(
                     "pages/1_Opportunities.py",
                     title="Opportunities",
                     icon=":material/work:",
-                ),
+                )
+            )
+
+        if product_policy.show_sources:
+            private_pages.append(
                 st.Page(
                     "pages/2_Sources.py",
                     title="Sources",
                     url_path="Sources",
                     icon=":material/hub:",
-                ),
+                )
+            )
+
+        if product_policy.show_profile:
+            private_pages.append(
                 st.Page(
                     "pages/3_Profile.py",
                     title="Profile",
                     icon=":material/person:",
-                ),
+                )
+            )
+
+        if product_policy.show_improvements:
+            private_pages.append(
                 st.Page(
                     "pages/4_Improvements.py",
                     title="Improvements",
                     icon=":material/trending_up:",
-                ),
+                )
+            )
+
+        private_pages.extend(
+            [
                 password_reset_page,
-            email_verification_page,
+                email_verification_page,
             ]
         )
+
+        navigation = st.navigation(private_pages)
 
 
 navigation.run()

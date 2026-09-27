@@ -26,6 +26,7 @@ from services.candidate_product_state_repository import (
 from services.candidate_product_state_service import (
     HiredTransitionService,
 )
+from services.product_mode_policy import product_mode_policy
 from services.external_application import external_application_url
 from services.system_state_presenter import application_age_state
 from datetime import datetime, timezone
@@ -202,6 +203,8 @@ def render_application_outcome(
     candidate_id: str,
     job_id: str,
     status: str,
+    *,
+    read_only: bool = False,
 ) -> None:
     repository = ApplicationOutcomeRepository()
     service = ApplicationOutcomeService(repository=repository)
@@ -217,6 +220,12 @@ def render_application_outcome(
     st.divider()
     st.subheader("Application status")
     st.markdown(f"**{view.status_label}**")
+
+    if read_only:
+        st.caption(
+            "Read-only access. Application history is preserved."
+        )
+        return
 
     if not view.actions:
         if view.state == "accepted":
@@ -368,14 +377,28 @@ def render_application_outcome(
             st.error(message)
 
 
-def render_interview_preparation(candidate_id: str, job_id: str, status: str) -> None:
+def render_interview_preparation(
+    candidate_id: str,
+    job_id: str,
+    status: str,
+    *,
+    read_only: bool = False,
+) -> None:
     from services.interview_preparation_ui import render_interview_rounds
-    render_interview_rounds(st, candidate_id=candidate_id, job_id=job_id)
+
+    render_interview_rounds(
+        st,
+        candidate_id=candidate_id,
+        job_id=job_id,
+        read_only=read_only,
+    )
 
 
 def render_job(
     candidate_id: str,
     item: dict,
+    *,
+    read_only: bool = False,
 ) -> None:
     analysis = item.get(
         "analysis",
@@ -485,7 +508,10 @@ def render_job(
         age = application_age_state(applied_at=item.get("applied_at"), now=datetime.now(timezone.utc).isoformat())
         if age:
             st.caption(age.title)
-        if item.get("application_stage") == "ready_to_apply":
+        if (
+            item.get("application_stage") == "ready_to_apply"
+            and not read_only
+        ):
             confirmed = st.button("Yes, I applied", key=f"confirm_applied:{candidate_id}:{job_id}")
             result = handle_mark_applied_action(action_requested=confirmed, candidate_id=candidate_id,
                 job_id=job_id, lifecycle_service=ApplicationLifecycleService())
@@ -498,6 +524,7 @@ def render_job(
             candidate_id=candidate_id,
             job_id=job_id,
             status=status,
+            read_only=read_only,
         )
 
         st.divider()
@@ -506,6 +533,7 @@ def render_job(
             candidate_id=candidate_id,
             job_id=job_id,
             status=status,
+            read_only=read_only,
         )
 
         st.subheader("Notes")
@@ -519,11 +547,15 @@ def render_job(
                 "Add salary information, interview notes, "
                 "recruiter feedback, or reasons for your decision."
             ),
+            disabled=read_only,
         )
 
-        if st.button(
-            "Save notes",
-            key=f"save_notes_{job_id}",
+        if (
+            not read_only
+            and st.button(
+                "Save notes",
+                key=f"save_notes_{job_id}",
+            )
         ):
             save_notes(
                 job_id=job_id,
@@ -636,6 +668,24 @@ def main() -> None:
         )
         return
 
+    product_state = CandidateProductStateRepository().get(
+        selected_candidate_id
+    )
+    product_policy = product_mode_policy(product_state)
+    read_only = not product_policy.can_mutate
+
+    if read_only:
+        st.info(
+            "WorkPilot is in read-only mode. "
+            "Your application and interview history remains available, "
+            "but it cannot be changed."
+        )
+    elif product_policy.mode.value == "career":
+        st.caption(
+            "Career mode is active. "
+            "New opportunity searches are paused."
+        )
+
     applications = ApplicationOutcomeRepository().list_applications(selected_candidate_id)
     groups = [
         ("ready_to_apply", "Ready to apply"), ("applied", "Applied"),
@@ -650,7 +700,11 @@ def main() -> None:
             if not grouped[key]:
                 st.info(f"No applications: {label}.")
             for item in grouped[key]:
-                render_job(selected_candidate_id, item)
+                render_job(
+                    selected_candidate_id,
+                    item,
+                    read_only=read_only,
+                )
 
 
 if __name__ == "__main__":

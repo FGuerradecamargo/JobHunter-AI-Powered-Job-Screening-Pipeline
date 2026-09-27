@@ -33,6 +33,10 @@ from services.application_lifecycle_ui import (
     handle_user_rejected_action,
 )
 from services.candidate_repository import CandidateRepository
+from services.candidate_product_state_repository import (
+    CandidateProductStateRepository,
+)
+from services.product_mode_policy import product_mode_policy
 from services.career_objective_repository import CareerObjectiveRepository
 from services.career_update_repository import CareerUpdateRepository
 from services.candidate_job_analysis_service import (
@@ -121,6 +125,29 @@ if candidate is None:
     st.error(
         "Could not load your professional profile."
     )
+    st.stop()
+
+
+product_state = CandidateProductStateRepository().get(
+    candidate_id
+)
+
+product_policy = product_mode_policy(
+    product_state
+)
+
+if not product_policy.can_search:
+    if product_policy.mode.value == "career":
+        st.info(
+            "WorkPilot is in Career mode. "
+            "Return to Search mode before looking for new opportunities."
+        )
+    else:
+        st.info(
+            "WorkPilot is currently read-only. "
+            "Your existing career history remains available."
+        )
+
     st.stop()
 
 

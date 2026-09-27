@@ -37,6 +37,10 @@ from services.session_auth import (
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context
+from services.candidate_product_state_repository import (
+    CandidateProductStateRepository,
+)
+from services.product_mode_policy import product_mode_policy
 
 load_dotenv()
 initialize_database()
@@ -54,6 +58,18 @@ user_context = (
 active_user = user_context.active_user
 
 render_logout_button()
+
+if active_user.candidate_id:
+    product_state = CandidateProductStateRepository().get(
+        active_user.candidate_id
+    )
+
+    if not product_mode_policy(product_state).can_mutate:
+        st.info(
+            "WorkPilot is currently read-only. "
+            "Job sources cannot be changed."
+        )
+        st.stop()
 
 st.set_page_config(
     page_title="Sources",

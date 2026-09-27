@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 
-def render_interview_rounds(st, *, candidate_id, job_id, repository=None, preparation_service=None):
+def render_interview_rounds(
+    st,
+    *,
+    candidate_id,
+    job_id,
+    repository=None,
+    preparation_service=None,
+    read_only=False,
+):
     """Current application UI: round-scoped writes, with historical records read-only."""
     from datetime import datetime, timezone
     from uuid import uuid4
@@ -19,7 +27,11 @@ def render_interview_rounds(st, *, candidate_id, job_id, repository=None, prepar
     }:
         return
     outcome = outcomes.get(candidate_id, job_id)
-    active = relationship["status"] in {"applied", "in_process"} and not (outcome and outcome.final_status)
+    active = (
+        relationship["status"] in {"applied", "in_process"}
+        and not (outcome and outcome.final_status)
+        and not read_only
+    )
     rounds = repository.list(candidate_id, job_id)
     st.subheader("Interviews")
     if active:
@@ -53,18 +65,56 @@ def render_interview_rounds(st, *, candidate_id, job_id, repository=None, prepar
         for value in (*item.interviewer_names, *item.interviewer_roles, item.interview_type, item.notes):
             if value:
                 st.write(value)
-        feedback = repository.feedback_for(item.interview_id, candidate_id, job_id)
-        with st.form(f"round_feedback:{candidate_id}:{job_id}:{item.interview_id}"):
-            text = st.text_area("Feedback", value=feedback.feedback_text if feedback else "")
-            next_steps = st.text_area("Next steps", value=feedback.next_steps if feedback else "")
-            save = st.form_submit_button("Save round feedback")
-        if save:
-            try:
-                repository.save_feedback(InterviewRoundFeedback(item.interview_id, candidate_id, job_id, text, next_steps))
-            except (ValueError, PermissionError):
-                st.error("Feedback could not be saved. Refresh and try again.")
+        feedback = repository.feedback_for(
+            item.interview_id,
+            candidate_id,
+            job_id,
+        )
+
+        if read_only:
+            if feedback is not None:
+                if feedback.feedback_text:
+                    st.write(feedback.feedback_text)
+                if feedback.next_steps:
+                    st.caption(
+                        "Next steps: " + feedback.next_steps
+                    )
             else:
-                st.rerun()
+                st.caption("No recorded feedback for this round.")
+        else:
+            with st.form(
+                f"round_feedback:{candidate_id}:{job_id}:{item.interview_id}"
+            ):
+                text = st.text_area(
+                    "Feedback",
+                    value=feedback.feedback_text if feedback else "",
+                )
+                next_steps = st.text_area(
+                    "Next steps",
+                    value=feedback.next_steps if feedback else "",
+                )
+                save = st.form_submit_button(
+                    "Save round feedback"
+                )
+
+            if save:
+                try:
+                    repository.save_feedback(
+                        InterviewRoundFeedback(
+                            item.interview_id,
+                            candidate_id,
+                            job_id,
+                            text,
+                            next_steps,
+                        )
+                    )
+                except (ValueError, PermissionError):
+                    st.error(
+                        "Feedback could not be saved. "
+                        "Refresh and try again."
+                    )
+                else:
+                    st.rerun()
         if st.button("View interview brief", key=f"brief:{candidate_id}:{job_id}:{item.interview_id}"):
             try:
                 brief = (preparation_service or InterviewPreparationService()).build_brief(candidate_id, job_id, item.interview_id)
