@@ -2,12 +2,13 @@ import logging
 
 import streamlit as st
 
-from services.career_intelligence_presenter import (
-    CONFIDENCE_EXPLANATION,
-    build_career_intelligence_view,
-    load_career_intelligence_snapshot,
+from services.candidate_market_runtime import (
+    load_candidate_market_runtime,
 )
-from services.session_auth import render_logout_button, require_authenticated_user
+from services.session_auth import (
+    render_logout_button,
+    require_authenticated_user,
+)
 from services.user_context_runtime import get_active_user_context
 
 
@@ -18,144 +19,176 @@ st.set_page_config(
     page_icon=":material/trending_up:",
     layout="wide",
 )
-st.caption("CAREER INTELLIGENCE")
+
+st.caption("YOUR CAREER")
 st.title("Improvements")
 st.write(
-    "A checkpoint based on the market opportunities WorkPilot has observed. "
-    "It supports your decisions; it does not define your career."
+    "What is worth developing now, considering who you are, "
+    "where you want to go and what the observed market is asking for?"
 )
 
 authenticated_user = require_authenticated_user()
-user_context = get_active_user_context(authenticated_user=authenticated_user)
+user_context = get_active_user_context(
+    authenticated_user=authenticated_user
+)
 active_user = user_context.active_user
-render_logout_button()
+render_logout_button(authenticated_user=authenticated_user)
 
 candidate_id = active_user.candidate_id
+
 if not candidate_id:
     st.error("This profile does not have professional information yet.")
     st.stop()
 
 try:
-    with st.spinner("Building your current career intelligence checkpoint..."):
-        snapshot = load_career_intelligence_snapshot(candidate_id)
-        view = build_career_intelligence_view(snapshot)
+    runtime = load_candidate_market_runtime(candidate_id)
 except Exception:
-    logger.exception("Could not build the Career Intelligence snapshot.")
-    st.error("Your career intelligence checkpoint could not be loaded.")
+    logger.exception("Could not load CandidateMarket.")
+    st.error("Your improvement plan could not be loaded.")
+    st.stop()
+
+status = runtime["status"]
+
+if status == "candidate_unavailable":
+    st.info(
+        "Your current professional profile is not available yet."
+    )
+    st.stop()
+
+if status == "direction_unavailable":
+    st.info(
+        "Choose a career direction before WorkPilot prioritises "
+        "market-based improvements."
+    )
+    st.stop()
+
+if status == "market_unavailable":
+    st.info(
+        "WorkPilot does not yet have enough public market evidence "
+        "for your current direction."
+    )
+    st.caption(
+        "Missing market evidence is not treated as a skill gap."
+    )
     st.stop()
 
 
-def show_labels(labels, empty_message):
-    if labels:
-        for label in labels:
-            st.write(f"- {label}")
-    else:
-        st.caption(empty_message)
+st.caption(
+    "BUILD = confirmed gap ? PROVE = strengthen evidence ? "
+    "EXPLORE = the current evidence is not enough to decide"
+)
+
+band_titles = {
+    "now": "Now",
+    "next": "Next",
+    "watch": "Watch",
+}
+
+kind_explanations = {
+    "build": "A confirmed gap that appears in this market.",
+    "prove": "You have relevant or transferable evidence worth making clearer.",
+    "explore": (
+        "The market signal exists, but WorkPilot cannot tell from "
+        "your current evidence whether this is a gap."
+    ),
+}
 
 
-def show_priority(priority):
-    with st.expander(priority["title"], expanded=False):
-        st.write(priority["why_now"])
-        st.caption(
-            f'{priority["category_label"]} · '
-            f'{priority["confidence_label"]} · '
-            f'{priority["direction_label"]}'
+for entry in runtime["segments"]:
+    market = entry["market_profile"]
+    assessment = entry["assessment"]
+    plan = entry["plan"]
+    segment = market.segment
+
+    st.divider()
+
+    title = segment.role_family or "Observed market"
+    st.subheader(title)
+
+    scope = [
+        value
+        for value in (
+            segment.location,
+            segment.seniority,
+            segment.domain,
         )
-        if priority["role_families"]:
-            st.write("Role families: " + ", ".join(priority["role_families"]))
-        st.caption(f'{priority["source_count"]} observed source(s)')
-        if priority["related_objective"]:
-            st.caption("Related objective: " + priority["related_objective"])
-        st.caption("Evidence references: " + str(priority["evidence_count"]))
+        if value
+    ]
 
+    if scope:
+        st.caption(" ? ".join(scope))
 
-position = view["current_position"]
-st.subheader("Current position")
-metric_columns = st.columns(4)
-metric_columns[0].metric("Observed jobs", position["sample_size"])
-metric_columns[1].metric("Best Matches", position["best_match_count"])
-metric_columns[2].metric("Near matches", position["near_match_count"])
-metric_columns[3].metric("Average fit", position["average_fit_label"])
+    metrics = st.columns(3)
+    metrics[0].metric("Observed jobs", market.sample_size)
+    metrics[1].metric("Market signals", len(assessment.signals))
+    metrics[2].metric("Market version", market.profile_version)
 
-st.subheader("Direction alignment")
-if not view["direction_known"]:
-    st.info(
-        "No career direction is currently selected. WorkPilot can show what "
-        "the observed market suggests, but it will not choose a direction for you."
-    )
+    if market.uncertainties:
+        with st.expander("Evidence limits", expanded=False):
+            for uncertainty in market.uncertainties:
+                st.write(
+                    "- " + uncertainty.replace("_", " ").capitalize()
+                )
 
-alignment_columns = st.columns(3)
-with alignment_columns[0]:
-    st.markdown("**Competitive now**")
-    show_labels(position["competitive_now"], "No recurring competitive family yet.")
-with alignment_columns[1]:
-    st.markdown("**Bridge**")
-    show_labels(position["bridge"], "No bridge family observed yet.")
-with alignment_columns[2]:
-    st.markdown("**Target**")
-    show_labels(position["target"], "No explicit target selected.")
+    for band in ("now", "next", "watch"):
+        st.markdown(f"### {band_titles[band]}")
 
-if position["sample_size"] == 0:
-    st.info(
-        "Analyze job opportunities first so WorkPilot can identify recurring "
-        "market patterns."
-    )
+        items = [
+            item
+            for item in plan.improvements
+            if item.band.value == band
+        ]
 
-st.subheader("Competitive advantages")
-if view["advantages"]:
-    for advantage in view["advantages"]:
-        with st.expander(advantage["signal"], expanded=False):
-            st.caption(
-                f'{advantage["confidence_label"]} · '
-                f'{advantage["evidence_count"]} evidence reference(s)'
-            )
-            if advantage["role_families"]:
-                st.write("Observed across: " + ", ".join(advantage["role_families"]))
-else:
-    st.info("The observed market does not show a supported advantage yet.")
+        if not items:
+            if band == "now":
+                st.caption(
+                    "No supported priority needs your attention now."
+                )
+            elif band == "next":
+                st.caption(
+                    "No supported next priority is available yet."
+                )
+            else:
+                st.caption(
+                    "There is nothing additional to watch right now."
+                )
+            continue
 
-st.subheader("Recurring blockers")
-if view["blockers"]:
-    for blocker in view["blockers"]:
-        with st.expander(blocker["blocker"], expanded=False):
-            st.caption(
-                f'{blocker["direction_label"]} · '
-                f'{blocker["confidence_label"]} · '
-                f'{blocker["evidence_count"]} evidence reference(s)'
-            )
-            if blocker["role_families"]:
-                st.write("Affects: " + ", ".join(blocker["role_families"]))
-else:
-    st.info("The current observed sample does not show a recurring blocker yet.")
+        for item in items:
+            kind = item.kind.value
 
-st.subheader("Improvements")
-band_labels = {"now": "Now", "next": "Next", "watch": "Watch"}
-for band in ("now", "next", "watch"):
-    st.markdown(f'### {band_labels[band]}')
-    items = view["priorities"][band]
-    if items:
-        for priority in items:
-            show_priority(priority)
-    else:
-        st.caption(view["priority_empty_messages"][band])
+            with st.expander(
+                f"{kind.upper()} ? {item.label}",
+                expanded=(band == "now"),
+            ):
+                st.write(item.why)
 
-st.subheader("Longer-term distances")
-if view["structural_distances"]:
-    st.write(
-        "These are experience gaps to keep in view, not quick tasks or promises."
-    )
-    for distance in view["structural_distances"]:
-        with st.expander(distance["blocker"], expanded=False):
-            st.caption(
-                f'{distance["direction_label"]} · '
-                f'{distance["confidence_label"]}'
-            )
-            if distance["role_families"]:
-                st.write("Affects: " + ", ".join(distance["role_families"]))
-else:
-    st.caption("No structural distance is supported by the current evidence.")
+                st.caption(
+                    kind_explanations[kind]
+                )
 
-with st.expander("Evidence and confidence", expanded=False):
-    st.write(view["checkpoint_summary"])
-    st.write(CONFIDENCE_EXPLANATION)
-    st.caption("Snapshot version: " + view["schema_version"])
+                frequency = round(item.frequency * 100)
+
+                st.caption(
+                    f"Observed in {frequency}% of this "
+                    f"{market.sample_size}-job sample ? "
+                    f"{item.market_confidence.title()} market confidence"
+                )
+
+                if item.candidate_evidence_refs:
+                    st.caption(
+                        f"{len(item.candidate_evidence_refs)} "
+                        "candidate evidence reference(s)"
+                    )
+
+                if item.source_job_ids:
+                    st.caption(
+                        f"{len(item.source_job_ids)} "
+                        "independent job source(s)"
+                    )
+
+st.divider()
+st.caption(
+    "These recommendations are decision support. "
+    "They do not change your professional evidence or career direction."
+)

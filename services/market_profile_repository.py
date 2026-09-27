@@ -30,6 +30,24 @@ class MarketProfileRepository:
             ).fetchone()
         return _decode(row["profile_json"]) if row else None
 
+    def list_current(self):
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT current.profile_json
+                FROM market_profile_snapshots current
+                JOIN (
+                    SELECT segment_key, MAX(profile_version) AS profile_version
+                    FROM market_profile_snapshots
+                    GROUP BY segment_key
+                ) latest
+                  ON latest.segment_key = current.segment_key
+                 AND latest.profile_version = current.profile_version
+                ORDER BY current.segment_key
+                """
+            ).fetchall()
+        return tuple(_decode(row["profile_json"]) for row in rows)
+
     def version(self, segment, version):
         with get_connection() as connection:
             row = connection.execute(
