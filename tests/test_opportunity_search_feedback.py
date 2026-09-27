@@ -15,7 +15,7 @@ def render_feedback(status, *, quota=False, saved=True, found=0):
     empty = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
                  and n.name == "empty_scan_result")
     feedback = source[source.index("\nif search_run is not None:\n"):
-                      source.index("# Market Position\n")]
+                      source.index("review_jobs = list_candidate_jobs(")]
     result_list = source[source.index("\nif (\n    best_matches\n"):
                          source.index("# Render partial opportunities")]
     script = '''
