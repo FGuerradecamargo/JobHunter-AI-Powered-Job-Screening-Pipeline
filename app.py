@@ -19,6 +19,13 @@ from services.application_outcome_ui import (
 )
 from services.application_lifecycle_service import ApplicationLifecycleService
 from services.application_lifecycle_ui import handle_mark_applied_action
+from models.product_state import HiredNextAction
+from services.candidate_product_state_repository import (
+    CandidateProductStateRepository,
+)
+from services.candidate_product_state_service import (
+    HiredTransitionService,
+)
 from services.external_application import external_application_url
 from services.system_state_presenter import application_age_state
 from datetime import datetime, timezone
@@ -212,7 +219,74 @@ def render_application_outcome(
     st.markdown(f"**{view.status_label}**")
 
     if not view.actions:
-        st.caption("This application has a final outcome.")
+        if view.state == "accepted":
+            product_state_repository = CandidateProductStateRepository()
+
+            st.success("You accepted this role.")
+            st.write("What would you like WorkPilot to do next?")
+
+            keep_searching, switch_career, end_subscription = st.columns(3)
+
+            with keep_searching:
+                if st.button(
+                    "Keep searching",
+                    key=f"hired_keep_searching_{candidate_id}_{job_id}",
+                    use_container_width=True,
+                ):
+                    HiredTransitionService(
+                        repository=product_state_repository,
+                    ).choose(
+                        candidate_id=candidate_id,
+                        job_id=job_id,
+                        action=HiredNextAction.KEEP_SEARCHING,
+                    )
+                    st.rerun()
+
+            with switch_career:
+                if st.button(
+                    "Switch to Career",
+                    key=f"hired_switch_career_{candidate_id}_{job_id}",
+                    use_container_width=True,
+                ):
+                    HiredTransitionService(
+                        repository=product_state_repository,
+                    ).choose(
+                        candidate_id=candidate_id,
+                        job_id=job_id,
+                        action=HiredNextAction.SWITCH_TO_CAREER,
+                    )
+                    st.rerun()
+
+            with end_subscription:
+                if st.button(
+                    "End subscription",
+                    key=f"hired_end_subscription_{candidate_id}_{job_id}",
+                    use_container_width=True,
+                ):
+                    HiredTransitionService(
+                        repository=product_state_repository,
+                    ).choose(
+                        candidate_id=candidate_id,
+                        job_id=job_id,
+                        action=HiredNextAction.END_SUBSCRIPTION,
+                    )
+                    st.rerun()
+
+            product_state = product_state_repository.get(candidate_id)
+
+            if product_state.subscription_end_requested:
+                st.info(
+                    "Your request to end the subscription has been recorded. "
+                    "Your access has not been changed until billing confirms it."
+                )
+            elif product_state.mode.value == "career":
+                st.info("WorkPilot is now in Career mode.")
+            else:
+                st.caption("WorkPilot remains in Search mode.")
+
+        else:
+            st.caption("This application has a final outcome.")
+
         return
 
     action_by_label = {item.label: item.value for item in view.actions}
