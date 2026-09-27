@@ -120,6 +120,50 @@ class JobSourceRepository:
             return [dict(row) for row in connection.execute(
                 "SELECT * FROM job_observations WHERE user_id = ? ORDER BY observation_id", (user_id,)).fetchall()]
 
+    def list_public_market_rows(self):
+        """Public provider evidence eligible for global Market projection.
+
+        Candidate/private observations are excluded at the repository boundary.
+        A discovery signal supplies only the public search taxonomy that led to
+        the vacancy; it is not candidate evidence.
+        """
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    o.observation_id,
+                    o.job_id,
+                    o.source_type,
+                    o.external_id,
+                    o.payload_json,
+                    o.created_at,
+                    o.updated_at,
+                    d.category,
+                    d.sub_category,
+                    d.search_query,
+                    d.last_seen_at
+                FROM job_observations o
+                JOIN jobs j
+                  ON j.id = o.job_id
+                 AND j.archived_at IS NULL
+                JOIN job_discovery_signals d
+                  ON d.job_id = o.job_id
+                 AND d.source_type = o.source_type
+                WHERE o.user_id IS NULL
+                ORDER BY
+                    o.job_id,
+                    o.source_type,
+                    o.external_id,
+                    d.sub_category,
+                    d.search_query
+                """
+            ).fetchall()
+
+        return [
+            dict(row)
+            for row in rows
+        ]
+
     def record_fetched_description(self, job):
         """Only an independently public canonical URL may enrich shared data.
 

@@ -5,6 +5,9 @@ import streamlit as st
 from services.candidate_market_runtime import (
     load_candidate_market_runtime,
 )
+from services.market_profile_refresh_service import (
+    MarketProfileRefreshService,
+)
 from services.session_auth import (
     render_logout_button,
     require_authenticated_user,
@@ -40,6 +43,16 @@ if not candidate_id:
     st.error("This profile does not have professional information yet.")
     st.stop()
 
+market_refresh_failed = False
+
+try:
+    MarketProfileRefreshService().refresh()
+except Exception:
+    logger.exception(
+        "Could not refresh global public MarketProfile."
+    )
+    market_refresh_failed = True
+
 try:
     runtime = load_candidate_market_runtime(candidate_id)
 except Exception:
@@ -48,6 +61,12 @@ except Exception:
     st.stop()
 
 status = runtime["status"]
+
+if market_refresh_failed:
+    st.caption(
+        "The latest public market evidence could not be refreshed. "
+        "Any previously saved public Market snapshot is preserved."
+    )
 
 if status == "candidate_unavailable":
     st.info(
