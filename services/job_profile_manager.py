@@ -1,157 +1,45 @@
-from dataclasses import asdict
-import hashlib
-import json
-
-from models.job import Job
+"""Runtime facade over the official, provenance-bound JobProfile snapshots."""
 from models.job_profile import JobProfile
-from services.ai.job_profile_service import JobProfileService
-from services.database import get_connection, utc_now
+from models.profile_interpretation import AI_JOB_PROFILE_SCHEMA_VERSION, JobRequirementStatus
+from services.profile_interpretation_service import ProfileInterpretationService
+from services.profile_snapshot_repository import ProfileSnapshotRepository
+from services.job_source_repository import JobSourceRepository
 
 
-JOB_PROFILE_VERSION = "job-profile-v2"
-
-
-def build_job_profile_signature(job: Job) -> str:
-    payload = {
-        "title": job.title or "",
-        "company": job.company or "",
-        "location": job.location or "",
-        "remote": job.remote,
-        "salary": job.salary or "",
-        "description": job.description or job.raw_text or "",
-    }
-
-    raw = json.dumps(
-        payload,
-        ensure_ascii=False,
-        sort_keys=True,
-    )
-
-    return hashlib.sha256(
-        raw.encode("utf-8")
-    ).hexdigest()
+JOB_PROFILE_VERSION = AI_JOB_PROFILE_SCHEMA_VERSION
 
 
 class JobProfileManager:
+    def __init__(self, service, *, source_repository=None, snapshot_repository=None):
+        self.sources = source_repository or JobSourceRepository()
+        self.snapshots = snapshot_repository or ProfileSnapshotRepository()
+        self.interpretation = ProfileInterpretationService(self.snapshots, service)
 
-    def __init__(
-        self,
-        service: JobProfileService,
-    ) -> None:
-        self.service = service
+    def get_official(self, job_id, *, candidate_id=None):
+        facts = self.sources.load_job_hard_facts(job_id, candidate_id=candidate_id)
+        return self.interpretation.job_profile(hard_facts=facts)
 
-    def ensure_table(self) -> None:
-        with get_connection() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS job_profiles (
-                    job_id TEXT PRIMARY KEY,
-                    profile_json TEXT NOT NULL,
-                    job_signature TEXT NOT NULL,
-                    profile_version TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
+    def get(self, job_id, *, candidate_id=None):
+        facts = self.sources.load_job_hard_facts(job_id, candidate_id=candidate_id)
+        snapshot = self.snapshots.job_for_signature(job_id, facts.job_signature, JOB_PROFILE_VERSION)
+        return self._compatibility_view(snapshot) if snapshot else None
 
-                    FOREIGN KEY (job_id)
-                        REFERENCES jobs(id)
-                        ON DELETE CASCADE
-                )
-                """
-            )
+    def get_or_create(self, job, *, candidate_id=None):
+        return self._compatibility_view(self.get_official(job.id, candidate_id=candidate_id))
 
-    def get(
-        self,
-        job_id: str,
-    ) -> JobProfile | None:
-        self.ensure_table()
-
-        with get_connection() as connection:
-            row = connection.execute(
-                """
-                SELECT profile_json
-                FROM job_profiles
-                WHERE job_id = ?
-                """,
-                (job_id,),
-            ).fetchone()
-
-        if not row:
-            return None
-
-        data = json.loads(
-            row["profile_json"]
+    @staticmethod
+    def _compatibility_view(snapshot):
+        # Transitional read projection only. No independent cache, extraction or
+        # inference; remaining consumers are replaced by the HiringCase cutover.
+        return JobProfile(
+            job_id=snapshot.job_id,
+            core_mission=snapshot.problem_to_solve,
+            must_have_capabilities=[need.label for need in snapshot.needs
+                                    if need.requirement_status is JobRequirementStatus.REQUIRED],
+            nice_to_have=[need.label for need in snapshot.needs
+                          if need.requirement_status in {JobRequirementStatus.PREFERRED, JobRequirementStatus.USEFUL}],
+            key_responsibilities=list(snapshot.responsibilities),
+            tools_and_technologies=list(snapshot.tools_as_means),
+            role_context=snapshot.context,
+            summary=snapshot.problem_to_solve,
         )
-
-        return JobProfile(**data)
-
-    def get_or_create(
-        self,
-        job: Job,
-    ) -> JobProfile:
-        self.ensure_table()
-
-        signature = build_job_profile_signature(
-            job
-        )
-
-        with get_connection() as connection:
-            row = connection.execute(
-                """
-                SELECT
-                    profile_json,
-                    job_signature,
-                    profile_version
-                FROM job_profiles
-                WHERE job_id = ?
-                """,
-                (job.id,),
-            ).fetchone()
-
-        if (
-            row
-            and row["job_signature"] == signature
-            and row["profile_version"]
-            == JOB_PROFILE_VERSION
-        ):
-            return JobProfile(
-                **json.loads(
-                    row["profile_json"]
-                )
-            )
-
-        profile = self.service.create(job)
-
-        now = utc_now()
-
-        with get_connection() as connection:
-            connection.execute(
-                """
-                INSERT INTO job_profiles (
-                    job_id,
-                    profile_json,
-                    job_signature,
-                    profile_version,
-                    created_at,
-                    updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(job_id) DO UPDATE SET
-                    profile_json = excluded.profile_json,
-                    job_signature = excluded.job_signature,
-                    profile_version = excluded.profile_version,
-                    updated_at = excluded.updated_at
-                """,
-                (
-                    job.id,
-                    json.dumps(
-                        asdict(profile),
-                        ensure_ascii=False,
-                    ),
-                    signature,
-                    JOB_PROFILE_VERSION,
-                    now,
-                    now,
-                ),
-            )
-
-        return profile

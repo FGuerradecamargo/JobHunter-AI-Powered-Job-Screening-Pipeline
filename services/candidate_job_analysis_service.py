@@ -1418,7 +1418,7 @@ class CandidateJobAnalysisService:
 
                 job_profile = (
                     self.job_profile_manager
-                    .get_or_create(job)
+                    .get_or_create(job, candidate_id=candidate_id)
                 )
 
                 row_stage = "hard_filter"

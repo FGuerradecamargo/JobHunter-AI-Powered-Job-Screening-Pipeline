@@ -266,6 +266,7 @@ def test_analyze_pending_forwards_same_candidates_memory_to_batch(
         def get_or_create(
             self,
             job,
+            *, candidate_id=None,
         ):
             return FakeJobProfile()
 

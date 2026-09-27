@@ -93,6 +93,11 @@ class ProfileInterpretationService:
         draft = self.interpreter.build_job_profile(
             hard_facts=hard_facts, previous_profile=previous,
         )
+        need_ids = [need.need_id for need in draft.needs]
+        if len(need_ids) != len(set(need_ids)) or any(
+            not need.need_id.strip() or not need.label.strip() for need in draft.needs
+        ):
+            raise ValueError("Job interpretation requires unique named needs.")
         available = set(hard_facts.fact_refs)
         for need in draft.needs:
             if not set(need.hard_fact_refs).issubset(available):

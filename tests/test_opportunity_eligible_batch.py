@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from models.job_profile import JobProfile
+from models.profile_interpretation import JobProfileDraft, JobHardFacts
 from services import database
 from services.job_profile_manager import JobProfileManager
 from services.job_search_repository import JobSearchRepository
@@ -27,8 +28,9 @@ def search(monkeypatch, discovery_pool, page_unit):
     service.enricher = SimpleNamespace(enrich=lambda job: setattr(job, "description", "Fixture"))
     monkeypatch.setattr(analysis_module.time, "sleep", lambda _: None)
     profile_ai = Mock()
-    profile_ai.create.side_effect = lambda job: JobProfile(job_id=job.id)
-    service.job_profile_manager = JobProfileManager(profile_ai)
+    profile_ai.build_job_profile.side_effect = lambda **kw: JobProfileDraft(needs=())
+    service.job_profile_manager = JobProfileManager(profile_ai, source_repository=SimpleNamespace(
+        load_job_hard_facts=lambda job_id, **kw: JobHardFacts(job_id, job_id, ())))
     rejected = set()
     monkeypatch.setattr(analysis_module, "HardFilterAnalyzer", lambda profile: SimpleNamespace(
         analyze=lambda job, jp: {"rejected": job.id in rejected, "reasons": ["Fixture constraint"]},
@@ -91,7 +93,7 @@ def test_ten_inspected_seven_survivors_wait_then_send_ten(search):
     assert search.run.unavailable_job_ids == set()
     assert search.run.aggregate["selected"] == 15
     assert search.run.aggregate["analyzed"] == 15
-    assert search.profile_ai.create.call_count == 15  # Reload uses the persisted cache.
+    assert search.profile_ai.build_job_profile.call_count == 15  # Reload uses the persisted cache.
 
 
 def test_exhausted_pool_flushes_six_once(search):
@@ -119,7 +121,7 @@ def test_stop_keeps_preparation_without_paid_flush_and_new_search_reuses_it(sear
     for _ in range(7):
         search.step()
     search.ai.analyze_batch.assert_called_once()
-    assert search.profile_ai.create.call_count == 6
+    assert search.profile_ai.build_job_profile.call_count == 6
 
 
 def test_partial_claim_race_refills_before_recommendation(search, monkeypatch):
@@ -184,7 +186,7 @@ def test_target_five_activates_only_five_after_ten_eligible(search, monkeypatch)
 
 def test_preparation_exception_releases_claim_and_stops_without_ai(search):
     search.add(1)
-    search.profile_ai.create.side_effect = RuntimeError("fixture")
+    search.profile_ai.build_job_profile.side_effect = RuntimeError("fixture")
     search.run.advance(search.run.scope, search.env["advance_opportunity_search"])
     assert search.run.status == "failed"
     search.ai.analyze_batch.assert_not_called()

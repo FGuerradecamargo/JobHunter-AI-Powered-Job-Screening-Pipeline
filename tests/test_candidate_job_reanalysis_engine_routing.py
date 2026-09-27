@@ -508,6 +508,7 @@ def test_reanalysis_ai_reject_preserves_active_lifecycle(
         def get_or_create(
             self,
             job,
+            *, candidate_id=None,
         ):
             return FakeJobProfile()
 

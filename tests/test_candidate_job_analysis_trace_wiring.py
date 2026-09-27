@@ -119,6 +119,7 @@ def _build_service(
         def get_or_create(
             self,
             job,
+            *, candidate_id=None,
         ):
             return FakeJobProfile()
 

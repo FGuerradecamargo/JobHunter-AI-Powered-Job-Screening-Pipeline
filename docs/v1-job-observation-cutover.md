@@ -38,8 +38,21 @@ the complete caller search.
 The official profile service can load literal fields through
 `JobSourceRepository.load_job_hard_facts`. Private inputs require the owner's ID;
 private observations never change public profile signatures. These fields are
-source facts, not AI-extracted mandatory requirements. The old production
-JobProfileManager still requires the next runtime caller replacement.
+source facts, not AI-extracted mandatory requirements.
+
+The production JobProfileManager now loads these facts and uses
+ProfileInterpretationService plus the versioned official snapshot repository.
+The legacy job_profiles cache is neither read nor written, and its per-rerun DDL
+is removed. Existing rows remain untouched for historical compatibility.
+The old extractor/parser have no remaining callers and were removed.
+
+Until the next HiringCase caller cutover, the manager supplies a deterministic
+read projection for legacy consumers. It does not infer missing role family,
+seniority or mandatory status. The visible opportunity classification still
+requires that next cutover; this intermediate commit is not V1 release completion.
+An old job without eligible observed provenance fails closed before any profile
+AI call. A controlled source refresh, not a speculative legacy backfill, is needed
+to make those jobs interpretable through this path.
 
 ## Validation boundary
 
