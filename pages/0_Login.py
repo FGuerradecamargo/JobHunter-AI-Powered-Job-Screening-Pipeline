@@ -19,6 +19,10 @@ from services.session_auth import (
     login_user,
     logout_user,
 )
+from services.streamlit_oidc import (
+    oidc_available,
+    oidc_logged_in,
+)
 
 
 def render_authentication(authenticated_user, auth_service) -> None:
@@ -35,13 +39,13 @@ def render_authentication(authenticated_user, auth_service) -> None:
     # ---------------------------------------------------------
 
     if authenticated_user is None:
-        if st.user.is_logged_in and st.session_state.get("reauthentication_required"):
+        if oidc_logged_in() and st.session_state.get("reauthentication_required"):
             st.info("Please sign in again to continue.")
             if st.button("Restart Google sign-in", key="restart_expired_google_session"):
                 st.logout()
             st.stop()
 
-        if st.user.is_logged_in:
+        if oidc_logged_in():
             google_claims = {
                 "sub": st.user.get(
                     "sub",
@@ -216,10 +220,13 @@ def render_authentication(authenticated_user, auth_service) -> None:
                 st.stop()
 
         else:
-            if st.button(
-                "Continue with Google",
-                use_container_width=True,
-                key="google_oidc_login",
+            if (
+                oidc_available()
+                and st.button(
+                    "Continue with Google",
+                    use_container_width=True,
+                    key="google_oidc_login",
+                )
             ):
                 st.login("google")
 
@@ -253,7 +260,7 @@ def render_authentication(authenticated_user, auth_service) -> None:
         if st.button("Log out"):
             logout_user()
 
-            if st.user.is_logged_in:
+            if oidc_logged_in():
                 st.logout()
 
             st.rerun()

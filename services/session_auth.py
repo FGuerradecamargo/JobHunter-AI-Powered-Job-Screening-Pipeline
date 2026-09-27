@@ -17,6 +17,7 @@ from services.session_store import (
     revoke_user_sessions_with_connection,
 )
 from services.user_repository import UserRepository
+from services.streamlit_oidc import oidc_logged_in
 
 
 SESSION_COOKIE = "jobhunter_session"
@@ -396,7 +397,7 @@ def render_logout_button(*, authenticated_user: AppUser | None = None) -> None:
         ):
             logout_user()
 
-            if st.user.is_logged_in:
+            if oidc_logged_in():
                 st.logout()
 
             st.rerun()

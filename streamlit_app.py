@@ -17,6 +17,7 @@ from services.candidate_product_state_service import (
 )
 from services.product_mode_policy import product_mode_policy
 from services.session_auth import get_authenticated_user
+from services.streamlit_oidc import oidc_logged_in
 from services.user_context_runtime import (
     get_active_user_context,
     set_active_user,
@@ -281,35 +282,70 @@ email_verification_page = st.Page(
 )
 
 
+home_page = st.Page(
+    "app.py",
+    title="Home",
+    icon=":material/home:",
+    default=True,
+)
+
+login_page = st.Page(
+    "pages/0_Login.py",
+    title="Log in",
+    icon=":material/login:",
+)
+
+public_pages = [
+    home_page,
+    login_page,
+    password_reset_page,
+    email_verification_page,
+]
+
+# A fresh browser session has no trusted in-memory identity yet.
+#
+# Execute the selected public page first. That page may mount the
+# encrypted-cookie component and resolve an existing durable session.
+# Calling get_authenticated_user() here before navigation.run() would
+# allow cookie readiness to stop the shell before /Login can render.
+if st.session_state.get("current_user") is None:
+    navigation = st.navigation(
+        public_pages,
+        position="hidden",
+    )
+
+    if (
+        oidc_logged_in()
+        and navigation.url_path
+        != login_page.url_path
+    ):
+        st.switch_page(
+            login_page
+        )
+
+    navigation.run()
+
+    # A public page may have restored a valid durable session or completed
+    # login. Re-enter the shell so private navigation is built from that
+    # verified identity.
+    if st.session_state.get("current_user") is not None:
+        st.rerun()
+
+    st.stop()
+
+# Never authorize the private shell from session_state alone.
+# Revalidate the encrypted cookie and server-side session every run.
 authenticated_user = get_authenticated_user()
 
 google_oidc_pending = bool(
     authenticated_user is None
-    and st.user.is_logged_in
+    and oidc_logged_in()
 )
 
 
 if authenticated_user is None:
-    home_page = st.Page(
-        "app.py",
-        title="Home",
-        icon=":material/home:",
-        default=True,
-    )
-
-    login_page = st.Page(
-        "pages/0_Login.py",
-        title="Log in",
-        icon=":material/login:",
-    )
-
     navigation = st.navigation(
-        [
-            home_page,
-            login_page,
-            password_reset_page,
-            email_verification_page,
-        ],
+        public_pages,
         position="hidden",
     )
 
