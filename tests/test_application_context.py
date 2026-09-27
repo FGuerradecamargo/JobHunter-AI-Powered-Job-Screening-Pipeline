@@ -376,8 +376,9 @@ def test_service_uses_candidate_scoped_source_once():
         source_repository=source_repository,
     )
 
-    context = service.build("candidate-a", "job-1")
-
-    assert context.candidate_id == "candidate-a"
+    # A historical bucket is still read with candidate scope, but cannot
+    # authorize new generation without the official HiringCase chain.
+    with pytest.raises(ValueError, match="not eligible"):
+        service.build("candidate-a", "job-1")
     assert source_repository.calls == [("candidate-a", "job-1")]
 

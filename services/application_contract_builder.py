@@ -22,6 +22,49 @@ APPLICATION_ELIGIBLE_RECOMMENDATIONS = {
 }
 
 
+def build_official_application_contract(*, candidate_profile, job_profile, hiring_case,
+                                        source_snapshot, source_evidence, analysis_source):
+    if not (candidate_profile.candidate_id == hiring_case.candidate_id == analysis_source.candidate_id
+            == source_snapshot.candidate_id and job_profile.job_id == hiring_case.job_id == analysis_source.job_id):
+        raise PermissionError("Application sources belong to different relationships.")
+    if (candidate_profile.memory_signature != source_snapshot.source_signature
+            or hiring_case.candidate_signature != candidate_profile.memory_signature
+            or hiring_case.job_signature != job_profile.job_signature
+            or hiring_case.candidate_profile_version != candidate_profile.profile_version
+            or hiring_case.job_profile_version != job_profile.profile_version):
+        raise ValueError("Application sources require reanalysis.")
+    experiences = {str(item["experience_id"]): item for item in source_snapshot.payload.get("experiences", [])}
+    evidence = []
+    for source in source_evidence:
+        if source.ref not in candidate_profile.source_refs or source.source_type not in {"professional_experience", "career_update"}:
+            continue
+        source_id = (next((key for key in experiences if source.ref.startswith(f"professional_experience:{key}:")), "")
+                     if source.source_type == "professional_experience" else source.ref.removeprefix("career_update:"))
+        if not source_id:
+            raise ValueError("Application evidence has no confirmed source identity.")
+        experience = experiences.get(source_id, {})
+        evidence.append(ApplicationEvidenceRef(
+            evidence_ref=source.ref, source_type=source.source_type, source_id=source_id,
+            authority="professional_fact" if source.source_type == "professional_experience" else "candidate_update",
+            statement=source.summary,
+            metadata={"company": experience.get("company", ""), "stated_role": "",
+                      "start_date": experience.get("start_date", ""), "end_date": experience.get("end_date"),
+                      "source_authority": "confirmed_user_record"},
+        ))
+    from services.hiring_case_compatibility import hiring_case_analysis
+    analysis = hiring_case_analysis(hiring_case)
+    return ApplicationContract(
+        candidate_id=hiring_case.candidate_id, job_id=hiring_case.job_id,
+        analysis_id=analysis_source.analysis_id, recommendation=analysis["recommendation"],
+        eligible=hiring_case.surfaced and not hiring_case.hard_eligibility_blockers,
+        evidence_refs=evidence, development_gaps=analysis["development_gaps"],
+        structural_gaps=analysis["hard_conflicts"],
+        source_signature=build_source_signature({"candidate": asdict(candidate_profile), "job": asdict(job_profile),
+            "case": asdict(hiring_case), "sources": [asdict(item) for item in evidence],
+            "analysis_id": analysis_source.analysis_id}),
+    )
+
+
 def _normalize(value) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip())
 

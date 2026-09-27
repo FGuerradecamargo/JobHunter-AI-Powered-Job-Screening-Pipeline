@@ -3,6 +3,12 @@ from services.application_contract_builder import build_application_contract
 from services.application_contract_repository import ApplicationContractSourceRepository
 from services.candidate_repository import CandidateRepository
 from services.career_update_repository import CareerUpdateRepository
+from services.application_contract_builder import build_official_application_contract
+from services.hiring_case_compatibility import read_hiring_case
+from services.profile_snapshot_repository import ProfileSnapshotRepository
+from services.candidate_onboarding_repository import CandidateOnboardingRepository
+from services.candidate_profile_source import load_confirmed_candidate_profile_input
+from services.job_source_repository import JobSourceRepository
 
 
 class ApplicationAnalysisNotFoundError(ValueError):
@@ -59,9 +65,26 @@ class ApplicationContractService:
                 "Analyzed candidate-job opportunity was not found."
             )
 
-        contract = build_application_contract(
-            candidate=candidate,
-            career_updates=updates,
-            analysis_source=source,
+        if any(update.candidate_id != normalized_candidate_id for update in updates):
+            raise PermissionError("Career update belongs to another candidate.")
+        if source.candidate_id != normalized_candidate_id or source.job_id != normalized_job_id:
+            raise PermissionError("Application source belongs to another relationship.")
+
+        case = read_hiring_case(source.analysis, candidate_id=normalized_candidate_id, job_id=normalized_job_id)
+        if case is None:
+            return ApplicationContract(normalized_candidate_id, normalized_job_id,
+                source.analysis_id, "not_surfaced", False), source
+        snapshots = ProfileSnapshotRepository()
+        candidate_profile = snapshots.current_candidate(normalized_candidate_id)
+        job_profile = snapshots.current_job(normalized_job_id)
+        if candidate_profile is None or job_profile is None:
+            raise ValueError("Application source profiles are unavailable.")
+        hard_facts = JobSourceRepository().load_job_hard_facts(normalized_job_id, candidate_id=normalized_candidate_id)
+        if job_profile.job_signature != hard_facts.job_signature:
+            raise ValueError("Job source changed; reanalysis is required.")
+        source_snapshot, evidence = load_confirmed_candidate_profile_input(
+            normalized_candidate_id, CandidateOnboardingRepository(), self.career_update_repository,
         )
+        contract = build_official_application_contract(candidate_profile=candidate_profile, job_profile=job_profile,
+            hiring_case=case, source_snapshot=source_snapshot, source_evidence=evidence, analysis_source=source)
         return contract, source

@@ -7,6 +7,7 @@ from models.application_context import ApplicationContext, PositioningTheme
 from models.application_contract import ApplicationAnalysisSource, ApplicationContract
 from services.career_memory_source_builder import build_source_signature
 from services.role_family_normalizer import normalize_role_family
+from services.hiring_case_compatibility import read_hiring_case
 
 
 APPLICATION_CONTEXT_SCHEMA_VERSION = "application-context-v1"
@@ -91,6 +92,12 @@ def build_application_context(
         if _normalize(item.statement).casefold() in selectors
     ]
     selected.sort(key=lambda item: item.evidence_ref)
+    if "hiring_case" in analysis_source.analysis:
+        case = read_hiring_case(analysis_source.analysis, candidate_id=contract.candidate_id, job_id=contract.job_id)
+        if case is None or not case.surfaced:
+            raise ValueError("A surfaced HiringCase is required for preparation.")
+        selected_refs = {ref for requirement in case.requirements for ref in requirement.evidence_refs}
+        selected = [item for item in contract.evidence_refs if item.evidence_ref in selected_refs]
 
     direct = [item for item in selected if item.authority in _DIRECT_AUTHORITIES]
     transferable = [

@@ -23,13 +23,31 @@ from services.prepared_cv_exporter import (
     export_prepared_cv_docx,
 )
 from services.tailored_cv_generator_client import TailoredCVGeneratorClient
+from models.application_context import ApplicationContext
+from models.application_contract import ApplicationEvidenceRef
+from types import SimpleNamespace
+
+
+@pytest.fixture(autouse=True)
+def confirmed_export_context(monkeypatch):
+    # Renderer tests inject the current source context, not a bypass of validation.
+    import services.prepared_cv_exporter as exporter
+    cv = _result().cv
+    statements = [cv.headline, *cv.professional_summary, *cv.key_skills,
+                  *cv.experiences[0].bullets, *cv.additional_relevant_information]
+    evidence = [ApplicationEvidenceRef(statement.evidence_refs[0], "professional_experience",
+        "internal-experience-id", "professional_fact", statement.text,
+        {"company": "Example Ltd", "stated_role": "Operations Specialist"}) for statement in statements]
+    context = ApplicationContext("internal-candidate-id", "internal-job-id", "internal-analysis-id", "contract",
+        direct_evidence=evidence, available_evidence=evidence, source_signature="internal-context-signature")
+    monkeypatch.setattr(exporter, "ApplicationContextService", lambda: SimpleNamespace(build=lambda *args: context))
 
 
 def _statement(text, claim_type="summary"):
     return TailoredCVStatement(
         text=text,
         claim_type=claim_type,
-        evidence_refs=["internal-evidence-ref"],
+        evidence_refs=["internal-evidence-ref:" + text],
     )
 
 

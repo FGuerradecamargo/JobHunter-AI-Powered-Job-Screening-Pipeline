@@ -7,6 +7,8 @@ from models.prepared_cv_export import PreparedCVExport
 from services.cv_renderer import render_tailored_cv_docx
 from services.prepared_application_ui import build_prepared_cv_view
 from services.prepared_application_ui import get_prepared_application
+from services.application_context_service import ApplicationContextService
+from services.tailored_cv_edit_service import validate_edited_cv
 
 
 DOCX_MIME_TYPE = (
@@ -115,6 +117,9 @@ def export_cached_prepared_cv_docx(
     )
     if result is None:
         raise ValueError("Prepared CV was not found in this candidate session.")
+    context = ApplicationContextService().build(candidate_id, job_id)
+    if not validate_edited_cv(draft=result.cv, context=context).accepted:
+        raise ValueError("CV requires review against current evidence before export.")
     return export_prepared_cv_docx(
         result,
         candidate_name=candidate_name,

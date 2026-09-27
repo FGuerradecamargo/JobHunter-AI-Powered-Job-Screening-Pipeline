@@ -4,6 +4,7 @@ from services.application_contract_builder import build_application_contract
 from services.application_contract_repository import ApplicationContractSourceRepository
 from services.candidate_repository import CandidateRepository
 from services.career_update_repository import CareerUpdateRepository
+from services.application_contract_service import ApplicationContractService
 
 
 class ApplicationContextService:
@@ -30,27 +31,10 @@ class ApplicationContextService:
         if not normalized_job_id:
             raise ValueError("job_id must be non-empty.")
 
-        candidate = self.candidate_repository.get(normalized_candidate_id)
-        if candidate is None:
-            raise ValueError(f"Candidate was not found: {normalized_candidate_id}")
-        if candidate.id != normalized_candidate_id:
-            raise PermissionError("Candidate repository returned another candidate.")
-
-        updates = self.career_update_repository.list_for_candidate(
-            normalized_candidate_id
-        )
-        source = self.source_repository.get_analysis_source(
-            normalized_candidate_id,
-            normalized_job_id,
-        )
-        if source is None:
-            raise ValueError("Analyzed candidate-job opportunity was not found.")
-
-        contract = build_application_contract(
-            candidate=candidate,
-            career_updates=updates,
-            analysis_source=source,
-        )
+        contract, source = ApplicationContractService(
+            candidate_repository=self.candidate_repository, career_update_repository=self.career_update_repository,
+            source_repository=self.source_repository,
+        ).build_with_source(normalized_candidate_id, normalized_job_id)
         return build_application_context(
             contract=contract,
             analysis_source=source,
