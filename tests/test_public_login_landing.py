@@ -14,6 +14,18 @@ PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Login.py"
 
 @pytest.fixture
 def login_page(monkeypatch):
+    # Streamlit AppTest does not expose st.html payloads reliably.
+    # In this isolated presentation test, route them through markdown
+    # so the rendered copy remains observable.
+    monkeypatch.setattr(
+        st,
+        "html",
+        lambda body: st.markdown(
+            body,
+            unsafe_allow_html=True,
+        ),
+    )
+
     user = SimpleNamespace(id=7, candidate_id=8, display_name="Test", access_level="user")
     oidc = SimpleNamespace(is_logged_in=False, get=lambda key, default=None: default)
     auth = Mock()
@@ -66,7 +78,24 @@ def login_page(monkeypatch):
 
 
 def html(app):
-    return "\n".join(element.proto.body for element in app.get("html"))
+    html_parts = [
+        element.proto.body
+        for element in app.get("html")
+        if getattr(element, "proto", None) is not None
+        and hasattr(element.proto, "body")
+    ]
+
+    markdown_parts = [
+        str(element.value)
+        for element in app.markdown
+    ]
+
+    return "\n".join(
+        [
+            *html_parts,
+            *markdown_parts,
+        ]
+    )
 
 
 def button(app, label):
@@ -77,7 +106,7 @@ def test_dedicated_login_keeps_auth_controls_without_marketing(login_page):
     app = login_page.app.run()
     assert not app.exception
     markup = html(app)
-    assert "Finding a job" not in markup
+    assert "Find jobs that make sense for you." not in markup
     assert "Welcome to" in markup
     assert "wp-auth-intro" in markup
     assert "<script" not in markup
@@ -110,7 +139,7 @@ def test_email_login_preserved(login_page):
     button(app, "Log in").click().run()
     login_page.auth.authenticate.assert_called_once_with(email="test@example.invalid", password="test-password")
     assert login_page.events == ["login"]
-    assert "Finding a job" not in html(app)
+    assert "Find jobs that make sense for you." not in html(app)
 
 
 def test_invalid_login_still_rejected(login_page):
@@ -152,7 +181,7 @@ def test_google_callback_preserved_without_public_hero(login_page, status):
     app = login_page.app.run()
     assert not app.exception
     assert login_page.events == ["login"]
-    assert "Finding a job" not in html(app)
+    assert "Find jobs that make sense for you." not in html(app)
     assert login_page.google.register.call_count == (status == "registration_required")
 
 
@@ -160,7 +189,7 @@ def test_existing_account_google_linking_preserved(login_page):
     login_page.oidc.is_logged_in = True
     login_page.identity.resolve.return_value = SimpleNamespace(status="link_required", email="test@example.invalid")
     app = login_page.app.run()
-    assert "Finding a job" not in html(app)
+    assert "Find jobs that make sense for you." not in html(app)
     assert not app.tabs
     app.text_input[0].input("test-password")
     button(app, "Connect Google account").click().run()
@@ -176,13 +205,14 @@ def test_expired_google_session_guard_preserved(login_page):
     app.run()
     assert not login_page.identity.resolve.called
     assert not app.tabs
-    assert "Finding a job" not in html(app)
+    assert "Find jobs that make sense for you." not in html(app)
     button(app, "Restart Google sign-in").click().run()
     assert login_page.events == ["oidc_logout"]
 
 
 @pytest.fixture
 def root_page(login_page, monkeypatch):
+    import components.dashboard as dashboard
     import services.database as database
     import services.candidate_repository as candidates
     import services.user_context_runtime as context
@@ -198,18 +228,20 @@ def root_page(login_page, monkeypatch):
     monkeypatch.setattr(database, "initialize_database", bootstrap)
     monkeypatch.setattr(candidates, "CandidateRepository", lambda: candidate_repository)
     monkeypatch.setattr(context, "get_active_user_context", dashboard_context)
+    dashboard_render = Mock(side_effect=lambda user: st.header("Dashboard"))
+    monkeypatch.setattr(dashboard, "render_dashboard", dashboard_render)
     return SimpleNamespace(app=AppTest.from_file(str(PAGE.parents[1] / "app.py")),
                            bootstrap=bootstrap, context=dashboard_context, require_user=require_user,
-                           repository=candidate_repository, login=login_page)
+                           repository=candidate_repository, login=login_page, dashboard=dashboard_render)
 
 
 def test_public_root_stops_before_dashboard_or_bootstrap(root_page):
     app = root_page.app.run()
     assert not app.exception
     markup = html(app)
-    assert "Finding a job" in markup
-    assert "Illustrative numbers, not live market statistics" in markup
-    assert "Illustrative opportunity. Not a live vacancy" in markup
+    assert "Find jobs that make sense for you." in markup
+    assert "Illustrative product preview" in markup
+    assert "Not another job board" in markup
     assert "Career Dashboard" not in markup
     assert not app.text_input
     root_page.bootstrap.assert_not_called()
@@ -218,23 +250,39 @@ def test_public_root_stops_before_dashboard_or_bootstrap(root_page):
     root_page.repository.get.assert_not_called()
 
 
-def test_authenticated_root_continues_original_dashboard(root_page):
+def test_authenticated_root_uses_attention_dashboard_without_bootstrap(root_page):
     root_page.bootstrap.side_effect = None
     app = root_page.app
     app.session_state["test_user"] = root_page.login.user
     app.run()
     assert not app.exception
-    assert "Career Dashboard" in html(app)
-    assert "Finding a job" not in html(app)
+    assert app.header[0].value == "Dashboard"
+    assert "Find jobs that make sense for you." not in html(app)
     assert "wp-seasonal" not in html(app)
-    root_page.bootstrap.assert_called_once()
+    root_page.bootstrap.assert_not_called()
     root_page.require_user.assert_called_once()
     root_page.context.assert_called_once_with(authenticated_user=root_page.login.user)
-    root_page.repository.get.assert_called_once_with(8)
+    root_page.repository.get.assert_not_called()
+    root_page.dashboard.assert_called_once_with(root_page.login.user)
+
+
+def test_cookie_recovery_defers_private_links_until_shell_rebuilds_navigation(root_page):
+    app = root_page.app
+    app.session_state["test_user"] = root_page.login.user
+    app.session_state["workpilot_public_navigation"] = True
+    app.run()
+    assert not app.exception
+    root_page.dashboard.assert_not_called()
+    root_page.require_user.assert_not_called()
+    app.session_state["workpilot_public_navigation"] = False
+    app.run()
+    assert not app.exception
+    root_page.dashboard.assert_called_once_with(root_page.login.user)
 
 
 @pytest.mark.parametrize("key,intent", [
     ("public_start_career", "signup"),
+    ("public_hero_start", "signup"),
     ("public_closing_start", "signup"),
     ("public_existing_account", "login"),
 ])
@@ -262,7 +310,7 @@ def test_signup_intent_is_presentation_only(login_page):
 def test_production_shell_routes_public_default_to_app(root_page):
     app = AppTest.from_file(str(PAGE.parents[1] / "streamlit_app.py")).run()
     assert not app.exception
-    assert "Finding a job" in html(app)
+    assert "Find jobs that make sense for you." in html(app)
     root_page.bootstrap.assert_not_called()
     root_page.context.assert_not_called()
 

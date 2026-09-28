@@ -8,6 +8,7 @@ from models.interview_context import InterviewContext, InterviewDetails
 from models.interview_preparation import InterviewPreparation, PreparationArea
 from services.interview_preparation_ui import (
     handle_interview_details_save,
+    render_interview_preparation_overview,
     interview_details_state_key,
     load_interview_preparation_view,
 )
@@ -354,3 +355,74 @@ def test_ui_has_no_ai_api_or_generator_path():
     assert "prepare interview ai" not in source
     assert ".generate(" not in source
     assert "requests." not in source
+
+
+class PreparationRenderUI:
+    def __init__(self):
+        self.output = []
+
+    def markdown(self, value, **kwargs):
+        self.output.append(str(value))
+
+    def write(self, value):
+        self.output.append(str(value))
+
+    def caption(self, value):
+        self.output.append(str(value))
+
+    def warning(self, value):
+        self.output.append(str(value))
+
+
+def test_overview_renders_interview_prep_without_round():
+    ui = PreparationRenderUI()
+
+    result = render_interview_preparation_overview(
+        ui,
+        candidate_id="candidate-a",
+        job_id="job-1",
+        lifecycle_status="applied",
+        context_service=ContextService(),
+        preparation_service=PreparationService(),
+        details_repository=DetailsRepository(),
+    )
+
+    assert result.visible
+
+    rendered = "\n".join(ui.output)
+
+    assert "Prepare for your interview" in rendered
+    assert "Prepare truthful examples." in rendered
+
+    assert "Core topics" in rendered
+    assert "SQL" in rendered
+
+    assert "Areas to handle carefully" in rendered
+    assert "Production Kubernetes" in rendered
+
+    assert "Practice" in rendered
+    assert "Choose a few topics and prepare a truthful example" in rendered
+    assert "situation - what you did - result" in rendered
+
+    assert "Questions to ask" in rendered
+    assert "What would success look like?" in rendered
+
+
+def test_overview_does_not_require_interview_round_repository():
+    source = Path(
+        "services/interview_preparation_ui.py"
+    ).read_text(encoding="utf-8-sig")
+
+    start = source.index(
+        "def render_interview_preparation_overview"
+    )
+
+    end = source.index(
+        "def handle_interview_details_save",
+        start,
+    )
+
+    overview_source = source[start:end]
+
+    assert "InterviewRoundRepository" not in overview_source
+    assert "repository.create" not in overview_source

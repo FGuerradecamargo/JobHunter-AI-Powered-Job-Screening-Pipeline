@@ -1,5 +1,6 @@
 import logging
 import streamlit as st
+from components.workpilot_ui import apply_theme, page_header, render_profile_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -54,13 +55,8 @@ st.set_page_config(
     layout="wide",
 )
 
-st.caption("YOUR CAREER")
-st.title("Professional Profile")
-
-st.write(
-    "Your career profile brings together your experience, "
-    "direction, strengths and professional evidence."
-)
+apply_theme()
+page_header("Profile", "Your experience, direction and confirmed career evidence.")
 
 onboarding_repository = CandidateOnboardingRepository()
 
@@ -104,6 +100,7 @@ product_state = CandidateProductStateRepository().get(
 )
 
 if not product_mode_policy(product_state).can_mutate:
+    render_profile_snapshot(candidate_id)
     st.info(
         "WorkPilot is currently read-only. "
         "Your professional profile is preserved but cannot be edited."
@@ -1022,104 +1019,7 @@ with direction_tab:
 
 
 with overview_tab:
-    if generated_candidate is not None:
-        st.divider()
-
-        st.subheader(
-            "Your positioning"
-        )
-
-        col_role, col_level = st.columns(2)
-
-        with col_role:
-            st.markdown(
-                "**Professional positioning**"
-            )
-            st.write(
-                generated_candidate.current_role
-            )
-
-        with col_level:
-            st.markdown(
-                "**Current level**"
-            )
-            st.write(
-                generated_candidate.current_level
-            )
-
-        st.markdown(
-            "**Professional summary**"
-        )
-        st.write(
-            generated_candidate.professional_summary
-        )
-
-        st.divider()
-
-        st.markdown(
-            "### Career positioning"
-        )
-
-        col_current, col_bridge, col_target = (
-            st.columns(3)
-        )
-
-        with col_current:
-            st.markdown(
-                "**Competitive now**"
-            )
-
-            if (
-                generated_candidate
-                .competitive_role_families
-            ):
-                for role in (
-                    generated_candidate
-                    .competitive_role_families
-                ):
-                    st.write(f"- {role}")
-            else:
-                st.caption(
-                    "Not identified yet."
-                )
-
-        with col_bridge:
-            st.markdown(
-                "**Bridge opportunities**"
-            )
-
-            if (
-                generated_candidate
-                .bridge_role_families
-            ):
-                for role in (
-                    generated_candidate
-                    .bridge_role_families
-                ):
-                    st.write(f"- {role}")
-            else:
-                st.caption(
-                    "Not identified yet."
-                )
-
-        with col_target:
-            st.markdown(
-                "**Target direction**"
-            )
-
-            if (
-                generated_candidate
-                .target_role_families
-            ):
-                for role in (
-                    generated_candidate
-                    .target_role_families
-                ):
-                    st.write(f"- {role}")
-            else:
-                st.caption(
-                    "Not identified yet."
-                )
+    render_profile_snapshot(candidate_id)
 
 
 with details_tab:

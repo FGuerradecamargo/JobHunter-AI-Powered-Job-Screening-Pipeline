@@ -1,6 +1,7 @@
 import logging
 
 import streamlit as st
+from components.workpilot_ui import apply_theme, page_header
 
 from services.candidate_market_runtime import (
     load_candidate_market_runtime,
@@ -23,12 +24,8 @@ st.set_page_config(
     layout="wide",
 )
 
-st.caption("YOUR CAREER")
-st.title("Improvements")
-st.write(
-    "What is worth developing now, considering who you are, "
-    "where you want to go and what the observed market is asking for?"
-)
+apply_theme()
+page_header("Improvements", "Grounded priorities for your next step.")
 
 authenticated_user = require_authenticated_user()
 user_context = get_active_user_context(
@@ -92,15 +89,10 @@ if status == "market_unavailable":
     st.stop()
 
 
-st.caption(
-    "BUILD = confirmed gap ? PROVE = strengthen evidence ? "
-    "EXPLORE = the current evidence is not enough to decide"
-)
-
 band_titles = {
-    "now": "Now",
-    "next": "Next",
-    "watch": "Watch",
+    "now": "NOW",
+    "next": "NEXT",
+    "watch": "WATCH",
 }
 
 kind_explanations = {
@@ -135,7 +127,7 @@ for entry in runtime["segments"]:
     ]
 
     if scope:
-        st.caption(" ? ".join(scope))
+        st.caption(" / ".join(scope))
 
     metrics = st.columns(3)
     metrics[0].metric("Observed jobs", market.sample_size)
@@ -177,7 +169,7 @@ for entry in runtime["segments"]:
             kind = item.kind.value
 
             with st.expander(
-                f"{kind.upper()} ? {item.label}",
+                f"{kind.upper()} / {item.label}",
                 expanded=(band == "now"),
             ):
                 st.write(item.why)
@@ -190,7 +182,7 @@ for entry in runtime["segments"]:
 
                 st.caption(
                     f"Observed in {frequency}% of this "
-                    f"{market.sample_size}-job sample ? "
+                    f"{market.sample_size}-job sample | "
                     f"{item.market_confidence.title()} market confidence"
                 )
 

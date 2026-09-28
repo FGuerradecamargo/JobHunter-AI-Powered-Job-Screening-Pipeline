@@ -24,8 +24,8 @@ def _render_hiring_case(case: dict, item: dict, status_label: str | None) -> Non
         st.info("There is not enough grounded evidence to recommend this opportunity yet.")
     opportunity = case.get("opportunity", {})
     columns = st.columns(3)
-    columns[0].metric("Evidence-backed fit", str(case.get("hiring_case_strength", "unknown")).replace("_", " ").title())
-    columns[1].metric("Value to you", str(opportunity.get("value", "unknown")).title())
+    columns[0].metric("You → Company", str(case.get("hiring_case_strength", "unknown")).replace("_", " ").title())
+    columns[1].metric("Job → You", str(opportunity.get("value", "unknown")).title())
     columns[2].metric("Confidence", str(opportunity.get("confidence", "unknown")).title())
     for requirement in case.get("requirements", []):
         st.markdown("**" + html.escape(str(requirement.get("requirement", ""))) + "**")
@@ -51,10 +51,10 @@ def _render_hiring_case(case: dict, item: dict, status_label: str | None) -> Non
 RECOMMENDATION_LABELS = {
     "best_match": "Best Match",
     "strong_match": "Best Match",
-    "potential": "Potential",
-    "worth_second_look": "Potential",
-    "good_opportunity": "Competitive",
-    "competitive": "Competitive",
+    "potential": "Worth a Try",
+    "worth_second_look": "Worth a Try",
+    "good_opportunity": "You’re Strong, But",
+    "competitive": "You’re Strong, But",
     "reject": "Reject",
     "rejected": "Reject",
     "system_rejected": "Reject",
@@ -324,8 +324,8 @@ def render_job_analysis(
 
         .wp-analysis-pill {
             display: inline-block;
-            background: #E2F1EE;
-            color: #075665;
+            background: #F5DFD0;
+            color: #A74E26;
             border-radius: 99px;
             padding: 0.3rem 0.65rem;
             font-size: 0.8rem;
@@ -384,7 +384,7 @@ def render_job_analysis(
             height: 6px;
             min-width: 6px;
             border-radius: 50%;
-            background: #075665;
+            background: #DD7338;
             margin-top: 0.48rem;
         }
 

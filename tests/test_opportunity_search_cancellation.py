@@ -289,18 +289,39 @@ def test_streamlit_stop_button_preserves_partial_and_new_search_works():
     controls = source[source.index("search_scope = ("):source.index("\nscan_result = st.session_state.get(")]
     script = '''
 import streamlit as st
+from html import escape
 from types import SimpleNamespace
 from unittest.mock import Mock
+
+# AppTest.from_string has no real multipage registry.
+# Navigation itself is not under test here.
+st.page_link = lambda *args, **kwargs: None
 from services.opportunity_search_run import OpportunitySearchRun
 from models.system_state import SearchRunState
 from services.system_state_presenter import search_progress_message, stopped_search_message, search_notice
 authenticated_user = SimpleNamespace(id="actor")
 active_user = SimpleNamespace(id="owner")
+candidate = SimpleNamespace(
+    target_role_families=[],
+    target_roles=[],
+    bridge_role_families=[],
+    competitive_role_families=[],
+    current_role="",
+    priorities=[],
+    preferences=SimpleNamespace(
+        remote_allowed=False,
+        hybrid_allowed=False,
+        onsite_allowed=False,
+    ),
+)
+career_objective = SimpleNamespace(
+    desired_role_families=[],
+)
 candidate_id = "candidate"
 candidate_signature = "signature"
 ANALYSIS_VERSION = "version"
 BATCH_MAX_SIZE = 10
-OPPORTUNITY_TARGETS = {"Quick": 5, "Standard": 10}
+DEFAULT_OPPORTUNITY_TARGET = 10
 repository = Mock()
 repository.count_jobs_to_analyze_for_candidate.return_value = 10
 analysis_service = Mock()
@@ -321,10 +342,17 @@ if "seeded" not in st.session_state:
     assert app.session_state["opportunity_search_run"].status == "stopped"
     assert any(i.value == "Search stopped. 3 opportunities kept." for i in app.info)
     assert app.session_state["last_scan_result"]["opportunities_found"] == 3
-    assert app.selectbox[0].proto.form_id == "opportunity_search_controls"
-    app.selectbox[0].set_value("Quick")
-    next(b for b in app.button if b.label == "Find opportunities for me").click().run()
+    assert not app.selectbox
+
+    find_button = next(
+        b
+        for b in app.button
+        if b.label == "Find opportunities for me"
+    )
+
+    find_button.click().run()
+
     assert not app.exception
     assert app.session_state["opportunity_search_run"].status == "running"
     assert app.session_state["opportunity_search_run"].scan_id != original_id
-    assert app.session_state["opportunity_search_run"].target == 5
+    assert app.session_state["opportunity_search_run"].target == 10

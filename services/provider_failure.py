@@ -36,7 +36,8 @@ def failure_code(error):
 def log_failure(logger, stage, error):
     # Stage names are constants, never exception attributes or user input.
     stages = {'ai_generation', 'profile_generation', 'job_analysis', 'job_enrichment',
-              'gmail_oauth', 'gmail_sync', 'gmail_background', 'gmail_processing'}
+              'company_research', 'gmail_oauth', 'gmail_sync', 'gmail_background',
+              'gmail_processing'}
     stage = stage if stage in stages else 'provider_operation'
     kind = type(error).__name__ if type(error) in (TypeError, ValueError, KeyError,
         AttributeError, RuntimeError, AssertionError) else 'ExternalOrOperationalError'

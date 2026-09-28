@@ -22,6 +22,10 @@ def render_feedback(status, *, quota=False, saved=True, found=0):
 import streamlit as st
 from types import SimpleNamespace
 from services.opportunity_search_run import OpportunitySearchRun
+
+# Preserve the production payload while making st.html
+# inspectable by Streamlit AppTest.
+st.html = lambda body: st.markdown(body)
 from models.system_state import SearchRunState
 from services.system_state_presenter import (
     search_progress_message, stopped_search_message, analysis_unavailable_notice, search_notice,
@@ -47,7 +51,9 @@ st.session_state["opportunity_search_run"] = search_run
 best_matches = [{{"id": "saved-job"}}] if {saved!r} else []
 potential_jobs = []
 good_opportunities = []
-render_job = lambda job: st.write("Saved opportunity: " + job["id"])
+_compact_job_card = lambda job: st.write(
+    "Saved opportunity: " + job["id"]
+)
 render_opportunity_category_header = lambda *args: None
 render_empty_category = lambda text: st.caption(text)
 ''' + feedback + result_list
@@ -64,15 +70,17 @@ def visible_text(app):
 
 def test_running_search_shows_actual_progress_not_final_summary():
     app = render_feedback("running")
+
     text = visible_text(app)
-    assert "Searching for opportunities..." in text
-    assert "Reviewed: 22" in text
-    assert "Passed initial screening: 20" in text
-    assert "Preparing deeper analysis: 3/10" in text
-    assert "WorkPilot is still searching." in text
-    assert "I found" not in text
-    assert "How this search worked" not in [e.label for e in app.expander]
-    assert "1,322 more opportunities available." in text
+
+    assert "Go grab a coffee" in text
+    assert "Worth reviewing" not in text
+
+    assert any(
+        button.label == "Stop search"
+        for button in app.button
+    )
+
     assert "Saved opportunity: saved-job" in text
 
 
@@ -98,11 +106,21 @@ def test_atomic_quota_failure_has_one_batch_message_and_preserves_results(status
 
 
 def test_completed_search_still_shows_normal_summary():
-    app = render_feedback("complete", found=5)
-    assert app.success[0].value == "I found 5 relevant opportunities for you after reviewing 22 jobs."
-    assert "WorkPilot is still searching." not in visible_text(app)
-    assert "How this search worked" in [e.label for e in app.expander]
-    assert "Saved opportunity: saved-job" in visible_text(app)
+    app = render_feedback(
+        "complete",
+        found=5,
+    )
+
+    text = visible_text(app)
+
+    assert "Worth reviewing" in text
+    assert "Go grab a coffee" not in text
+
+    assert (
+        "Saved opportunity: saved-job"
+        in text
+    )
+
     assert not app.warning
 
 

@@ -1,10 +1,11 @@
 import logging
+from html import escape
 from services.historical_cv_presenter import normalize_historical_cv
 from services.opportunity_search_run import OpportunitySearchRun
 from services.ai.prompt_builder import BATCH_MAX_SIZE
 from models.system_state import SearchRunState
 from services.system_state_presenter import (
-    search_progress_message, stopped_search_message, analysis_unavailable_notice, search_notice,
+    stopped_search_message, analysis_unavailable_notice, search_notice,
 )
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 import streamlit as st
 
 from components.job_analysis_view import render_job_analysis
+from components.workpilot_ui import apply_theme, page_header
 
 
 from services.job_search_repository import JobSearchRepository
@@ -63,8 +65,8 @@ from services.database import (
 
 
 st.set_page_config(
-    page_title="Opportunities",
-    page_icon="Ã°Å¸â€Å½",
+    page_title="Jobs",
+    page_icon=":material/work:",
     layout="wide",
 )
 
@@ -151,21 +153,11 @@ if not product_policy.can_search:
     st.stop()
 
 
-st.html(
-    """
-    <div class="wp-opp-eyebrow">
-        DISCOVER
-    </div>
-    <div class="wp-opp-title">
-        Opportunities
-    </div>
-    <div class="wp-opp-copy">
-        Let WorkPilot screen the market against your
-        experience, career direction, preferences and
-        priorities — then bring forward the opportunities
-        worth your attention.
-    </div>
-    """
+apply_theme()
+page_header(
+    "Jobs for you",
+    "Opportunities interpreted against your profile, direction and what matters to you.",
+    eyebrow="JOBS",
 )
 
 career_objective = (
@@ -188,136 +180,56 @@ candidate_signature = build_candidate_signature(
 
 OPPORTUNITIES_CSS = """
 <style>
-    .wp-opp-eyebrow {
-        color: #075665;
-        font-size: 0.78rem;
-        font-weight: 800;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        margin-bottom: 0.55rem;
+    .wp-search-context {
+        background: #FFFDF8;
+        border: 1px solid #E7DED1;
+        border-radius: 18px;
+        padding: 1.15rem 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 8px 24px rgba(31, 48, 53, 0.035);
     }
-
-    .wp-opp-title {
-        color: #18363D;
-        font-size: 2.45rem;
-        line-height: 1.08;
-        font-weight: 800;
-        letter-spacing: -0.035em;
-        margin-bottom: 0.45rem;
-    }
-
-    .wp-opp-copy {
-        color: #65777C;
-        font-size: 1rem;
-        line-height: 1.55;
-        max-width: 760px;
-        margin-bottom: 1.5rem;
-    }
-
-    .wp-pool-card {
-        background: #EDF5F5;
-        border: 1px solid #D8E6E5;
-        border-radius: 12px;
-        padding: 0.9rem 1rem;
-        margin-bottom: 1.1rem;
-    }
-
-    .wp-pool-number {
-        color: #075665;
-        font-size: 1.25rem;
-        font-weight: 800;
-    }
-
-    .wp-pool-label {
-        color: #60757A;
-        font-size: 0.82rem;
-        margin-top: 0.1rem;
-    }
-
-    .wp-results-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-top: 2rem;
-        margin-bottom: 0.8rem;
-    }
-
-    .wp-results-title {
-        color: #18363D;
-        font-size: 1.35rem;
-        font-weight: 800;
-    }
-
-    .wp-results-copy {
-        color: #718287;
-        font-size: 0.86rem;
-        margin-top: 0.2rem;
-    }
-
-    .wp-category {
-        margin-top: 1.35rem;
-        margin-bottom: 0.65rem;
-    }
-
-    .wp-category-top {
-        display: flex;
-        align-items: center;
-        gap: 0.55rem;
-    }
-
-    .wp-category-title {
-        color: #18363D;
-        font-size: 1rem;
-        font-weight: 800;
-    }
-
-    .wp-category-count {
-        display: inline-block;
-        background: #E2F1EE;
-        color: #075665;
-        border-radius: 99px;
-        padding: 0.16rem 0.48rem;
-        font-size: 0.72rem;
-        font-weight: 800;
-    }
-
-    .wp-category-copy {
-        color: #77888C;
-        font-size: 0.82rem;
-        margin-top: 0.25rem;
-    }
-
-    .wp-empty-category {
-        background: #F8FAF9;
-        border: 1px dashed #CFDCDD;
-        border-radius: 11px;
-        color: #708287;
-        font-size: 0.86rem;
-        padding: 0.85rem 1rem;
-        margin-bottom: 0.7rem;
-    }
-
-    /* Opportunity job expanders */
-    [data-testid="stMain"] [data-testid="stExpander"] {
-        background: #FFFFFF !important;
-        border: 1px solid #DFE7E7 !important;
-        border-radius: 12px !important;
-        overflow: hidden;
-        margin-bottom: 0.55rem;
-    }
-
-    [data-testid="stMain"] [data-testid="stExpander"] details summary {
-        background: #FFFFFF !important;
-        color: #18363D !important;
-    }
-
-    [data-testid="stMain"] [data-testid="stExpander"] details summary * {
-        color: #18363D !important;
-    }
+    .wp-search-context-head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:.85rem; }
+    .wp-search-context h3 { margin:0 0 .15rem 0 !important; font-size:1rem !important; }
+    .wp-search-context p { color:#6E7C7F; margin:0 !important; font-size:.82rem !important; }
+    .wp-context-row, .wp-priority-row { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:.7rem; }
+    .wp-context-chip { display:inline-flex; gap:.42rem; align-items:center; padding:.46rem .66rem; border-radius:999px; background:#F5EFE5; color:#30464E; border:1px solid #E6DDD1; font-size:.76rem; }
+    .wp-context-chip strong { color:#173B4B; }
+    .wp-priority-label { color:#173B4B; font-size:.72rem; font-weight:750; margin-top:.85rem; }
+    .wp-priority-label span { color:#7A8587; font-weight:500; margin-left:.35rem; }
+    .wp-priority-chip { display:inline-flex; padding:.34rem .62rem; border-radius:999px; background:#F5DFD0; color:#A74E26; font-size:.74rem; font-weight:700; }
+    .wp-searching-card { display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:center; background:linear-gradient(105deg,#FFFDF8 0%,#F5EEE4 100%); border:1px solid #E7DED1; border-radius:18px; padding:1.2rem 1.3rem; margin:.75rem 0; }
+    .wp-coffee-mark { width:52px; height:52px; border-radius:16px; display:grid; place-items:center; background:#F5DFD0; font-size:1.45rem; }
+    .wp-searching-card h3 { margin:0 !important; }
+    .wp-searching-card p { color:#6E7C7F; margin:.22rem 0 0 !important; }
+    .wp-searching-line { height:5px; border-radius:999px; background:#E9E1D7; overflow:hidden; margin-top:.75rem; }
+    .wp-searching-line::after { content:""; display:block; width:42%; height:100%; border-radius:inherit; background:#DD7338; }
+    .wp-search-report { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.7rem; background:#FFFDF8; border:1px solid #E7DED1; border-radius:18px; padding:1rem; margin:1rem 0 1.6rem; }
+    .wp-search-report > div { padding:.75rem; border-right:1px solid #EEE7DD; }
+    .wp-search-report > div:last-child { border-right:0; }
+    .wp-search-report strong { display:block; color:#173B4B; font-size:1.35rem; }
+    .wp-search-report span { color:#6E7C7F; font-size:.74rem; }
+    .wp-results-header { display:flex; align-items:end; justify-content:space-between; gap:1rem; margin:2rem 0 .9rem; }
+    .wp-results-title { color:#173B4B; font-size:1.35rem; font-weight:800; }
+    .wp-results-copy { color:#6E7C7F; font-size:.84rem; margin-top:.2rem; }
+    .wp-category { padding:.75rem .2rem .6rem; margin-bottom:.35rem; }
+    .wp-category-top { display:flex; align-items:center; justify-content:space-between; gap:.55rem; }
+    .wp-category-title { color:#173B4B; font-size:1rem; font-weight:800; }
+    .wp-category-count { background:#F1EADF; color:#173B4B; border-radius:999px; padding:.16rem .5rem; font-size:.7rem; font-weight:800; }
+    .wp-category-copy { color:#6E7C7F; font-size:.76rem; margin-top:.25rem; min-height:2.4rem; }
+    .wp-compact-job { background:#FFFDF8; border:1px solid #E7DED1; border-radius:16px; padding:.95rem; margin-bottom:.7rem; min-height:178px; box-shadow:0 8px 22px rgba(31,48,53,.035); }
+    .wp-compact-job h4 { color:#173B4B; margin:.12rem 0 !important; font-size:.95rem !important; }
+    .wp-compact-job-company { color:#566B70; font-size:.79rem; }
+    .wp-compact-job-meta { color:#849093; font-size:.72rem; margin-top:.25rem; }
+    .wp-compact-fit { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-top:.8rem; }
+    .wp-compact-fit div { background:#F7F1E8; border-radius:10px; padding:.55rem; }
+    .wp-compact-fit span { display:block; color:#7A8587; font-size:.62rem; }
+    .wp-compact-fit strong { display:block; color:#173B4B; font-size:.78rem; margin-top:.1rem; }
+    .wp-compact-reason { color:#617276; font-size:.75rem; line-height:1.45; margin:.65rem 0 0 !important; }
+    .wp-empty-category { background:rgba(255,253,248,.55); border:1px dashed #D8CFC2; border-radius:14px; color:#748184; font-size:.8rem; padding:.9rem; }
+    [data-testid="stMain"] [data-testid="stExpander"] { background:#FFFDF8 !important; border:1px solid #E7DED1 !important; border-radius:16px !important; overflow:hidden; margin-bottom:.75rem; }
+    @media (max-width:900px) { .wp-search-report { grid-template-columns:repeat(2,1fr); } .wp-search-report > div { border-right:0; } }
 </style>
 """
-
 st.markdown(
     OPPORTUNITIES_CSS,
     unsafe_allow_html=True,
@@ -361,11 +273,7 @@ def render_empty_category(
     )
 
 
-OPPORTUNITY_TARGETS = {
-    "Quick - 5 opportunities": 5,
-    "Standard - 10 opportunities": 10,
-    "Deep - 15 opportunities": 15,
-}
+DEFAULT_OPPORTUNITY_TARGET = 10
 
 def empty_scan_result() -> dict:
     return {
@@ -626,26 +534,72 @@ pool_available = repository.count_jobs_to_analyze_for_candidate(
     candidate_signature=candidate_signature,
 )
 
+direction_values = list(
+    getattr(career_objective, "desired_role_families", None)
+    or candidate.target_role_families
+    or candidate.target_roles
+    or ([candidate.current_role] if candidate.current_role else [])
+)
+priorities = list(getattr(candidate, "priorities", None) or [])
+active_priorities = [
+    priority.text
+    for priority in priorities
+    if priority.active and priority.direction == "positive"
+]
+deal_breakers = [
+    priority.text
+    for priority in priorities
+    if priority.active and priority.direction != "positive"
+]
+preferences = getattr(candidate, "preferences", None)
+work_modes = [
+    label
+    for label, allowed in (
+        ("Remote", bool(getattr(preferences, "remote_allowed", False))),
+        ("Hybrid", bool(getattr(preferences, "hybrid_allowed", False))),
+        ("On-site", bool(getattr(preferences, "onsite_allowed", False))),
+    )
+    if allowed
+]
+
+
+def _context_chip(label: str, values: list[str]) -> str:
+    value = " / ".join(str(item) for item in values if item) or "Not set"
+    return (
+        '<span class="wp-context-chip"><strong>' + escape(label) + '</strong> '
+        + escape(value) + '</span>'
+    )
+
+
 st.html(
-    f"""
-    <div class="wp-pool-card">
-        <div class="wp-pool-number">{pool_available:,}</div>
-        <div class="wp-pool-label">
-            opportunities currently available for screening
+    '''<section class="wp-search-context">
+      <div class="wp-search-context-head">
+        <div>
+          <h3>Searching based on your profile</h3>
+          <p>Your direction, preferences and priorities shape what WorkPilot looks at first.</p>
         </div>
-    </div>
-    """
+      </div>
+      <div class="wp-context-row">'''
+    + _context_chip("Direction", direction_values[:3])
+    + _context_chip("Work mode", work_modes)
+    + '''</div>
+      <div class="wp-priority-label">Active priorities <span>These influence what we show first.</span></div>
+      <div class="wp-priority-row">'''
+    + ''.join('<span class="wp-priority-chip">' + escape(item) + '</span>' for item in active_priorities[:5])
+    + '''</div>
+    </section>'''
 )
 
-with st.form("opportunity_search_controls"):
-    target_label = st.selectbox(
-        "How many opportunities would you like me to find?",
-        list(OPPORTUNITY_TARGETS.keys()),
-        index=1,
-        disabled=st.session_state["scan_in_progress"],
-    )
-    target_opportunities = OPPORTUNITY_TARGETS[target_label]
+with st.expander("Adjust search", expanded=False):
+    st.write("WorkPilot uses your current profile rather than a typed job title to drive normal search.")
+    if active_priorities:
+        st.caption("Active priorities: " + " · ".join(active_priorities))
+    if deal_breakers:
+        st.caption("Deal breakers: " + " · ".join(deal_breakers))
+    st.page_link("pages/3_Profile.py", label="Update profile and direction →")
 
+target_opportunities = DEFAULT_OPPORTUNITY_TARGET
+with st.form("opportunity_search_controls"):
     st.form_submit_button(
         "Searching for opportunities..."
         if st.session_state["scan_in_progress"]
@@ -762,17 +716,22 @@ def advance_opportunity_search() -> bool:
 
 if search_run is not None:
     if search_run.status == "running":
+        st.html(
+            '''<section class="wp-searching-card">
+              <div class="wp-coffee-mark">☕</div>
+              <div>
+                <h3>We’re searching. Go grab a coffee ☕</h3>
+                <p>We’re interpreting new opportunities against your profile and current direction.</p>
+                <div class="wp-searching-line"></div>
+              </div>
+            </section>'''
+        )
         st.button(
             "Stop search",
             key="stop_opportunity_search",
             on_click=stop_opportunity_scan,
             args=(search_scope, search_run.scan_id),
         )
-        st.info(search_progress_message(
-            reviewed=search_run.aggregate['selected'],
-            ai_eligible=search_run.aggregate['ai_eligible'],
-            buffered=len(search_run.prepared_job_ids), batch_max=BATCH_MAX_SIZE,
-        ))
 
     aggregate = search_run.aggregate
     aggregate["target_reached"] = aggregate["opportunities_found"] >= search_run.target
@@ -792,143 +751,33 @@ scan_result = st.session_state.get(
     "last_scan_result"
 )
 
-if scan_result and st.session_state.get("scan_in_progress", False):
-    pool_remaining = st.session_state.get("last_pool_remaining", 0)
-    if pool_remaining:
-        st.caption(f"{pool_remaining:,} more opportunities available.")
-
 if scan_result and not st.session_state.get("scan_in_progress", False):
-    st.divider()
+    opportunities_found = scan_result.get("opportunities_found", 0)
+    best_count = scan_result.get("activated_best_match", 0)
+    worth_count = scan_result.get("activated_potential", 0)
+    strong_count = scan_result.get("activated_good_opportunity", 0)
+    failed = scan_result.get("failed", 0)
+    provider_unavailable = bool(scan_result.get("provider_quota_exhausted"))
 
-    total_scanned = st.session_state.get(
-        "last_scan_total",
-        0,
-    )
-
-    target_requested = st.session_state.get(
-        "last_scan_target",
-        0,
-    )
-
-    pool_remaining = st.session_state.get(
-        "last_pool_remaining",
-        0,
-    )
-
-    opportunities_found = scan_result.get(
-        "opportunities_found",
-        0,
-    )
-
-    hard_rejected = scan_result.get(
-        "hard_rejected",
-        0,
-    )
-
-    ai_analyzed = scan_result.get(
-        "ai_analyses_created",
-        0,
-    )
-
-    if (
-        target_requested
-        and opportunities_found >= target_requested
-    ):
-        st.success(
-            f"I found {opportunities_found} relevant opportunities "
-            f"for you after reviewing {total_scanned} jobs."
+    # A search report is useful only when there is something real to summarize.
+    # Do not present a row of zeroes after a provider/runtime failure.
+    if opportunities_found:
+        st.html(
+            f'''<section class="wp-search-report">
+              <div><strong>{opportunities_found}</strong><span>Worth reviewing</span></div>
+              <div><strong>{best_count}</strong><span>Best Match</span></div>
+              <div><strong>{worth_count}</strong><span>Worth a Try</span></div>
+              <div><strong>{strong_count}</strong><span>You’re Strong, But</span></div>
+            </section>'''
         )
 
-    elif pool_remaining == 0:
-        st.info(
-            f"I found {opportunities_found} relevant opportunities. "
-            "I've now worked through everything currently available "
-            "in the pool."
-        )
-
-    else:
-        st.info(
-            f"I found {opportunities_found} relevant opportunities "
-            f"so far after reviewing {total_scanned} jobs."
-        )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Best Match",
-        scan_result.get(
-            "activated_best_match",
-            0,
-        ),
-    )
-
-    col2.metric(
-        "Competitive",
-        scan_result.get(
-            "activated_good_opportunity",
-            0,
-        ),
-    )
-
-    col3.metric(
-        "Potential",
-        scan_result.get(
-            "activated_potential",
-            0,
-        ),
-    )
-
-    if pool_remaining:
-        st.caption(
-            f"{pool_remaining:,} more opportunities available."
-        )
-
-    with st.expander(
-        "How this search worked",
-        expanded=False,
-    ):
-        st.write(
-            f"**{total_scanned} jobs reviewed**"
-        )
-
-        st.write(
-            f"{hard_rejected} were ruled out during "
-            "initial screening."
-        )
-
-        st.write(
-            f"{ai_analyzed} received deeper analysis."
-        )
-
-        st.write(
-            f"{scan_result.get('ai_rejected', 0)} were not "
-            "strong enough matches."
-        )
-
-        st.write(
-            f"{opportunities_found} opportunities were selected."
-        )
-
-        if pool_remaining:
-            st.caption(
-                f"{pool_remaining:,} jobs remain available "
-                "for future searches."
-            )
-
-    failed = scan_result.get(
-        "failed",
-        0,
-    )
-
-    if scan_result.get("provider_quota_exhausted"):
+    if provider_unavailable:
         st.warning(analysis_unavailable_notice().message)
     elif failed:
         st.warning(
-            f"{failed} job(s) failed during analysis."
+            "Search couldn’t finish this time. Any opportunities already found are safe. "
+            "You can try again when you’re ready."
         )
-
-        for error in scan_result.get("errors", []):
-            st.warning("An opportunity could not be analyzed. Please try again later.")
 
 
 review_jobs = list_candidate_jobs(
@@ -1176,8 +1025,53 @@ def render_tailored_cv(
 
 
 
+def _compact_job_card(job: dict) -> None:
+    analysis = job.get("analysis", {}) or {}
+    raw_case = analysis.get("hiring_case")
+    case = raw_case if (
+        isinstance(raw_case, dict)
+        and raw_case.get("authority") == "deterministic_hiring_case"
+        and raw_case.get("schema_version") == "hiring-case-v2"
+    ) else {}
+    title = escape(str(job.get("title") or "Untitled role"))
+    company = escape(str(job.get("company") or "Unknown company"))
+    location = escape(str(job.get("location") or "Location unavailable"))
+
+    if case:
+        you_company = str(case.get("hiring_case_strength", "Unknown")).replace("_", " ").title()
+        opportunity = case.get("opportunity", {}) or {}
+        job_you = str(opportunity.get("value", "Unknown")).replace("_", " ").title()
+        reason = str(case.get("decision_reason") or "Evidence-based analysis available.")
+    else:
+        you_company = str(job.get("current_fit") or "See analysis")
+        job_you = str(job.get("growth_value") or "See analysis")
+        reason = str(
+            analysis.get("simple_summary")
+            or analysis.get("final_reason")
+            or "Open the analysis to review the evidence and trade-offs."
+        )
+
+    if len(reason) > 130:
+        reason = reason[:127].rstrip() + "…"
+
+    st.html(
+        f'''<article class="wp-compact-job">
+          <h4>{title}</h4>
+          <div class="wp-compact-job-company">{company}</div>
+          <div class="wp-compact-job-meta">{location}</div>
+          <div class="wp-compact-fit">
+            <div><span>You → Company</span><strong>{escape(you_company)}</strong></div>
+            <div><span>Job → You</span><strong>{escape(job_you)}</strong></div>
+          </div>
+          <p class="wp-compact-reason">{escape(reason)}</p>
+        </article>'''
+    )
+
+
 def render_job(
     job: dict,
+    *,
+    expanded: bool = False,
 ) -> None:
     analysis = job.get(
         "analysis",
@@ -1193,7 +1087,8 @@ def render_job(
     ) or "Unknown company"
 
     with st.expander(
-        f"{title} - {company}"
+        f"{title} - {company}",
+        expanded=expanded,
     ):
         render_job_analysis(
             job,
@@ -1386,90 +1281,58 @@ if (
     or potential_jobs
     or good_opportunities
 ):
-    total_visible = (
-        len(best_matches)
-        + len(potential_jobs)
-        + len(good_opportunities)
-    )
+    total_visible = len(best_matches) + len(potential_jobs) + len(good_opportunities)
 
     st.html(
-        f"""
-        <div class="wp-results-header">
-            <div>
-                <div class="wp-results-title">
-                    Your opportunities
-                </div>
-                <div class="wp-results-copy">
-                    {total_visible} opportunities are currently
-                    worth reviewing.
-                </div>
-            </div>
-        </div>
-        """
+        f'''<div class="wp-results-header">
+          <div>
+            <div class="wp-results-title">Your opportunities</div>
+            <div class="wp-results-copy">{total_visible} opportunities are worth your attention right now.</div>
+          </div>
+        </div>'''
     )
 
-    render_opportunity_category_header(
-        "Best Match",
-        len(best_matches),
+    category_columns = st.columns(3, gap="medium")
+    categories = (
+        (category_columns[0], "Best Match", best_matches, "Strong alignment for you and for the employer."),
+        (category_columns[1], "Worth a Try", potential_jobs, "Interesting opportunities with some stretch or evidence gaps."),
+        (category_columns[2], "You’re Strong, But", good_opportunities, "You may compete well, but the role may offer less of what you want."),
+    )
+
+    for column, title, jobs, description in categories:
+        with column:
+            render_opportunity_category_header(title, len(jobs), description)
+            if not jobs:
+                render_empty_category("Nothing in this category right now.")
+            for job in jobs:
+                _compact_job_card(job)
+                if st.button(
+                    "View analysis →",
+                    key=f"view_analysis_{candidate_id}_{job['id']}",
+                    use_container_width=True,
+                ):
+                    st.session_state["selected_opportunity_id"] = str(job["id"])
+
+    selected_id = st.session_state.get("selected_opportunity_id")
+    selected_job = next(
         (
-            "Strong alignment with both your current "
-            "evidence and career direction."
+            job
+            for job in [*best_matches, *potential_jobs, *good_opportunities]
+            if str(job["id"]) == str(selected_id)
         ),
+        None,
     )
-
-    if not best_matches:
-        render_empty_category(
-            "No Best Matches in the current results. "
-            "That is okay — WorkPilot only uses this label "
-            "when the evidence is strong enough."
-        )
-
-    for job in best_matches:
-        render_job(job)
-
-    render_opportunity_category_header(
-        "Potential",
-        len(potential_jobs),
-        (
-            "Worth reviewing, with meaningful alignment "
-            "and some gaps or trade-offs to consider."
-        ),
-    )
-
-    if not potential_jobs:
-        render_empty_category(
-            "No Potential opportunities in the current results."
-        )
-
-    for job in potential_jobs:
-        render_job(job)
-
-    render_opportunity_category_header(
-        "Competitive",
-        len(good_opportunities),
-        (
-            "Roles where your evidence may compete, but "
-            "the overall fit is less direct."
-        ),
-    )
-
-    if not good_opportunities:
-        render_empty_category(
-            "No Competitive opportunities in the current results."
-        )
-
-    for job in good_opportunities:
-        render_job(job)
+    if selected_job is not None:
+        st.divider()
+        st.subheader("Job analysis")
+        render_job(selected_job, expanded=True)
 
 elif (scan_result and not st.session_state.get("scan_in_progress", False)
-      and not scan_result.get("provider_quota_exhausted")):
-    st.html(
-        '<div class="wp-empty-category">'
-        'This scan did not identify an opportunity strong '
-        'enough to recommend. Your profile has not failed '
-        'the search - the current jobs simply did not clear '
-        'the WorkPilot recommendation threshold.'
-        '</div>'
+      and not scan_result.get("provider_quota_exhausted")
+      and not scan_result.get("failed", 0)):
+    render_empty_category(
+        "Nothing worthwhile surfaced in this search. Your profile has not failed — "
+        "the current opportunities simply did not clear the recommendation threshold."
     )
 
 

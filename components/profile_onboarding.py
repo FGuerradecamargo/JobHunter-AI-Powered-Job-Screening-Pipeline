@@ -169,7 +169,7 @@ WORKPILOT_ONBOARDING_CSS = """
     .wp-side-card {
         background: #FFFFFF;
         border: 1px solid #E1E8E8;
-        border-radius: 14px;
+        border-radius: 8px;
         padding: 1.45rem 1.4rem;
         margin-bottom: 1rem;
         box-shadow: 0 2px 10px rgba(18, 63, 74, 0.035);
@@ -179,7 +179,7 @@ WORKPILOT_ONBOARDING_CSS = """
         color: #38525A;
         font-size: 0.78rem;
         font-weight: 800;
-        letter-spacing: 0.08em;
+        letter-spacing: 0;
         margin-bottom: 1.2rem;
     }
 
@@ -249,7 +249,7 @@ WORKPILOT_ONBOARDING_CSS = """
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background: #FFFFFF !important;
         border: 1px solid #E1E8E8 !important;
-        border-radius: 15px !important;
+        border-radius: 8px !important;
         box-shadow: 0 2px 14px rgba(18, 63, 74, 0.035);
     }
 
@@ -272,7 +272,7 @@ WORKPILOT_ONBOARDING_CSS = """
         background: #075665 !important;
         border-color: #075665 !important;
         color: #FFFFFF !important;
-        border-radius: 9px !important;
+        border-radius: 6px !important;
         font-weight: 650 !important;
     }
 
@@ -338,7 +338,7 @@ WORKPILOT_ONBOARDING_CSS = """
     div[data-baseweb="popover"] > div {
         background: #FFFFFF !important;
         color: #18363D !important;
-        border-radius: 10px !important;
+        border-radius: 6px !important;
         border: 1px solid #D6E0E2 !important;
         box-shadow: 0 8px 28px rgba(7, 62, 73, 0.14) !important;
     }

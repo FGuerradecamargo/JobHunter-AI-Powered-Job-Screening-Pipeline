@@ -31,7 +31,6 @@ from services.external_application import external_application_url
 from services.system_state_presenter import application_age_state
 from datetime import datetime, timezone
 from services.database import (
-    count_candidate_jobs_by_status,
     initialize_database,
     list_candidate_jobs,
     update_candidate_job_notes,
@@ -39,111 +38,6 @@ from services.database import (
 
 
 
-DASHBOARD_CSS = """
-<style>
-    .wp-dashboard-eyebrow {
-        color: #075665;
-        font-size: 0.78rem;
-        font-weight: 800;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        margin-bottom: 0.55rem;
-    }
-
-    .wp-dashboard-title {
-        color: #18363D;
-        font-size: 2.45rem;
-        line-height: 1.08;
-        font-weight: 800;
-        letter-spacing: -0.035em;
-        margin-bottom: 0.45rem;
-    }
-
-    .wp-dashboard-copy {
-        color: #65777C;
-        font-size: 1rem;
-        line-height: 1.55;
-        margin-bottom: 1.7rem;
-        max-width: 720px;
-    }
-
-    .wp-dashboard-section {
-        color: #18363D;
-        font-size: 1.15rem;
-        font-weight: 750;
-        margin-top: 1.7rem;
-        margin-bottom: 0.25rem;
-    }
-
-    .wp-dashboard-section-copy {
-        color: #738388;
-        font-size: 0.88rem;
-        margin-bottom: 0.9rem;
-    }
-
-    .wp-stat-card {
-        background: #FFFFFF;
-        border: 1px solid #DFE7E7;
-        border-radius: 14px;
-        padding: 1.05rem 1.15rem;
-        min-height: 105px;
-        box-shadow:
-            0 2px 10px rgba(7, 62, 73, 0.025);
-    }
-
-    .wp-stat-label {
-        color: #6C7D81;
-        font-size: 0.78rem;
-        font-weight: 650;
-        margin-bottom: 0.35rem;
-    }
-
-    .wp-stat-value {
-        color: #18363D;
-        font-size: 2rem;
-        line-height: 1;
-        font-weight: 750;
-    }
-
-    [data-testid="stTabs"] {
-        margin-top: 0.35rem;
-    }
-
-    [data-testid="stExpander"] {
-        border: 1px solid #DFE7E7 !important;
-        border-radius: 12px !important;
-        overflow: hidden;
-        background: #FFFFFF !important;
-    }
-
-    [data-testid="stExpander"] details summary {
-        background: #FFFFFF !important;
-        color: #18363D !important;
-    }
-
-    [data-testid="stExpander"] details summary * {
-        color: #18363D !important;
-    }
-</style>
-"""
-
-
-def render_dashboard_stat(
-    label: str,
-    value: int,
-) -> None:
-    st.html(
-        f"""
-        <div class="wp-stat-card">
-            <div class="wp-stat-label">
-                {label}
-            </div>
-            <div class="wp-stat-value">
-                {value}
-            </div>
-        </div>
-        """
-    )
 
 
 STATUS_LABELS = {
@@ -205,6 +99,7 @@ def render_application_outcome(
     status: str,
     *,
     read_only: bool = False,
+    compact: bool = False,
 ) -> None:
     repository = ApplicationOutcomeRepository()
     service = ApplicationOutcomeService(repository=repository)
@@ -217,9 +112,12 @@ def render_application_outcome(
     if view is None:
         return
 
-    st.divider()
-    st.subheader("Application status")
-    st.markdown(f"**{view.status_label}**")
+    if compact:
+        st.caption(f"Current status: {view.status_label}")
+    else:
+        st.divider()
+        st.subheader("Application status")
+        st.markdown(f"**{view.status_label}**")
 
     if read_only:
         st.caption(
@@ -298,76 +196,127 @@ def render_application_outcome(
 
         return
 
-    action_by_label = {item.label: item.value for item in view.actions}
+    friendly_labels = {
+        "Interview": "I got an interview",
+        "Final interview": "I have another interview",
+        "Offer": "I got an offer",
+        "Accepted": "Accept offer",
+        "Declined": "Decline offer",
+        "Rejected": "I was rejected",
+        "Withdrawn": "I withdrew",
+        "No response": "No response",
+    }
+
+    action_by_label = {
+        (
+            friendly_labels.get(item.label, item.label)
+            if compact
+            else item.label
+        ): item.value
+        for item in view.actions
+    }
+
+    action_options = list(
+        action_by_label
+    )
+
+    if compact:
+        action_options = [
+            "Select an update...",
+            *action_options,
+        ]
+
     selected_label = st.selectbox(
-        "Next step",
-        options=list(action_by_label),
+        "What changed?" if compact else "Next step",
+        options=action_options,
+        index=0,
         key=f"outcome_action_{candidate_id}_{job_id}",
     )
-    selected_action = action_by_label[selected_label]
+
+    selected_action = action_by_label.get(
+        selected_label
+    )
+
     existing = view.outcome
 
     rejection_reason = ""
     recruiter_feedback = ""
-    if selected_action == "rejected":
-        rejection_reason = st.text_area(
-            "Rejection reason",
-            value=existing.rejection_reason if existing else "",
-            key=f"outcome_rejection_{candidate_id}_{job_id}",
-            placeholder="Optional",
-        )
-        recruiter_feedback = st.text_area(
-            "Recruiter / company feedback",
-            value=existing.recruiter_feedback if existing else "",
-            key=f"outcome_feedback_{candidate_id}_{job_id}",
-            placeholder="Optional",
-        )
-
-    candidate_notes = st.text_area(
-        "Your notes",
-        value=existing.candidate_notes if existing else "",
-        placeholder="Optional",
-        key=f"outcome_notes_{candidate_id}_{job_id}",
-    )
-
+    candidate_notes = ""
     offer_salary = ""
     offer_currency = ""
-    if selected_action == "offer":
-        offer_columns = st.columns(2)
-        with offer_columns[0]:
-            offer_salary = st.text_input(
-                "Offer salary",
-                value=existing.offer_salary if existing else "",
-                key=f"outcome_salary_{candidate_id}_{job_id}",
+
+    if selected_action:
+        if selected_action == "rejected":
+            rejection_reason = st.text_area(
+                "Rejection reason",
+                value=existing.rejection_reason if existing else "",
+                key=f"outcome_rejection_{candidate_id}_{job_id}",
                 placeholder="Optional",
-            )
-        with offer_columns[1]:
-            offer_currency = st.text_input(
-                "Currency",
-                value=existing.offer_currency if existing else "",
-                placeholder="Optional",
-                key=f"outcome_currency_{candidate_id}_{job_id}",
             )
 
-    confirmed = st.button(
-        "Confirm update",
-        key=f"confirm_outcome_{candidate_id}_{job_id}",
-        type="primary",
-        use_container_width=True,
-    )
-    result = dispatch_application_outcome_action(
-        confirmed=confirmed,
-        action=selected_action,
-        candidate_id=candidate_id,
-        job_id=job_id,
-        lifecycle_status=status,
-        service=service,
-        rejection_reason=rejection_reason,
-        recruiter_feedback=recruiter_feedback,
-        candidate_notes=candidate_notes,
-        offer_salary=offer_salary,
-        offer_currency=offer_currency,
-    )
+            recruiter_feedback = st.text_area(
+                "Recruiter / company feedback",
+                value=existing.recruiter_feedback if existing else "",
+                key=f"outcome_feedback_{candidate_id}_{job_id}",
+                placeholder="Optional",
+            )
+
+        candidate_notes = st.text_area(
+            "Your notes",
+            value=existing.candidate_notes if existing else "",
+            placeholder="Optional",
+            key=f"outcome_notes_{candidate_id}_{job_id}",
+        )
+
+        if selected_action == "offer":
+            offer_columns = st.columns(2)
+
+            with offer_columns[0]:
+                offer_salary = st.text_input(
+                    "Offer salary",
+                    value=existing.offer_salary if existing else "",
+                    key=f"outcome_salary_{candidate_id}_{job_id}",
+                    placeholder="Optional",
+                )
+
+            with offer_columns[1]:
+                offer_currency = st.text_input(
+                    "Currency",
+                    value=existing.offer_currency if existing else "",
+                    placeholder="Optional",
+                    key=f"outcome_currency_{candidate_id}_{job_id}",
+                )
+
+        confirmed = st.button(
+            "Save update" if compact else "Confirm update",
+            key=f"confirm_outcome_{candidate_id}_{job_id}",
+            type="primary",
+            use_container_width=True,
+        )
+    else:
+        confirmed = False
+
+        if compact:
+            st.caption(
+                "Choose an update before saving."
+            )
+
+    result = None
+
+    if selected_action:
+        result = dispatch_application_outcome_action(
+            confirmed=confirmed,
+            action=selected_action,
+            candidate_id=candidate_id,
+            job_id=job_id,
+            lifecycle_status=status,
+            service=service,
+            rejection_reason=rejection_reason,
+            recruiter_feedback=recruiter_feedback,
+            candidate_notes=candidate_notes,
+            offer_salary=offer_salary,
+            offer_currency=offer_currency,
+        )
     if result is not None:
         message = outcome_result_message(result)
         if result.succeeded:
@@ -383,14 +332,31 @@ def render_interview_preparation(
     status: str,
     *,
     read_only: bool = False,
+    compact: bool = False,
 ) -> None:
-    from services.interview_preparation_ui import render_interview_rounds
+    from services.interview_preparation_ui import (
+        render_interview_preparation_overview,
+        render_interview_rounds,
+    )
+
+    if compact:
+        render_interview_preparation_overview(
+            st,
+            candidate_id=candidate_id,
+            job_id=job_id,
+            lifecycle_status=status,
+            read_only=read_only,
+        )
+
+        st.divider()
+        st.markdown("#### Interview rounds")
 
     render_interview_rounds(
         st,
         candidate_id=candidate_id,
         job_id=job_id,
         read_only=read_only,
+        compact=compact,
     )
 
 
@@ -597,10 +563,332 @@ def render_job_section(
         )
 
 
-def main() -> None:
+def _application_filter_group(item) -> str:
+    """Presentation grouping only. Domain state remains authoritative."""
+    group = str(item.get("application_group") or "")
+    stage = str(item.get("application_stage") or "")
+
+    if (
+        group == "no_response"
+        or stage in {
+            "accepted",
+            "declined",
+            "rejected",
+            "withdrawn",
+            "no_response",
+        }
+    ):
+        return "closed"
+
+    if group in {"applied", "interview", "offer", "closed"}:
+        return group
+
+    return ""
+
+
+def _application_status_label(item) -> str:
+    stage = str(item.get("application_stage") or "")
+
+    labels = {
+        "applied": "Applied",
+        "interview": "Interview",
+        "final_interview": "Interview",
+        "offer": "Offer",
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "rejected": "Rejected",
+        "withdrawn": "Withdrawn",
+        "no_response": "No response",
+    }
+
+    return labels.get(
+        stage,
+        stage.replace("_", " ").title() if stage else "Application",
+    )
+
+
+def _application_attention_message(item) -> str:
+    """Surface only states with a concrete action available now."""
+    group = _application_filter_group(item)
+
+    if group == "offer":
+        return "An offer is waiting for your decision."
+
+    if group != "applied":
+        return ""
+
+    applied_at = str(item.get("applied_at") or "")
+    if not applied_at:
+        return ""
+
+    from datetime import datetime, timezone
+    from services.system_state_presenter import application_age_state
+
+    state = application_age_state(
+        applied_at=applied_at,
+        now=datetime.now(timezone.utc).isoformat(),
+    )
+
+    if state is None or not state.action_prompt:
+        return ""
+
+    return f"{state.action_prompt} {state.title}"
+
+
+def _render_application_summary(item) -> None:
+    """Compact presentation card. No domain decisions are made here."""
+    from html import escape
+
+    title = escape(str(item.get("title") or "Untitled role"))
+    company = escape(str(item.get("company") or "Company not available"))
+    location = escape(str(item.get("location") or ""))
+    status = escape(_application_status_label(item))
+
+    round_count = item.get("round_count") or 0
+
+    meta = [company]
+
+    if location:
+        meta.append(location)
+
+    try:
+        rounds = int(round_count)
+    except (TypeError, ValueError):
+        rounds = 0
+
+    if rounds:
+        meta.append(
+            f"{rounds} interview round"
+            + ("" if rounds == 1 else "s")
+        )
+
+    meta_text = " ? ".join(escape(str(value)) for value in meta)
+
+    group = _application_filter_group(item)
+    tone = (
+        "offer"
+        if group == "offer"
+        else "interview"
+        if group == "interview"
+        else "closed"
+        if group == "closed"
+        else "applied"
+    )
+
+    st.html(
+        f"""
+        <section class="wp-application-card">
+            <div class="wp-application-card-main">
+                <h3>{title}</h3>
+                <p>{meta_text}</p>
+            </div>
+            <span class="wp-application-status wp-application-status-{tone}">
+                {status}
+            </span>
+        </section>
+        """
+    )
+
+
+
+def _render_application_details(
+    candidate_id: str,
+    item: dict,
+    *,
+    read_only: bool = False,
+) -> None:
+    """Stage-focused Applications UI. Existing services remain authoritative."""
+    from datetime import datetime, timezone
+    from html import escape
+
+    from services.system_state_presenter import application_age_state
+
+    job_id = str(item["id"])
+    status = str(item.get("status") or "applied")
+    group = _application_filter_group(item)
+    stage_label = _application_status_label(item)
+
+    notes = str(item.get("notes") or "")
+    url = item.get("url")
+
+    age = application_age_state(
+        applied_at=item.get("applied_at"),
+        now=datetime.now(timezone.utc).isoformat(),
+    )
+
+    if group == "applied":
+        st.markdown("#### Waiting for an update")
+
+        if age is not None:
+            if age.action_prompt:
+                st.caption(
+                    f"{age.title} - {age.action_prompt}"
+                )
+            else:
+                st.caption(age.title)
+
+        st.write(
+            "When something changes, update this application here. "
+            "WorkPilot will keep the application history and move the "
+            "next step forward."
+        )
+
+        if not read_only:
+            with st.expander(
+                "Update application",
+                expanded=False,
+            ):
+                render_application_outcome(
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    status=status,
+                    read_only=False,
+                    compact=True,
+                )
+
+        else:
+            render_application_outcome(
+                candidate_id=candidate_id,
+                job_id=job_id,
+                status=status,
+                read_only=True,
+                compact=True,
+            )
+
+    elif group == "interview":
+        st.markdown("#### Interview")
+
+        st.write(
+            "Prepare from the evidence WorkPilot already has, then keep "
+            "each interview round separate so feedback and next steps "
+            "stay connected to the right stage."
+        )
+
+        render_interview_preparation(
+            candidate_id=candidate_id,
+            job_id=job_id,
+            status=status,
+            read_only=read_only,
+            compact=True,
+        )
+
+        if not read_only:
+            with st.expander(
+                "Update application status",
+                expanded=False,
+            ):
+                render_application_outcome(
+                    candidate_id=candidate_id,
+                    job_id=job_id,
+                    status=status,
+                    read_only=False,
+                    compact=True,
+                )
+
+    elif group == "offer":
+        st.markdown("#### Offer")
+
+        outcome = ApplicationOutcomeRepository().get(
+            candidate_id,
+            job_id,
+        )
+
+        if outcome is not None:
+            offer_parts = []
+
+            if outcome.offer_salary:
+                offer_parts.append(str(outcome.offer_salary))
+
+            if outcome.offer_currency:
+                offer_parts.append(str(outcome.offer_currency))
+
+            if offer_parts:
+                st.html(
+                    f"""
+                    <div class="wp-offer-summary">
+                        <span>Recorded offer</span>
+                        <strong>{escape(" ".join(offer_parts))}</strong>
+                    </div>
+                    """
+                )
+
+        st.write(
+            "Review the offer and record your decision when you are ready."
+        )
+
+        render_application_outcome(
+            candidate_id=candidate_id,
+            job_id=job_id,
+            status=status,
+            read_only=read_only,
+            compact=True,
+        )
+
+    elif group == "closed":
+        st.markdown("#### Final outcome")
+
+        render_application_outcome(
+            candidate_id=candidate_id,
+            job_id=job_id,
+            status=status,
+            read_only=read_only,
+            compact=True,
+        )
+
+    st.markdown(
+        '<div class="wp-application-detail-divider"></div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.expander(
+        "Notes",
+        expanded=False,
+    ):
+        notes_value = st.text_area(
+            "Personal notes",
+            value=notes,
+            key=f"application_notes_{candidate_id}_{job_id}",
+            label_visibility="collapsed",
+            placeholder=(
+                "Add recruiter feedback, decision context, "
+                "or anything you want to remember."
+            ),
+            disabled=read_only,
+        )
+
+        if (
+            not read_only
+            and st.button(
+                "Save notes",
+                key=f"application_save_notes_{candidate_id}_{job_id}",
+            )
+        ):
+            save_notes(
+                job_id=job_id,
+                notes=notes_value,
+                candidate_id=candidate_id,
+            )
+
+    try:
+        safe_url = (
+            external_application_url(url)
+            if url
+            else ""
+        )
+    except ValueError:
+        safe_url = ""
+
+    if safe_url:
+        st.link_button(
+            "Open job posting",
+            safe_url,
+        )
+
+
+def applications_main() -> None:
     st.set_page_config(
-        page_title="WorkPilot",
-        page_icon="ðŸŽ¯",
+        page_title="Applications | WorkPilot",
+        page_icon=":material/assignment:",
         layout="wide",
     )
 
@@ -610,44 +898,29 @@ def main() -> None:
 
     initialize_database()
 
-    authenticated_user = (
-        require_authenticated_user()
+    authenticated_user = require_authenticated_user()
+
+    user_context = get_active_user_context(
+        authenticated_user=authenticated_user
     )
 
-    user_context = (
-        get_active_user_context(
-            authenticated_user=(
-                authenticated_user
-            )
-        )
-    )
-
-    active_user = (
-        user_context.active_user
-    )
+    active_user = user_context.active_user
 
     render_logout_button()
 
     candidate_repository = CandidateRepository()
 
-    st.markdown(
-        DASHBOARD_CSS,
-        unsafe_allow_html=True,
+    from components.workpilot_ui import (
+        apply_theme,
+        empty_state,
+        page_header,
     )
 
-    st.html(
-        """
-        <div class="wp-dashboard-eyebrow">
-            YOUR CAREER
-        </div>
-        <div class="wp-dashboard-title">
-            Career Dashboard
-        </div>
-        <div class="wp-dashboard-copy">
-            Track your applications, follow your progress
-            and keep what happens next in one place.
-        </div>
-        """
+    apply_theme()
+
+    page_header(
+        "Applications",
+        "Track what is moving, what needs your attention, and what comes next.",
     )
 
     if not active_user.candidate_id:
@@ -671,6 +944,7 @@ def main() -> None:
     product_state = CandidateProductStateRepository().get(
         selected_candidate_id
     )
+
     product_policy = product_mode_policy(product_state)
     read_only = not product_policy.can_mutate
 
@@ -680,31 +954,155 @@ def main() -> None:
             "Your application and interview history remains available, "
             "but it cannot be changed."
         )
+
     elif product_policy.mode.value == "career":
         st.caption(
             "Career mode is active. "
             "New opportunity searches are paused."
         )
 
-    applications = ApplicationOutcomeRepository().list_applications(selected_candidate_id)
-    groups = [
-        ("ready_to_apply", "Ready to apply"), ("applied", "Applied"),
-        ("interview", "Interview"), ("offer", "Offer"),
-        ("closed", "Closed"), ("no_response", "No Response"),
+    raw_applications = (
+        ApplicationOutcomeRepository()
+        .list_applications(selected_candidate_id)
+    )
+
+    # Ready-to-apply belongs to Jobs. Applications begins only once
+    # the candidate has explicitly confirmed an application.
+    applications = [
+        item
+        for item in raw_applications
+        if _application_filter_group(item)
     ]
-    grouped = {key: [item for item in applications if item["application_group"] == key] for key, _ in groups}
-    st.subheader("Applications")
-    tabs = st.tabs([f"{label} ({len(grouped[key])})" for key, label in groups])
-    for tab, (key, label) in zip(tabs, groups):
-        with tab:
-            if not grouped[key]:
-                st.info(f"No applications: {label}.")
-            for item in grouped[key]:
-                render_job(
-                    selected_candidate_id,
-                    item,
-                    read_only=read_only,
-                )
+
+    if not applications:
+        empty_state(
+            "No applications yet",
+            "Applications appear here after you confirm that you applied.",
+        )
+        return
+
+    attention = [
+        (item, _application_attention_message(item))
+        for item in applications
+    ]
+    attention = [
+        (item, message)
+        for item, message in attention
+        if message
+    ]
+
+    if attention:
+        st.markdown("### Needs your attention")
+        st.caption(
+            "Only applications with a concrete next action appear here."
+        )
+
+        for item, message in attention[:3]:
+            title = str(item.get("title") or "Untitled role")
+            company = str(
+                item.get("company") or "Company not available"
+            )
+
+            st.html(
+                f"""
+                <section class="wp-application-attention">
+                    <div>
+                        <strong>{title}</strong>
+                        <span>{company}</span>
+                    </div>
+                    <p>{message}</p>
+                </section>
+                """
+            )
+
+        st.markdown(
+            '<div class="wp-section-space"></div>',
+            unsafe_allow_html=True,
+        )
+
+    filter_order = (
+        "All",
+        "Applied",
+        "Interview",
+        "Offer",
+        "Closed",
+    )
+
+    group_by_filter = {
+        "Applied": "applied",
+        "Interview": "interview",
+        "Offer": "offer",
+        "Closed": "closed",
+    }
+
+    counts = {
+        "All": len(applications),
+        **{
+            label: sum(
+                1
+                for item in applications
+                if _application_filter_group(item) == group
+            )
+            for label, group in group_by_filter.items()
+        },
+    }
+
+    st.markdown("### Your applications")
+
+    selected_filter = st.radio(
+        "Application status",
+        options=filter_order,
+        horizontal=True,
+        label_visibility="collapsed",
+        format_func=lambda label: f"{label} ({counts[label]})",
+        key="applications_filter",
+    )
+
+    if selected_filter == "All":
+        visible = applications
+    else:
+        selected_group = group_by_filter[selected_filter]
+
+        visible = [
+            item
+            for item in applications
+            if _application_filter_group(item) == selected_group
+        ]
+
+    if not visible:
+        empty_state(
+            f"No {selected_filter.lower()} applications",
+            "Nothing in your application history matches this filter.",
+        )
+        return
+
+    for item in visible:
+        _render_application_summary(item)
+
+        with st.expander(
+            "View application details",
+            expanded=False,
+        ):
+            _render_application_details(
+                selected_candidate_id,
+                item,
+                read_only=read_only,
+            )
+
+
+
+def main():
+    if get_authenticated_user() is None:
+        render_public_landing()
+        st.stop()
+    # Cookie recovery can finish while only public routes are registered.
+    # Let the shell rebuild navigation before rendering private page links.
+    if st.session_state.get("workpilot_public_navigation", False):
+        return
+    from components.dashboard import render_dashboard
+    authenticated = require_authenticated_user()
+    active = get_active_user_context(authenticated_user=authenticated).active_user
+    render_dashboard(active)
 
 
 if __name__ == "__main__":

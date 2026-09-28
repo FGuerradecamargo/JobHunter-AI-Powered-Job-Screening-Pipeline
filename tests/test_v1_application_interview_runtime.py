@@ -145,6 +145,9 @@ class UI:
         self.output = []
     def form(self, *args):
         return nullcontext()
+    def columns(self, spec):
+        count = spec if isinstance(spec, int) else len(spec)
+        return [nullcontext() for _ in range(count)]
     def checkbox(self, *args):
         return False
     def date_input(self, label, value):
@@ -197,10 +200,13 @@ def test_current_applications_screen_uses_outcomes_and_safe_confirmed_apply():
     from pathlib import Path
     source = Path("app.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
-    main = next(item for item in tree.body if isinstance(item, ast.FunctionDef) and item.name == "main")
+    main = next(item for item in tree.body if isinstance(item, ast.FunctionDef) and item.name == "applications_main")
     render = next(item for item in tree.body if isinstance(item, ast.FunctionDef) and item.name == "render_job")
     assert "list_applications" in ast.unparse(main)
-    assert all(label in ast.unparse(main) for label in ("Ready to apply", "Applied", "Interview", "Offer", "Closed", "No Response"))
+    main_source = ast.unparse(main)
+    assert all(label in main_source for label in ("All", "Applied", "Interview", "Offer", "Closed"))
+    assert "st.tabs" not in main_source
+    assert "_application_filter_group" in main_source
     assert "external_application_url" in ast.unparse(render)
     assert "handle_mark_applied_action" in ast.unparse(render)
     assert "application_age_state" in ast.unparse(render)

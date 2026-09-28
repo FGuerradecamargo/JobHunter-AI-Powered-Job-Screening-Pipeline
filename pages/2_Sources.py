@@ -77,7 +77,10 @@ st.set_page_config(
     layout="centered",
 )
 
-st.title("Job sources")
+from components.workpilot_ui import apply_theme, page_header
+apply_theme()
+page_header("Connections & sources", "Manage your connections and the jobs you bring to WorkPilot.")
+st.page_link("pages/6_Settings.py", label="Settings", icon=":material/arrow_back:")
 
 st.caption(
     "Choose how WorkPilot finds opportunities for you."
