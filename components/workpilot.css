@@ -1281,3 +1281,388 @@ textarea {
         max-width: 1080px !important;
     }
 }
+
+/* === HALLOWEEN 2026 SKIN === */
+/*
+   Seasonal presentation layer only.
+   WorkPilot base layout remains unchanged.
+*/
+
+:root {
+    --wp-halloween-pumpkin: #D96C22;
+    --wp-halloween-pumpkin-soft: #E98B42;
+    --wp-halloween-plum: #2A1828;
+    --wp-halloween-plum-soft: #43243D;
+    --wp-halloween-cream: #FAF6EF;
+    --wp-halloween-gold: #C99A4A;
+}
+
+
+/* ---------------------------------------------------------
+   MAIN CANVAS
+   Keep the normal WorkPilot ivory, but add very subtle
+   seasonal warmth rather than turning the site dark.
+   --------------------------------------------------------- */
+
+[data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(
+            circle at 92% 4%,
+            rgba(217, 108, 34, 0.075) 0,
+            rgba(217, 108, 34, 0.025) 13rem,
+            transparent 25rem
+        ),
+        radial-gradient(
+            circle at 5% 96%,
+            rgba(67, 36, 61, 0.055) 0,
+            transparent 22rem
+        ),
+        #FAF8F5 !important;
+}
+
+
+/* ---------------------------------------------------------
+   SIDEBAR
+   Deep autumn plum / charcoal.
+   --------------------------------------------------------- */
+
+[data-testid="stSidebar"] {
+    background:
+        linear-gradient(
+            180deg,
+            #171218 0%,
+            #211620 55%,
+            #181217 100%
+        ) !important;
+
+    border-right:
+        1px solid rgba(217, 108, 34, 0.28) !important;
+}
+
+[data-testid="stSidebar"]::after {
+    content: "??  Halloween edition";
+    display: block;
+
+    margin:
+        1.25rem
+        1rem
+        1.1rem;
+
+    padding-top: 0.9rem;
+
+    border-top:
+        1px solid rgba(250, 248, 245, 0.10);
+
+    color:
+        rgba(250, 248, 245, 0.48);
+
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+}
+
+
+/* ---------------------------------------------------------
+   HEADINGS
+   --------------------------------------------------------- */
+
+h1,
+h2,
+h3 {
+    text-shadow:
+        0 10px 30px rgba(67, 36, 61, 0.035);
+}
+
+
+/* ---------------------------------------------------------
+   LINKS
+   --------------------------------------------------------- */
+
+a {
+    text-decoration-color:
+        rgba(217, 108, 34, 0.45);
+}
+
+a:hover {
+    color:
+        var(--wp-halloween-pumpkin) !important;
+}
+
+
+/* ---------------------------------------------------------
+   BUTTONS
+   Pumpkin accent, while preserving WorkPilot hierarchy.
+   --------------------------------------------------------- */
+
+button[kind="primary"] {
+    background:
+        linear-gradient(
+            135deg,
+            #CC5D1A 0%,
+            #E0792D 100%
+        ) !important;
+
+    border-color:
+        #C85B19 !important;
+
+    box-shadow:
+        0 7px 20px
+        rgba(204, 93, 26, 0.16) !important;
+}
+
+button[kind="primary"]:hover {
+    box-shadow:
+        0 9px 24px
+        rgba(204, 93, 26, 0.23) !important;
+
+    transform:
+        translateY(-1px);
+}
+
+
+/* ---------------------------------------------------------
+   EXPANDERS
+   Tiny autumn accent ? useful on Applications / Interview.
+   --------------------------------------------------------- */
+
+[data-testid="stExpander"] {
+    border-color:
+        rgba(67, 36, 61, 0.12) !important;
+
+    background:
+        rgba(255, 253, 249, 0.72) !important;
+}
+
+[data-testid="stExpander"]:hover {
+    border-color:
+        rgba(217, 108, 34, 0.28) !important;
+}
+
+
+/* ---------------------------------------------------------
+   INPUT FOCUS
+   --------------------------------------------------------- */
+
+input:focus,
+textarea:focus {
+    border-color:
+        rgba(217, 108, 34, 0.55) !important;
+
+    box-shadow:
+        0 0 0 1px
+        rgba(217, 108, 34, 0.12) !important;
+}
+
+
+/* ---------------------------------------------------------
+   DIVIDERS
+   --------------------------------------------------------- */
+
+hr {
+    border-color:
+        rgba(67, 36, 61, 0.10) !important;
+}
+
+
+/* ---------------------------------------------------------
+   SELECTION
+   --------------------------------------------------------- */
+
+::selection {
+    background:
+        rgba(217, 108, 34, 0.22);
+
+    color:
+        #211620;
+}
+
+
+/* === END HALLOWEEN 2026 SKIN === */
+
+/* === HALLOWEEN 2026 DECORATIVE DETAILS === */
+
+/*
+   Autumn-first seasonal layer
+   with light Halloween accents.
+*/
+
+
+[data-testid="stAppViewContainer"] {
+    position: relative;
+    overflow-x: hidden;
+}
+
+
+/* =========================================================
+   MAIN DECORATIVE CANVAS
+   ========================================================= */
+
+[data-testid="stAppViewContainer"]::before {
+    content: "";
+
+    position: fixed;
+    inset: 0;
+
+    pointer-events: none;
+    user-select: none;
+
+    z-index: 8;
+
+    background-image:
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAxNjAgMTYwIj4KCiAgPGcgZmlsbD0ibm9uZSIKICAgICBzdHJva2U9IiMyQTE4MjgiCiAgICAgc3Ryb2tlLXdpZHRoPSIxLjUiCiAgICAgb3BhY2l0eT0iLjMwIj4KCiAgICA8cGF0aCBkPSIKICAgICAgTTE2MCAwSDMyCiAgICAgIE0xNjAgMEw1MiA0MgogICAgICBNMTYwIDBMNzggODIKICAgICAgTTE2MCAwTDExMSAxNjAKICAgICAgTTE2MCAwVjEzMgogICAgIi8+CgogICAgPHBhdGggZD0iTTEzMiAwQTI4IDI4IDAgMCAwIDE2MCAyOCIvPgogICAgPHBhdGggZD0iTTEwMiAwQTU4IDU4IDAgMCAwIDE2MCA1OCIvPgogICAgPHBhdGggZD0iTTcwIDBBOTAgOTAgMCAwIDAgMTYwIDkwIi8+CiAgICA8cGF0aCBkPSJNMzggMEExMjIgMTIyIDAgMCAwIDE2MCAxMjIiLz4KCiAgPC9nPgo8L3N2Zz4K"),
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAxNTAgNzAiPgoKICA8ZyBmaWxsPSIjMkExODI4IiBvcGFjaXR5PSIuMzgiPgoKICAgIDxwYXRoIGQ9IgogICAgICBNOCAyNQogICAgICBDMTcgMTggMjMgMTkgMjkgMjUKICAgICAgQzM0IDE4IDQwIDE2IDQ4IDE4CiAgICAgIEM0MiAyMiAzOSAyNyAzOCAzMgogICAgICBDMzIgMjggMjcgMjcgMjMgMzAKICAgICAgQzE5IDI3IDE0IDI2IDggMjVaCiAgICAiLz4KCiAgICA8cGF0aCBkPSIKICAgICAgTTY3IDEzCiAgICAgIEM3NSA3IDgyIDkgODcgMTQKICAgICAgQzkyIDggOTkgNyAxMDYgMTAKICAgICAgQzEwMSAxNCA5OCAxOCA5NyAyMwogICAgICBDOTEgMTkgODcgMTkgODMgMjIKICAgICAgQzc5IDE4IDc0IDE2IDY3IDEzWgogICAgIi8+CgogICAgPHBhdGggZD0iCiAgICAgIE0xMTAgMzkKICAgICAgQzExNyAzMyAxMjQgMzUgMTI5IDQwCiAgICAgIEMxMzQgMzQgMTQwIDM0IDE0NiAzNwogICAgICBDMTQyIDQwIDEzOSA0NCAxMzggNDgKICAgICAgQzEzMyA0NSAxMjkgNDUgMTI2IDQ4CiAgICAgIEMxMjIgNDQgMTE3IDQyIDExMCAzOVoKICAgICIvPgoKICA8L2c+Cjwvc3ZnPgo="),
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAxNzAgODAiPgoKICA8ZyBmaWxsPSIjMkExODI4IiBvcGFjaXR5PSIuMzAiPgoKICAgIDxjaXJjbGUgY3g9IjkxIiBjeT0iMjkiIHI9IjciLz4KCiAgICA8cGF0aCBkPSIKICAgICAgTTg0IDM1CiAgICAgIEM3NiA0NCA3MyA1MiA3MSA1OQogICAgICBMMTAxIDU4CiAgICAgIEM5NyA0OSA5NiA0MCA5NSAzNQogICAgICBaCiAgICAiLz4KCiAgICA8cGF0aCBkPSIKICAgICAgTTgxIDI0CiAgICAgIEw5MSA1CiAgICAgIEwxMDIgMjQKICAgICAgWgogICAgIi8+CgogICAgPHJlY3QKICAgICAgeD0iNzgiCiAgICAgIHk9IjIzIgogICAgICB3aWR0aD0iMzEiCiAgICAgIGhlaWdodD0iMy41IgogICAgICByeD0iMiIKICAgIC8+CgogICAgPHBhdGggZD0iCiAgICAgIE03NiA1NAogICAgICBMMzEgNjIKICAgICAgTDMzIDY2CiAgICAgIEw4MiA1OQogICAgICBaCiAgICAiLz4KCiAgICA8cGF0aCBkPSIKICAgICAgTTMzIDU5CiAgICAgIEwxMCA1NAogICAgICBMMjkgNjkKICAgICAgWgogICAgIi8+CgogIDwvZz4KPC9zdmc+Cg=="),
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAyMzAgMTUwIj4KCiAgPGcgb3BhY2l0eT0iLjU2Ij4KCiAgICA8cGF0aCBkPSJNNSAxNDVRNTQgMTAyIDkyIDU1IgogICAgICAgICAgZmlsbD0ibm9uZSIKICAgICAgICAgIHN0cm9rZT0iI0I5NzgzRiIKICAgICAgICAgIHN0cm9rZS13aWR0aD0iMiIvPgoKICAgIDxwYXRoIGQ9Ik01MSAxMDgKICAgICAgICAgICAgIEMyNCA5MyAyMCA3MiAyOCA1OAogICAgICAgICAgICAgQzQ4IDYyIDYxIDc2IDUxIDEwOFoiCiAgICAgICAgICBmaWxsPSIjRDk3ODJEIi8+CgogICAgPHBhdGggZD0iTTc4IDc5CiAgICAgICAgICAgICBDNTggNTcgNjQgMzggNzcgMjgKICAgICAgICAgICAgIEM5NCAzOSA5NyA1NyA3OCA3OVoiCiAgICAgICAgICBmaWxsPSIjRTY5QTRCIi8+CgogICAgPHBhdGggZD0iTTI4IDEyOQogICAgICAgICAgICAgQzEwIDExNyA4IDEwMSAxNCA5MQogICAgICAgICAgICAgQzMxIDk2IDQwIDEwOCAyOCAxMjlaIgogICAgICAgICAgZmlsbD0iI0M5NjMyNyIvPgoKICAgIDxwYXRoIGQ9Ik0xMDQgNTIKICAgICAgICAgICAgIEM5MSAzMiA5OSAxNyAxMTIgMTAKICAgICAgICAgICAgIEMxMjQgMjMgMTIzIDM5IDEwNCA1MloiCiAgICAgICAgICBmaWxsPSIjREE3RDMyIi8+CgogICAgPGNpcmNsZSBjeD0iNjUiIGN5PSIxMTYiIHI9IjMiIGZpbGw9IiNCMDVEMjgiLz4KICAgIDxjaXJjbGUgY3g9IjkzIiBjeT0iNzEiIHI9IjIuNSIgZmlsbD0iI0Q0OTQ0MyIvPgoKICA8L2c+Cjwvc3ZnPgo="),
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAyNTAgMTcwIj4KCiAgPGcgb3BhY2l0eT0iLjUyIj4KCiAgICA8cGF0aCBkPSJNMjQ3IDE2NlExOTIgMTE4IDE1OCA2MCIKICAgICAgICAgIGZpbGw9Im5vbmUiCiAgICAgICAgICBzdHJva2U9IiNCOTc4M0YiCiAgICAgICAgICBzdHJva2Utd2lkdGg9IjIiLz4KCiAgICA8cGF0aCBkPSJNMjA0IDEyNgogICAgICAgICAgICAgQzIyOCAxMTEgMjMyIDkwIDIyMyA3NgogICAgICAgICAgICAgQzIwNCA4MSAxOTEgOTYgMjA0IDEyNloiCiAgICAgICAgICBmaWxsPSIjRDk3ODJEIi8+CgogICAgPHBhdGggZD0iTTE3NyA5MQogICAgICAgICAgICAgQzE5NiA2OSAxODkgNDggMTc2IDM5CiAgICAgICAgICAgICBDMTYwIDUwIDE1OSA3MCAxNzcgOTFaIgogICAgICAgICAgZmlsbD0iI0U2OUE0QiIvPgoKICAgIDxwYXRoIGQ9Ik0yMjYgMTQ4CiAgICAgICAgICAgICBDMjQzIDEzNiAyNDYgMTE5IDIzOSAxMDkKICAgICAgICAgICAgIEMyMjIgMTE0IDIxNSAxMjggMjI2IDE0OFoiCiAgICAgICAgICBmaWxsPSIjQzk2MzI3Ii8+CgogICAgPHBhdGggZD0iTTE1MSA2MQogICAgICAgICAgICAgQzE2NSA0MCAxNTcgMjMgMTQ0IDE2CiAgICAgICAgICAgICBDMTMyIDI5IDEzMyA0NiAxNTEgNjFaIgogICAgICAgICAgZmlsbD0iI0RBN0QzMiIvPgoKICA8L2c+Cjwvc3ZnPgo="),
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCA3NSA4NSI+CgogIDxwYXRoCiAgICBkPSIKICAgICAgTTE1IDcxCiAgICAgIFYzOAogICAgICBDMTUgMjEgMjQgMTIgMzcgMTIKICAgICAgQzUwIDEyIDU5IDIxIDU5IDM4CiAgICAgIFY3MQogICAgICBMNTIgNjUKICAgICAgTDQ1IDczCiAgICAgIEwzOCA2NQogICAgICBMMzEgNzMKICAgICAgTDI0IDY1CiAgICAgIFoKICAgICIKICAgIGZpbGw9IiNGN0YyRUEiCiAgICBzdHJva2U9IiMyQTE4MjgiCiAgICBzdHJva2Utd2lkdGg9IjEuNSIKICAgIG9wYWNpdHk9Ii44MCIKICAvPgoKICA8Y2lyY2xlIGN4PSIzMSIKICAgICAgICAgIGN5PSIzOCIKICAgICAgICAgIHI9IjIuNSIKICAgICAgICAgIGZpbGw9IiMyQTE4MjgiCiAgICAgICAgICBvcGFjaXR5PSIuNjAiLz4KCiAgPGNpcmNsZSBjeD0iNDQiCiAgICAgICAgICBjeT0iMzgiCiAgICAgICAgICByPSIyLjUiCiAgICAgICAgICBmaWxsPSIjMkExODI4IgogICAgICAgICAgb3BhY2l0eT0iLjYwIi8+Cgo8L3N2Zz4K"),
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCA4MCA4MCI+CgogIDxwYXRoCiAgICBkPSJNNDAgMjVDMzkgMTcgNDQgMTIgNDkgOSIKICAgIGZpbGw9Im5vbmUiCiAgICBzdHJva2U9IiM2ODUyMzgiCiAgICBzdHJva2Utd2lkdGg9IjMiCiAgICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgICBvcGFjaXR5PSIuNjAiCiAgLz4KCiAgPGVsbGlwc2UKICAgIGN4PSI0MCIKICAgIGN5PSI0OSIKICAgIHJ4PSIyNSIKICAgIHJ5PSIyMCIKICAgIGZpbGw9IiNEOTZDMjIiCiAgICBvcGFjaXR5PSIuODIiCiAgLz4KCiAgPGVsbGlwc2UKICAgIGN4PSI0MCIKICAgIGN5PSI0OSIKICAgIHJ4PSIxNCIKICAgIHJ5PSIyMCIKICAgIGZpbGw9IiNFRDk4NTAiCiAgICBvcGFjaXR5PSIuNTAiCiAgLz4KCiAgPHBhdGgKICAgIGQ9IgogICAgICBNMjggNDZMMzUgNDFMMzcgNDlaCiAgICAgIE01MiA0Nkw0NSA0MUw0MyA0OVoKICAgICIKICAgIGZpbGw9IiMyQTE4MjgiCiAgICBvcGFjaXR5PSIuNTAiCiAgLz4KCiAgPHBhdGgKICAgIGQ9Ik0zMSA1N1E0MCA2MyA0OSA1NyIKICAgIGZpbGw9Im5vbmUiCiAgICBzdHJva2U9IiMyQTE4MjgiCiAgICBzdHJva2Utd2lkdGg9IjIiCiAgICBvcGFjaXR5PSIuNDYiCiAgLz4KCjwvc3ZnPgo=");
+
+    background-repeat:
+        no-repeat,
+        no-repeat,
+        no-repeat,
+        no-repeat,
+        no-repeat,
+        no-repeat,
+        no-repeat;
+
+    background-position:
+        right 0 top 36px,
+        right 48px top 116px,
+        right 150px top 145px,
+        left 270px bottom 0,
+        right 0 bottom 0,
+        right 54px bottom 31px,
+        right 18px bottom 23px;
+
+    background-size:
+        132px 132px,
+        92px 43px,
+        90px 43px,
+        155px 100px,
+        170px 112px,
+        45px 51px,
+        45px 45px;
+}
+
+
+/* =========================================================
+   SUBTLE WARM EDGE GLOW
+   ========================================================= */
+
+[data-testid="stAppViewContainer"]::after {
+    content: "";
+
+    position: fixed;
+    inset: 0;
+
+    pointer-events: none;
+
+    z-index: 0;
+
+    background:
+        radial-gradient(
+            circle at 95% 8%,
+            rgba(217,108,34,.055),
+            transparent 18rem
+        ),
+        radial-gradient(
+            circle at 3% 96%,
+            rgba(217,108,34,.045),
+            transparent 18rem
+        );
+}
+
+
+/* =========================================================
+   SINGLE SIDEBAR HAT
+   ========================================================= */
+
+[data-testid="stSidebar"] {
+    position: relative;
+}
+
+[data-testid="stSidebar"]::after {
+    content: "";
+
+    position: absolute;
+
+    width: 34px;
+    height: 27px;
+
+    top: 58px;
+    right: 19px;
+
+    background-image:
+        url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCA4MCA2MCI+CgogIDxwYXRoCiAgICBkPSIKICAgICAgTTIyIDQzCiAgICAgIEw0NCA4CiAgICAgIEw1OSA0MwogICAgICBaCiAgICAiCiAgICBmaWxsPSIjRjdGMkVBIgogICAgb3BhY2l0eT0iLjI0IgogIC8+CgogIDxlbGxpcHNlCiAgICBjeD0iNDAiCiAgICBjeT0iNDQiCiAgICByeD0iMzAiCiAgICByeT0iNSIKICAgIGZpbGw9IiNGN0YyRUEiCiAgICBvcGFjaXR5PSIuMjQiCiAgLz4KCiAgPHBhdGgKICAgIGQ9Ik0yOCAzNVE0MiA0MCA1NCAzNSIKICAgIGZpbGw9Im5vbmUiCiAgICBzdHJva2U9IiNEOTZDMjIiCiAgICBzdHJva2Utd2lkdGg9IjMiCiAgICBvcGFjaXR5PSIuNjUiCiAgLz4KCjwvc3ZnPgo=");
+
+    background-repeat: no-repeat;
+    background-size: contain;
+
+    transform: rotate(7deg);
+
+    pointer-events: none;
+    user-select: none;
+
+    z-index: 12;
+}
+
+
+/* Remove old leftover pseudo-decorations */
+
+[data-testid="stSidebar"]::before,
+.block-container::before,
+.block-container::after {
+    content: none !important;
+    background-image: none !important;
+}
+
+
+/* =========================================================
+   SUBTLE INTERACTIVE DETAIL
+   ========================================================= */
+
+.wp-card:hover,
+[data-testid="stExpander"]:hover {
+    box-shadow:
+        0 10px 28px rgba(42,24,40,.035),
+        0 0 0 1px rgba(217,108,34,.04)
+        !important;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 900px) {
+
+    [data-testid="stAppViewContainer"]::before {
+        background-image:
+            url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAxNjAgMTYwIj4KCiAgPGcgZmlsbD0ibm9uZSIKICAgICBzdHJva2U9IiMyQTE4MjgiCiAgICAgc3Ryb2tlLXdpZHRoPSIxLjUiCiAgICAgb3BhY2l0eT0iLjMwIj4KCiAgICA8cGF0aCBkPSIKICAgICAgTTE2MCAwSDMyCiAgICAgIE0xNjAgMEw1MiA0MgogICAgICBNMTYwIDBMNzggODIKICAgICAgTTE2MCAwTDExMSAxNjAKICAgICAgTTE2MCAwVjEzMgogICAgIi8+CgogICAgPHBhdGggZD0iTTEzMiAwQTI4IDI4IDAgMCAwIDE2MCAyOCIvPgogICAgPHBhdGggZD0iTTEwMiAwQTU4IDU4IDAgMCAwIDE2MCA1OCIvPgogICAgPHBhdGggZD0iTTcwIDBBOTAgOTAgMCAwIDAgMTYwIDkwIi8+CiAgICA8cGF0aCBkPSJNMzggMEExMjIgMTIyIDAgMCAwIDE2MCAxMjIiLz4KCiAgPC9nPgo8L3N2Zz4K"),
+            url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAxNTAgNzAiPgoKICA8ZyBmaWxsPSIjMkExODI4IiBvcGFjaXR5PSIuMzgiPgoKICAgIDxwYXRoIGQ9IgogICAgICBNOCAyNQogICAgICBDMTcgMTggMjMgMTkgMjkgMjUKICAgICAgQzM0IDE4IDQwIDE2IDQ4IDE4CiAgICAgIEM0MiAyMiAzOSAyNyAzOCAzMgogICAgICBDMzIgMjggMjcgMjcgMjMgMzAKICAgICAgQzE5IDI3IDE0IDI2IDggMjVaCiAgICAiLz4KCiAgICA8cGF0aCBkPSIKICAgICAgTTY3IDEzCiAgICAgIEM3NSA3IDgyIDkgODcgMTQKICAgICAgQzkyIDggOTkgNyAxMDYgMTAKICAgICAgQzEwMSAxNCA5OCAxOCA5NyAyMwogICAgICBDOTEgMTkgODcgMTkgODMgMjIKICAgICAgQzc5IDE4IDc0IDE2IDY3IDEzWgogICAgIi8+CgogICAgPHBhdGggZD0iCiAgICAgIE0xMTAgMzkKICAgICAgQzExNyAzMyAxMjQgMzUgMTI5IDQwCiAgICAgIEMxMzQgMzQgMTQwIDM0IDE0NiAzNwogICAgICBDMTQyIDQwIDEzOSA0NCAxMzggNDgKICAgICAgQzEzMyA0NSAxMjkgNDUgMTI2IDQ4CiAgICAgIEMxMjIgNDQgMTE3IDQyIDExMCAzOVoKICAgICIvPgoKICA8L2c+Cjwvc3ZnPgo="),
+            url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCAyNTAgMTcwIj4KCiAgPGcgb3BhY2l0eT0iLjUyIj4KCiAgICA8cGF0aCBkPSJNMjQ3IDE2NlExOTIgMTE4IDE1OCA2MCIKICAgICAgICAgIGZpbGw9Im5vbmUiCiAgICAgICAgICBzdHJva2U9IiNCOTc4M0YiCiAgICAgICAgICBzdHJva2Utd2lkdGg9IjIiLz4KCiAgICA8cGF0aCBkPSJNMjA0IDEyNgogICAgICAgICAgICAgQzIyOCAxMTEgMjMyIDkwIDIyMyA3NgogICAgICAgICAgICAgQzIwNCA4MSAxOTEgOTYgMjA0IDEyNloiCiAgICAgICAgICBmaWxsPSIjRDk3ODJEIi8+CgogICAgPHBhdGggZD0iTTE3NyA5MQogICAgICAgICAgICAgQzE5NiA2OSAxODkgNDggMTc2IDM5CiAgICAgICAgICAgICBDMTYwIDUwIDE1OSA3MCAxNzcgOTFaIgogICAgICAgICAgZmlsbD0iI0U2OUE0QiIvPgoKICAgIDxwYXRoIGQ9Ik0yMjYgMTQ4CiAgICAgICAgICAgICBDMjQzIDEzNiAyNDYgMTE5IDIzOSAxMDkKICAgICAgICAgICAgIEMyMjIgMTE0IDIxNSAxMjggMjI2IDE0OFoiCiAgICAgICAgICBmaWxsPSIjQzk2MzI3Ii8+CgogICAgPHBhdGggZD0iTTE1MSA2MQogICAgICAgICAgICAgQzE2NSA0MCAxNTcgMjMgMTQ0IDE2CiAgICAgICAgICAgICBDMTMyIDI5IDEzMyA0NiAxNTEgNjFaIgogICAgICAgICAgZmlsbD0iI0RBN0QzMiIvPgoKICA8L2c+Cjwvc3ZnPgo="),
+            url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCA3NSA4NSI+CgogIDxwYXRoCiAgICBkPSIKICAgICAgTTE1IDcxCiAgICAgIFYzOAogICAgICBDMTUgMjEgMjQgMTIgMzcgMTIKICAgICAgQzUwIDEyIDU5IDIxIDU5IDM4CiAgICAgIFY3MQogICAgICBMNTIgNjUKICAgICAgTDQ1IDczCiAgICAgIEwzOCA2NQogICAgICBMMzEgNzMKICAgICAgTDI0IDY1CiAgICAgIFoKICAgICIKICAgIGZpbGw9IiNGN0YyRUEiCiAgICBzdHJva2U9IiMyQTE4MjgiCiAgICBzdHJva2Utd2lkdGg9IjEuNSIKICAgIG9wYWNpdHk9Ii44MCIKICAvPgoKICA8Y2lyY2xlIGN4PSIzMSIKICAgICAgICAgIGN5PSIzOCIKICAgICAgICAgIHI9IjIuNSIKICAgICAgICAgIGZpbGw9IiMyQTE4MjgiCiAgICAgICAgICBvcGFjaXR5PSIuNjAiLz4KCiAgPGNpcmNsZSBjeD0iNDQiCiAgICAgICAgICBjeT0iMzgiCiAgICAgICAgICByPSIyLjUiCiAgICAgICAgICBmaWxsPSIjMkExODI4IgogICAgICAgICAgb3BhY2l0eT0iLjYwIi8+Cgo8L3N2Zz4K"),
+            url("data:image/svg+xml;base64,CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICAgIHZpZXdCb3g9IjAgMCA4MCA4MCI+CgogIDxwYXRoCiAgICBkPSJNNDAgMjVDMzkgMTcgNDQgMTIgNDkgOSIKICAgIGZpbGw9Im5vbmUiCiAgICBzdHJva2U9IiM2ODUyMzgiCiAgICBzdHJva2Utd2lkdGg9IjMiCiAgICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgICBvcGFjaXR5PSIuNjAiCiAgLz4KCiAgPGVsbGlwc2UKICAgIGN4PSI0MCIKICAgIGN5PSI0OSIKICAgIHJ4PSIyNSIKICAgIHJ5PSIyMCIKICAgIGZpbGw9IiNEOTZDMjIiCiAgICBvcGFjaXR5PSIuODIiCiAgLz4KCiAgPGVsbGlwc2UKICAgIGN4PSI0MCIKICAgIGN5PSI0OSIKICAgIHJ4PSIxNCIKICAgIHJ5PSIyMCIKICAgIGZpbGw9IiNFRDk4NTAiCiAgICBvcGFjaXR5PSIuNTAiCiAgLz4KCiAgPHBhdGgKICAgIGQ9IgogICAgICBNMjggNDZMMzUgNDFMMzcgNDlaCiAgICAgIE01MiA0Nkw0NSA0MUw0MyA0OVoKICAgICIKICAgIGZpbGw9IiMyQTE4MjgiCiAgICBvcGFjaXR5PSIuNTAiCiAgLz4KCiAgPHBhdGgKICAgIGQ9Ik0zMSA1N1E0MCA2MyA0OSA1NyIKICAgIGZpbGw9Im5vbmUiCiAgICBzdHJva2U9IiMyQTE4MjgiCiAgICBzdHJva2Utd2lkdGg9IjIiCiAgICBvcGFjaXR5PSIuNDYiCiAgLz4KCjwvc3ZnPgo=");
+
+        background-position:
+            right 0 top 37px,
+            right 30px top 105px,
+            right 0 bottom 0,
+            right 39px bottom 19px,
+            right 8px bottom 14px;
+
+        background-size:
+            86px 86px,
+            63px 30px,
+            105px 70px,
+            33px 38px,
+            34px 34px;
+    }
+
+    [data-testid="stSidebar"]::after {
+        display: none;
+    }
+}
+
+
+/* === END HALLOWEEN 2026 DECORATIVE DETAILS === */
