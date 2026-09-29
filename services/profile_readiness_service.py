@@ -1,6 +1,10 @@
 """Read-only profile readiness, independent of product and commercial access."""
 from dataclasses import dataclass
 
+from streamlit.runtime.scriptrunner import (
+    get_script_run_ctx,
+)
+
 from models.profile_interpretation import CANDIDATE_PROFILE_SCHEMA_VERSION, CandidateProfileSnapshot
 from services.candidate_profile_source import load_confirmed_candidate_profile_input
 from services.runtime_timing import timed
@@ -96,9 +100,79 @@ class ProfileReadinessService:
             return winner
 
 
+def _runtime_readiness_cache():
+    """
+    Return a cache that exists only for the current Streamlit
+    script run.
+
+    Streamlit replaces context.cursors on the next rerun, so
+    profile mutations followed by st.rerun always receive a
+    fresh readiness calculation.
+    """
+    context = get_script_run_ctx()
+
+    if context is None:
+        return None
+
+    cursors = getattr(
+        context,
+        "cursors",
+        None,
+    )
+
+    runtime = getattr(
+        context,
+        "_workpilot_profile_readiness_runtime",
+        None,
+    )
+
+    if (
+        runtime is None
+        or runtime[0] is not cursors
+    ):
+        runtime = (
+            cursors,
+            {},
+        )
+
+        context._workpilot_profile_readiness_runtime = (
+            runtime
+        )
+
+    return runtime[1]
+
+
 def profile_readiness(candidate_id):
+    normalized_candidate_id = str(
+        candidate_id or ""
+    ).strip()
+
+    cache = _runtime_readiness_cache()
+
+    if (
+        cache is not None
+        and normalized_candidate_id in cache
+    ):
+        return cache[
+            normalized_candidate_id
+        ]
+
     try:
-        return ProfileReadinessService().check(candidate_id)
+        result = (
+            ProfileReadinessService()
+            .check(candidate_id)
+        )
+
     except Exception:
-        # Fail closed without leaking evidence or database exception text.
-        return ProfileReadiness("unavailable")
+        # Fail closed without leaking evidence or
+        # database exception text.
+        result = ProfileReadiness(
+            "unavailable"
+        )
+
+    if cache is not None:
+        cache[
+            normalized_candidate_id
+        ] = result
+
+    return result
