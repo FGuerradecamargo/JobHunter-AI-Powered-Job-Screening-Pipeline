@@ -127,6 +127,64 @@ def _get_cookies_if_ready() -> EncryptedCookieManager | None:
     return cookies
 
 
+_AUTH_CACHE_MISS = object()
+
+
+def _authentication_runtime_cache():
+    """
+    Authentication results may be reused only inside the current
+    Streamlit script run.
+
+    Streamlit replaces context.cursors on the next rerun, forcing
+    durable cookie/server-session validation again.
+    """
+    context = get_script_run_ctx()
+
+    if context is None:
+        return None
+
+    cursors = getattr(
+        context,
+        "cursors",
+        None,
+    )
+
+    runtime = getattr(
+        context,
+        "_workpilot_auth_runtime",
+        None,
+    )
+
+    if (
+        runtime is None
+        or runtime[0] is not cursors
+    ):
+        runtime = (
+            cursors,
+            {},
+        )
+
+        context._workpilot_auth_runtime = runtime
+
+    return runtime[1]
+
+
+def _reset_authentication_runtime_cache():
+    context = get_script_run_ctx()
+
+    if context is None:
+        return
+
+    context._workpilot_auth_runtime = (
+        getattr(
+            context,
+            "cursors",
+            None,
+        ),
+        {},
+    )
+
+
 def _hash_session_token(
     token: str,
 ) -> str:
@@ -163,6 +221,8 @@ def _parse_utc_datetime(value: str) -> datetime:
 
 
 def _clear_local_session() -> None:
+    _reset_authentication_runtime_cache()
+
     cookies = _get_cookies()
     for key in (
         "opportunity_search_run", "scan_requested", "scan_in_progress",
@@ -216,6 +276,19 @@ def get_authenticated_user(
     token_hash = _hash_session_token(
         token
     )
+
+    runtime_cache = (
+        _authentication_runtime_cache()
+    )
+
+    if runtime_cache is not None:
+        cached_user = runtime_cache.get(
+            token_hash,
+            _AUTH_CACHE_MISS,
+        )
+
+        if cached_user is not _AUTH_CACHE_MISS:
+            return cached_user
 
     now = _utc_now_datetime()
     session_expired = False
@@ -286,6 +359,11 @@ def get_authenticated_user(
 
     st.session_state.current_user = user
 
+    if runtime_cache is not None:
+        runtime_cache[
+            token_hash
+        ] = user
+
     return user
 
 
@@ -317,6 +395,8 @@ def get_current_user() -> AppUser | None:
 def login_user(
     user: AppUser,
 ) -> None:
+    _reset_authentication_runtime_cache()
+
     cookies = _get_cookies()
 
     token = secrets.token_urlsafe(48)
@@ -374,10 +454,14 @@ def revoke_user_sessions(
         )
 
     with get_connection() as connection:
-        return revoke_user_sessions_with_connection(
+        revoked = revoke_user_sessions_with_connection(
             connection,
             normalized_user_id,
         )
+
+    _reset_authentication_runtime_cache()
+
+    return revoked
 
 
 def logout_user() -> None:
