@@ -7,6 +7,9 @@ from models.candidate import Candidate
 from models.structured_interpretation import (
     StructuredInterpretationInput, InterpretationOperation, RegisteredSourceRef, SourceRefClass,
 )
+from services.candidate_profile_output_schema import (
+    CandidateProfileOutput,
+)
 from services.profile_interpretation_service import ProfileInterpretationService
 from services.profile_snapshot_repository import ProfileSnapshotRepository
 from services.structured_interpretation_validation import validate_output
@@ -43,19 +46,57 @@ class CandidateProfileGenerationService:
             "Checkpoint has current_position (string), proven_strengths, transferable_strengths, evidence_missing, "
             "current_direction, open_questions, changes_since_previous_version, possible_next_profile_triggers "
             "(arrays of strings), authority='derived_checkpoint'. It is interpretation, never source evidence. "
-            "Keep confirmed_gaps empty and fact_coverage unknown. Return empty capabilities when evidence is insufficient. "
+            "Every field required by the response schema must be returned. "
+            "Use empty arrays or empty strings when the source does not support a value. "
+            "Keep confirmed_gaps empty and every fact_coverage dimension unknown unless the source explicitly establishes completeness. "
+            "Return empty capabilities when evidence is insufficient. "
             "Preserve uncertainty. Do not claim a language, licence, authorization or achievement from silence.\n"
             + json.dumps({"confirmed_interview_answers": memory_payload,
                           "sources": [asdict(item) for item in source_evidence],
                           "previous_checkpoint": asdict(previous_checkpoint) if previous_checkpoint else None},
                          ensure_ascii=True)
         )
-        raw = self.llm_client.generate(prompt)
+        structured_generate = getattr(
+            self.llm_client,
+            "generate_structured",
+            None,
+        )
+
         try:
-            draft, _ = validate_output(request, json.loads(raw))
+            if callable(
+                structured_generate
+            ):
+                raw_payload = structured_generate(
+                    prompt,
+                    CandidateProfileOutput,
+                )
+
+            else:
+                # Offline fixtures and legacy LLM clients keep
+                # the original interface. Production OpenAI uses
+                # the structured provider boundary above.
+                raw_payload = json.loads(
+                    self.llm_client.generate(
+                        prompt
+                    )
+                )
+
+            draft, _ = validate_output(
+                request,
+                raw_payload,
+            )
+
             return draft
-        except (ValueError, TypeError):
-            raise ValueError("Invalid structured candidate interpretation.") from None
+
+        except (
+            json.JSONDecodeError,
+            ValueError,
+            TypeError,
+        ):
+            raise ValueError(
+                "Invalid structured candidate "
+                "interpretation."
+            ) from None
 
     def generate(self, candidate_id, candidate_name):
         onboarding = self.onboarding_repository.get_onboarding(candidate_id)
