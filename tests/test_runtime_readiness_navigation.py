@@ -6,19 +6,32 @@ from unittest.mock import Mock
 import pytest
 
 
-def test_cookie_recovery_precedes_any_navigation_graph():
-    tree = ast.parse(Path("streamlit_app.py").read_text(encoding="utf-8"))
-    recovery = next(n for n in tree.body if isinstance(n, ast.Assign)
-                    and any(isinstance(t, ast.Name) and t.id == "authenticated_user" for t in n.targets))
-    navigation = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
-                  and isinstance(n.func, ast.Attribute) and n.func.attr == "navigation"]
-    assert all(n.lineno > recovery.lineno for n in navigation)
-    class WaitingForCookie(BaseException):
-        pass
-    env = {"get_authenticated_user": Mock(side_effect=WaitingForCookie)}
-    with pytest.raises(WaitingForCookie):
-        exec(compile(ast.Module(body=[recovery], type_ignores=[]), "shell", "exec"), env)
-    assert "authenticated_user" not in env
+def test_public_cookie_recovery_is_nonblocking_before_navigation():
+    source = Path(
+        "streamlit_app.py"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    public_recovery = source.index(
+        "get_authenticated_user_if_ready()"
+    )
+
+    public_navigation = source.index(
+        "st.navigation("
+    )
+
+    assert public_recovery < public_navigation
+
+    # A cached UI identity never bypasses durable validation.
+    assert (
+        "else:\n"
+        "    # Never authorize the private shell "
+        "from session_state alone.\n"
+        "    authenticated_user = "
+        "get_authenticated_user()"
+        in source
+    )
 
 
 def test_missing_snapshot_stops_before_search_and_clears_pending_run():

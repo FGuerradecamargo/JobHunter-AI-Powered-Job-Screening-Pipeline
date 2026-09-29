@@ -18,7 +18,10 @@ from services.candidate_product_state_service import (
     HiredTransitionService,
 )
 from services.product_mode_policy import product_mode_policy
-from services.session_auth import get_authenticated_user
+from services.session_auth import (
+    get_authenticated_user,
+    get_authenticated_user_if_ready,
+)
 from services.streamlit_oidc import oidc_logged_in
 from services.user_context_runtime import (
     get_active_user_context,
@@ -96,11 +99,21 @@ public_pages.extend(st.Page(_require_sign_in, title=route, url_path=route,
                             visibility="hidden")
                     for route in ("Jobs", "Applications", "Sources", "Profile", "Settings", "Improvements"))
 
-# Cookie readiness may pause this rerun. Do not register a public-only
-# navigation graph until recovery has resolved the server-side session.
-# Never authorize the private shell from session_state alone.
-# Revalidate the encrypted cookie and server-side session every run.
-authenticated_user = get_authenticated_user()
+# Public routes must remain renderable while the browser cookie
+# component completes its handshake. A pending cookie is not treated
+# as authenticated and never grants private access.
+#
+# Once a user has an in-memory identity from a completed login or
+# previous validated run, the shell waits for cookie recovery and
+# revalidates the durable server-side session before private pages
+# are registered.
+if st.session_state.get("current_user") is None:
+    authenticated_user = (
+        get_authenticated_user_if_ready()
+    )
+else:
+    # Never authorize the private shell from session_state alone.
+    authenticated_user = get_authenticated_user()
 
 google_oidc_pending = bool(
     authenticated_user is None

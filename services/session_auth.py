@@ -63,25 +63,67 @@ def _resolve_session_cookie_key() -> str:
 SESSION_COOKIE_KEY = _resolve_session_cookie_key()
 
 
-def _get_cookies() -> EncryptedCookieManager:
+def _build_cookie_manager() -> EncryptedCookieManager:
     context = get_script_run_ctx()
     if context is None:
-        raise RuntimeError("Authentication requires a Streamlit session context.")
+        raise RuntimeError(
+            "Authentication requires a Streamlit session context."
+        )
 
     # Streamlit replaces cursors on each script run. Reuse only within that run
     # to avoid duplicate component keys, never across browsers or reruns.
-    runtime = getattr(context, "_workpilot_cookie_runtime", None)
-    if runtime is None or runtime[0] is not context.cursors:
+    runtime = getattr(
+        context,
+        "_workpilot_cookie_runtime",
+        None,
+    )
+
+    if (
+        runtime is None
+        or runtime[0] is not context.cursors
+    ):
         cookies = EncryptedCookieManager(
             prefix="jobhunter_",
             password=SESSION_COOKIE_KEY,
         )
-        context._workpilot_cookie_runtime = (context.cursors, cookies)
+
+        context._workpilot_cookie_runtime = (
+            context.cursors,
+            cookies,
+        )
+
     else:
         cookies = runtime[1]
 
+    return cookies
+
+
+def _get_cookies() -> EncryptedCookieManager:
+    """
+    Private/authenticated flows must wait until browser cookie
+    recovery is complete.
+    """
+    cookies = _build_cookie_manager()
+
     if not cookies.ready():
         st.stop()
+
+    return cookies
+
+
+def _get_cookies_if_ready() -> EncryptedCookieManager | None:
+    """
+    Public pages may render while the cookie component is still
+    completing its browser handshake.
+
+    Returning None here means authentication is unresolved for this
+    rerun, never that a private session has been authorized.
+    """
+    cookies = _build_cookie_manager()
+
+    if not cookies.ready():
+        return None
+
     return cookies
 
 
@@ -147,9 +189,18 @@ def _expire_local_session() -> None:
 
 
 @timed("auth.session")
-def get_authenticated_user() -> AppUser | None:
-    cookies = _get_cookies()
-    ensure_session_table()
+def get_authenticated_user(
+    *,
+    wait_for_cookie: bool = True,
+) -> AppUser | None:
+    cookies = (
+        _get_cookies()
+        if wait_for_cookie
+        else _get_cookies_if_ready()
+    )
+
+    if cookies is None:
+        return None
 
     token = cookies.get(
         SESSION_COOKIE
@@ -238,6 +289,20 @@ def get_authenticated_user() -> AppUser | None:
     return user
 
 
+def get_authenticated_user_if_ready() -> AppUser | None:
+    """
+    Resolve authentication only when browser cookie recovery
+    has completed.
+
+    Public pages use this so cookie readiness can never make
+    Login/Home disappear. Returning None grants no private
+    authorization.
+    """
+    return get_authenticated_user(
+        wait_for_cookie=False
+    )
+
+
 def get_current_user() -> AppUser | None:
     """
     Backward-compatible alias.
@@ -253,7 +318,6 @@ def login_user(
     user: AppUser,
 ) -> None:
     cookies = _get_cookies()
-    ensure_session_table()
 
     token = secrets.token_urlsafe(48)
 

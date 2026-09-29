@@ -17,6 +17,7 @@ from services.google_identity_service import (
 )
 from services.session_auth import (
     get_authenticated_user,
+    get_authenticated_user_if_ready,
     login_user,
     logout_user,
 )
@@ -454,7 +455,9 @@ st.set_page_config(
 )
 
 auth_service = AuthService()
-authenticated_user = get_authenticated_user()
+authenticated_user = (
+    get_authenticated_user_if_ready()
+)
 
 if authenticated_user is None:
     render_public_theme()

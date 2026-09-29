@@ -6,6 +6,7 @@ from components.job_analysis_view import render_job_analysis
 from services.candidate_repository import CandidateRepository
 from services.session_auth import (
     get_authenticated_user,
+    get_authenticated_user_if_ready,
     render_logout_button,
     require_authenticated_user,
 )
@@ -1093,7 +1094,7 @@ def applications_main() -> None:
 
 
 def main():
-    if get_authenticated_user() is None:
+    if get_authenticated_user_if_ready() is None:
         render_public_landing()
         st.stop()
     # Cookie recovery can finish while only public routes are registered.

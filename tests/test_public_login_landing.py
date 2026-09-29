@@ -57,8 +57,13 @@ def login_page(monkeypatch):
         result.__dict__.update(attributes)
         monkeypatch.setitem(sys.modules, name, result)
 
-    module("services.session_auth", get_authenticated_user=lambda: st.session_state.get("test_user"),
-           login_user=login, logout_user=logout)
+    module(
+        "services.session_auth",
+        get_authenticated_user=lambda: st.session_state.get("test_user"),
+        get_authenticated_user_if_ready=lambda: st.session_state.get("test_user"),
+        login_user=login,
+        logout_user=logout,
+    )
     module("services.auth_service", AuthService=FakeAuthService)
     module("services.account_recovery_service", AccountRecoveryService=SimpleNamespace(request_password_reset=recovery))
     module("services.email_verification_delivery_service", EmailVerificationDeliveryService=SimpleNamespace(send_verification_email=verification))

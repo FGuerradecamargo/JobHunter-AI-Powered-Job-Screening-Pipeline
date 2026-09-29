@@ -284,6 +284,52 @@ def session_runtime(
     )
 
 
+def test_public_cookie_lookup_does_not_stop_when_component_is_pending(
+    monkeypatch,
+):
+    class PendingCookies(dict):
+        def ready(self):
+            return False
+
+    pending = PendingCookies()
+
+    monkeypatch.setattr(
+        session_auth,
+        "_build_cookie_manager",
+        lambda: pending,
+    )
+
+    assert (
+        session_auth._get_cookies_if_ready()
+        is None
+    )
+
+
+def test_public_entrypoints_use_nonblocking_cookie_recovery():
+    sources = {
+        path: Path(path).read_text(
+            encoding="utf-8"
+        )
+        for path in (
+            "streamlit_app.py",
+            "pages/0_Login.py",
+            "app.py",
+        )
+    }
+
+    assert "get_authenticated_user_if_ready" in sources[
+        "streamlit_app.py"
+    ]
+
+    assert "get_authenticated_user_if_ready" in sources[
+        "pages/0_Login.py"
+    ]
+
+    assert "get_authenticated_user_if_ready" in sources[
+        "app.py"
+    ]
+
+
 def test_session_token_hash_is_not_raw():
     raw_token = (
         "raw-session-token-example"

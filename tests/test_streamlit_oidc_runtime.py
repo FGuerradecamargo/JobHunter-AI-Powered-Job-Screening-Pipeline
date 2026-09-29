@@ -55,15 +55,45 @@ def test_runtime_has_no_unsafe_direct_oidc_access():
         assert "st.user.is_logged_in" not in source
 
 
-def test_cookie_resolution_precedes_navigation_and_preserves_oidc_route():
+def test_public_cookie_bootstrap_does_not_block_navigation_and_preserves_oidc_route():
     from pathlib import Path
-    source = Path("streamlit_app.py").read_text(encoding="utf-8")
-    authentication = source.index("authenticated_user = get_authenticated_user()")
-    assert authentication < source.index("st.navigation(")
-    assert authentication < source.index("run_page(navigation)")
-    assert "oidc_logged_in()" in source[authentication:]
-    assert "st.switch_page(" in source[authentication:]
-    assert 'if st.session_state.get("current_user") is None:' not in source
+
+    source = Path(
+        "streamlit_app.py"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    public_gate = source.index(
+        'if st.session_state.get("current_user") is None:'
+    )
+
+    nonblocking_auth = source.index(
+        "get_authenticated_user_if_ready()",
+        public_gate,
+    )
+
+    navigation = source.index(
+        "st.navigation(",
+        nonblocking_auth,
+    )
+
+    assert (
+        public_gate
+        < nonblocking_auth
+        < navigation
+    )
+
+    assert "oidc_logged_in()" in source
+    assert "st.switch_page(" in source
+
+    # Private navigation still requires durable session validation.
+    private_validation = source.index(
+        "authenticated_user = get_authenticated_user()",
+        nonblocking_auth,
+    )
+
+    assert private_validation < navigation
 
 
 def test_private_shell_revalidates_cached_identity():
