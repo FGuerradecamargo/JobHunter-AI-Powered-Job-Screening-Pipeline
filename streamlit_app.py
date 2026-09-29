@@ -1,4 +1,6 @@
 import streamlit as st
+from services.profile_readiness_service import profile_readiness
+from services.runtime_timing import run_page
 
 from services.access_policy import AccessPolicy
 from services.admin_access_audit_service import (
@@ -69,6 +71,9 @@ login_page = st.Page(
     icon=":material/login:",
 )
 
+sources_page = st.Page("pages/2_Sources.py", title="Sources", url_path="Sources",
+                       visibility="hidden", icon=":material/hub:")
+
 public_pages = [
     home_page,
     login_page,
@@ -76,38 +81,23 @@ public_pages = [
     email_verification_page,
 ]
 
-# A fresh browser session has no trusted in-memory identity yet.
-#
-# Execute the selected public page first. That page may mount the
-# encrypted-cookie component and resolve an existing durable session.
-# Calling get_authenticated_user() here before navigation.run() would
-# allow cookie readiness to stop the shell before /Login can render.
-if st.session_state.get("current_user") is None:
-    st.session_state["workpilot_public_navigation"] = True
-    navigation = st.navigation(
-        public_pages,
-        position="hidden",
-    )
 
-    if (
-        oidc_logged_in()
-        and navigation.url_path
-        != login_page.url_path
-    ):
-        st.switch_page(
-            login_page
-        )
+def _require_sign_in():
+    st.switch_page(login_page)
 
-    navigation.run()
 
-    # A public page may have restored a valid durable session or completed
-    # login. Re-enter the shell so private navigation is built from that
-    # verified identity.
-    if st.session_state.get("current_user") is not None:
-        st.rerun()
+def _sources_unavailable():
+    st.info("Connections are unavailable in the current product mode.")
+    st.page_link("pages/6_Settings.py", label="Open Settings")
 
-    st.stop()
 
+# Stable protected URLs never run private page code without authentication.
+public_pages.extend(st.Page(_require_sign_in, title=route, url_path=route,
+                            visibility="hidden")
+                    for route in ("Jobs", "Applications", "Sources", "Profile", "Settings", "Improvements"))
+
+# Cookie readiness may pause this rerun. Do not register a public-only
+# navigation graph until recovery has resolved the server-side session.
 # Never authorize the private shell from session_state alone.
 # Revalidate the encrypted cookie and server-side session every run.
 authenticated_user = get_authenticated_user()
@@ -370,11 +360,7 @@ else:
             active_user.candidate_id
         )
 
-    profile_ready = bool(
-        candidate
-        and candidate.professional_summary.strip()
-        and candidate.current_role.strip()
-    )
+    profile_ready = profile_readiness(active_user.candidate_id).ready
 
     product_state = (
         CandidateProductStateRepository().get(candidate.id)
@@ -389,39 +375,16 @@ else:
     )
 
     if not profile_ready:
-        if (
-            product_policy is not None
-            and not product_policy.can_mutate
-        ):
-            navigation = st.navigation(
-                [
-                    st.Page(
-                        "app.py",
-                        title="Dashboard",
-                        icon=":material/dashboard:",
-                        default=True,
-                    ),
-                    st.Page("pages/5_Applications.py", title="Applications", url_path="Applications", icon=":material/assignment:"),
-                    st.Page("pages/4_Improvements.py", title="Improvements", icon=":material/trending_up:"),
-                    st.Page("pages/3_Profile.py", title="Profile", icon=":material/person:"),
-                    st.Page("pages/6_Settings.py", title="Settings", url_path="Settings", icon=":material/settings:"),
-                    password_reset_page,
-                    email_verification_page,
-                ]
-            )
-        else:
-            navigation = st.navigation(
-                [
-                    st.Page(
-                        "pages/3_Profile.py",
-                        title="Create your profile",
-                        icon=":material/person_add:",
-                        default=True,
-                    ),
-                    password_reset_page,
-                    email_verification_page,
-                ]
-            )
+        navigation = st.navigation([
+            st.Page("app.py", title="Dashboard", default=True),
+            st.Page("pages/3_Profile.py", title="Profile", url_path="Profile"),
+            st.Page("pages/1_Opportunities.py", title="Jobs", url_path="Jobs", visibility="hidden"),
+            st.Page("pages/5_Applications.py", title="Applications", url_path="Applications"),
+            st.Page("pages/6_Settings.py", title="Settings", url_path="Settings"),
+            sources_page,
+            st.Page("pages/4_Improvements.py", title="Improvements", visibility="hidden"),
+            password_reset_page, email_verification_page,
+        ])
 
     else:
         if product_state.subscription_end_requested:
@@ -469,16 +432,15 @@ else:
                 )
             )
 
+        else:
+            private_pages.append(st.Page("pages/1_Opportunities.py", title="Jobs",
+                                         url_path="Jobs", visibility="hidden"))
+
         if product_policy.show_sources:
-            private_pages.append(
-                st.Page(
-                    "pages/2_Sources.py",
-                    title="Sources",
-                    visibility="hidden",
-                    url_path="Sources",
-                    icon=":material/hub:",
-                )
-            )
+            private_pages.append(sources_page)
+        else:
+            private_pages.append(st.Page(_sources_unavailable, title="Sources",
+                                         url_path="Sources", visibility="hidden"))
 
         private_pages.append(st.Page("pages/5_Applications.py", title="Applications", url_path="Applications", icon=":material/assignment:"))
 
@@ -509,5 +471,5 @@ else:
         navigation = st.navigation(private_pages)
 
 
-navigation.run()
+run_page(navigation)
 

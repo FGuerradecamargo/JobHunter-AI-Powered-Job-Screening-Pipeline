@@ -11,6 +11,8 @@ from services.system_state_presenter import (
 logger = logging.getLogger(__name__)
 
 import streamlit as st
+from services.profile_readiness_service import profile_readiness
+from services.runtime_timing import timed, timed_page
 
 from components.job_analysis_view import render_job_analysis
 from components.workpilot_ui import apply_theme, page_header
@@ -118,6 +120,15 @@ if not active_user.candidate_id:
 
 
 candidate_id = active_user.candidate_id
+
+readiness = profile_readiness(candidate_id)
+if not readiness.ready:
+    st.session_state.pop("scan_requested", None)
+    st.session_state.pop("opportunity_search_run", None)
+    st.session_state["scan_in_progress"] = False
+    st.info(readiness.message)
+    st.page_link("pages/3_Profile.py", label="Open Profile")
+    st.stop()
 
 candidate = candidate_repository.get(
     candidate_id
@@ -583,7 +594,7 @@ st.html(
     + _context_chip("Direction", direction_values[:3])
     + _context_chip("Work mode", work_modes)
     + '''</div>
-      <div class="wp-priority-label">Active priorities <span>These influence what we show first.</span></div>
+      <div class="wp-priority-label">Priorities <span>things WorkPilot should favor</span></div>
       <div class="wp-priority-row">'''
     + ''.join('<span class="wp-priority-chip">' + escape(item) + '</span>' for item in active_priorities[:5])
     + '''</div>
@@ -591,6 +602,8 @@ st.html(
 )
 
 with st.expander("Adjust search", expanded=False):
+    st.caption("Priorities — things WorkPilot should favor")
+    st.caption("Deal breakers — conditions that rule a job out")
     st.write("WorkPilot uses your current profile rather than a typed job title to drive normal search.")
     if active_priorities:
         st.caption("Active priorities: " + " · ".join(active_priorities))
@@ -629,6 +642,7 @@ if (st.session_state.pop("scan_requested", False)
     st.rerun()
 
 
+@timed("opportunities.search_unit")
 def advance_opportunity_search() -> bool:
     # No Streamlit output inside this unit: finish persistence before yielding.
     aggregate = search_run.aggregate
@@ -715,23 +729,6 @@ def advance_opportunity_search() -> bool:
 
 
 if search_run is not None:
-    if search_run.status == "running":
-        st.html(
-            '''<section class="wp-searching-card">
-              <div class="wp-coffee-mark">☕</div>
-              <div>
-                <h3>We’re searching. Go grab a coffee ☕</h3>
-                <p>We’re interpreting new opportunities against your profile and current direction.</p>
-                <div class="wp-searching-line"></div>
-              </div>
-            </section>'''
-        )
-        st.button(
-            "Stop search",
-            key="stop_opportunity_search",
-            on_click=stop_opportunity_scan,
-            args=(search_scope, search_run.scan_id),
-        )
 
     aggregate = search_run.aggregate
     aggregate["target_reached"] = aggregate["opportunities_found"] >= search_run.target
@@ -743,8 +740,6 @@ if search_run is not None:
     st.session_state["scan_in_progress"] = search_run.status == "running"
     if search_run.status == "stopped":
         st.info(stopped_search_message(opportunities_kept=aggregate['opportunities_found']))
-    elif search_run.status == "failed" and not aggregate.get("provider_quota_exhausted"):
-        st.warning(search_notice(SearchRunState.ERROR).message)
 
 
 scan_result = st.session_state.get(
@@ -771,13 +766,17 @@ if scan_result and not st.session_state.get("scan_in_progress", False):
             </section>'''
         )
 
+    search_failed = failed or (search_run is not None and search_run.status == "failed")
     if provider_unavailable:
         st.warning(analysis_unavailable_notice().message)
-    elif failed:
+    elif search_failed:
         st.warning(
             "Search couldn’t finish this time. Any opportunities already found are safe. "
             "You can try again when you’re ready."
         )
+    if provider_unavailable or search_failed:
+        st.button("Try again", key="retry_opportunity_search", on_click=request_opportunity_scan,
+                  disabled=analysis_service is None)
 
 
 review_jobs = list_candidate_jobs(
@@ -1336,8 +1335,37 @@ elif (scan_result and not st.session_state.get("scan_in_progress", False)
     )
 
 
-# Render partial opportunities and the Stop control before starting one unit.
-# No blocking search loop: Streamlit processes queued callbacks on the rerun.
-if search_run is not None and search_run.status == "running":
-    search_run.advance(search_scope, advance_opportunity_search)
-    st.rerun()
+@st.fragment(run_every=0.5 if search_run is not None and search_run.status == "running" else None)
+@timed_page("Jobs")
+def render_search_progress():
+    run = st.session_state.get("opportunity_search_run")
+    if run is None or run.scope != search_scope:
+        return
+    if run.status != "running":
+        if st.session_state.get("scan_in_progress"):
+            st.rerun()
+        return
+    # Fragment reruns must revalidate authorization, not reuse an old identity.
+    actor = require_authenticated_user()
+    context = get_active_user_context(authenticated_user=actor)
+    current = profile_readiness(candidate_id)
+    if (actor.id != run.authenticated_user_id or context.active_user.id != run.active_user_id
+            or context.active_user.candidate_id != candidate_id or not current.ready
+            or current.snapshot.memory_signature != readiness.snapshot.memory_signature
+            or not product_mode_policy(CandidateProductStateRepository().get(candidate_id)).can_search):
+        run.stop(search_scope, run.scan_id)
+        st.rerun()
+    with st.container(key="persistent_search_progress"):
+        st.subheader("Searching for opportunities...")
+        st.caption("WorkPilot is still searching.")
+        st.write(f"Reviewed: {run.aggregate.get('selected', 0)}")
+        st.write(f"Passed initial screening: {run.aggregate.get('ai_eligible', 0)}")
+        st.write(f"Preparing deeper analysis: {len(run.prepared_job_ids)}/{BATCH_MAX_SIZE}")
+        st.button("Stop search", key="stop_opportunity_search",
+                  on_click=stop_opportunity_scan, args=(search_scope, run.scan_id))
+    run.advance(search_scope, advance_opportunity_search)
+    if run.status != "running":
+        st.rerun()
+
+
+render_search_progress()

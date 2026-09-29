@@ -16,7 +16,7 @@ def test_dashboard_reads_active_candidate_without_mutating_domain(monkeypatch, m
     state = Mock()
     state.get.return_value = CandidateProductState(candidate_id="active", mode=mode)
     profiles = Mock()
-    profiles.current_candidate.return_value = None
+    profiles.return_value = SimpleNamespace(snapshot=None, ready=False)
     applications = Mock()
     applications.list_applications.return_value = [
         {"application_group": "ready_to_apply"}, {"application_group": "interview"},
@@ -25,10 +25,12 @@ def test_dashboard_reads_active_candidate_without_mutating_domain(monkeypatch, m
     market = Mock(return_value={"segments": ()})
     links = []
     monkeypatch.setattr(dashboard, "CandidateProductStateRepository", lambda: state)
-    monkeypatch.setattr(dashboard, "ProfileSnapshotRepository", lambda: profiles)
+    monkeypatch.setattr(dashboard, "profile_readiness", profiles)
     monkeypatch.setattr(dashboard, "ApplicationOutcomeRepository", lambda: applications)
     monkeypatch.setattr(dashboard, "list_candidate_jobs", jobs)
     monkeypatch.setattr(dashboard, "load_candidate_market_runtime", market)
+    authorize = Mock()
+    monkeypatch.setattr(dashboard, "authorize_dashboard_candidate", authorize)
     monkeypatch.setattr(st, "page_link", lambda page, **kwargs: links.append(page))
     app = AppTest.from_string('''
 from types import SimpleNamespace
@@ -38,22 +40,27 @@ render_dashboard(SimpleNamespace(candidate_id="active"))
     assert not app.exception
     assert not app.metric
     state.get.assert_called_once_with("active")
-    profiles.current_candidate.assert_called_once_with("active")
+    profiles.assert_called_once_with("active")
     applications.list_applications.assert_called_once_with("active")
     jobs.assert_called_once_with("active", "in_review")
-    market.assert_called_once_with("active")
+    market.assert_not_called()
     assert len(state.mock_calls) == len(profiles.mock_calls) == len(applications.mock_calls) == 1
     assert "pages/1_Opportunities.py" not in links
     if mode == WorkPilotMode.READ_ONLY:
         assert any("history is preserved" in item.value for item in app.info)
         assert "pages/5_Applications.py" in links
+    next(button for button in app.button if button.label == "Load market and next improvement").click().run()
+    assert not app.exception
+    market.assert_called_once_with("active")
+    authorize.assert_called_once_with("active")
 
 
 
 def test_jobs_frontend_hides_internal_pool_and_uses_final_categories():
     source = Path("pages/1_Opportunities.py").read_text(encoding="utf-8")
     assert "Searching based on your profile" in source
-    assert "We’re searching. Go grab a coffee" in source
+    assert 'st.subheader("Searching for opportunities...")' in source
+    assert "@st.fragment" in source
     assert "Worth a Try" in source
     assert "You’re Strong, But" in source
     assert "How many opportunities would you like me to find?" not in source
@@ -132,7 +139,8 @@ def test_applications_workspace_uses_list_filters_and_same_page_details():
 
     assert "st.tabs" not in rendered
     assert "st.radio" in rendered
-    assert "st.expander" in rendered
+    assert "st.button" in rendered
+    assert "Loading application details..." in rendered
     assert "_render_application_details" in rendered
 
     assert "Ready to apply" not in rendered

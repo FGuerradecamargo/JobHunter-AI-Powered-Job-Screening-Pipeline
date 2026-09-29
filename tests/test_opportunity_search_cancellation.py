@@ -89,11 +89,12 @@ def test_in_flight_unit_finishes_without_overwriting_stop():
 
 @pytest.fixture
 def page_unit():
+    from services.runtime_timing import timed
     tree = ast.parse((ROOT / "pages/1_Opportunities.py").read_text(encoding="utf-8"))
     names = {"empty_scan_result", "merge_scan_result", "merge_activation_result",
              "advance_opportunity_search", "stop_opportunity_scan"}
     nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
-    env = dict(repository=Mock(), analysis_service=Mock(), candidate_id="candidate", BATCH_MAX_SIZE=10,
+    env = dict(timed=timed, repository=Mock(), analysis_service=Mock(), candidate_id="candidate", BATCH_MAX_SIZE=10,
                candidate_signature="signature", ANALYSIS_VERSION="version",
                candidate=SimpleNamespace(target_role_families=[], bridge_role_families=[],
                                          competitive_role_families=[]),
@@ -213,8 +214,11 @@ def test_ui_has_no_blocking_loop_and_renders_results_before_advancing():
     assert len(advances) == len(stops) == 1
     assert stops[0].lineno < advances[0].lineno
     assert max(n.lineno for n in renders) < advances[0].lineno
-    assert isinstance(tree.body[-1], ast.If)
-    assert tree.body[-1].body[-1].value.func.attr == "rerun"
+    assert tree.body[-1].value.func.id == "render_search_progress"
+    fragment = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "render_search_progress")
+    assert fragment.decorator_list[0].func.attr == "fragment"
+    assert any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr == "rerun" for n in ast.walk(fragment))
 
 
 def test_streamlit_queued_stop_survives_automatic_rerun(page_unit):
@@ -287,11 +291,20 @@ def test_streamlit_stop_button_preserves_partial_and_new_search_works():
     # Actual production controls with fake dependencies; omit the footer's
     # automatic advance so the test can click between deterministic units.
     controls = source[source.index("search_scope = ("):source.index("\nscan_result = st.session_state.get(")]
+    progress = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                    and n.name == "render_search_progress")
     script = '''
 import streamlit as st
 from html import escape
 from types import SimpleNamespace
 from unittest.mock import Mock
+from services.runtime_timing import timed
+readiness = SimpleNamespace(ready=True, snapshot=SimpleNamespace(memory_signature="current"))
+profile_readiness = lambda _: readiness
+require_authenticated_user = lambda: SimpleNamespace(id="actor")
+get_active_user_context = lambda **kw: SimpleNamespace(active_user=SimpleNamespace(id="owner", candidate_id="candidate"))
+CandidateProductStateRepository = lambda: SimpleNamespace(get=lambda _: None)
+product_mode_policy = lambda _: SimpleNamespace(can_search=True)
 
 # AppTest.from_string has no real multipage registry.
 # Navigation itself is not under test here.
@@ -333,7 +346,7 @@ if "seeded" not in st.session_state:
     run.aggregate["opportunities_found"] = 3
     st.session_state["opportunity_search_run"] = run
     st.session_state["seeded"] = True
-''' + controls
+''' + controls + '\nadvance_opportunity_search = lambda: True\n' + ast.get_source_segment(source, progress) + '\nrender_search_progress()\n'
     app = AppTest.from_string(script).run()
     assert not app.exception
     original_id = app.session_state["opportunity_search_run"].scan_id

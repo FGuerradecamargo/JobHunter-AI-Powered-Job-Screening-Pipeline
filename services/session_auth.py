@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import os
 import secrets
+from services.runtime_timing import timed
 
 import streamlit as st
 from streamlit.runtime.scriptrunner import get_script_run_ctx
@@ -145,6 +146,7 @@ def _expire_local_session() -> None:
     )
 
 
+@timed("auth.session")
 def get_authenticated_user() -> AppUser | None:
     cookies = _get_cookies()
     ensure_session_table()

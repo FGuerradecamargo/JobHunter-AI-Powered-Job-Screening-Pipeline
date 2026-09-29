@@ -999,6 +999,13 @@ textarea {
   text-decoration: underline !important;
 }
 
+[data-testid="stMain"] [data-testid="stPageLink"] a p,
+[data-testid="stMain"] [data-testid="stPageLink"] a span {
+  color: #8a3c16 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 .wp-opportunity-summary > div:nth-child(1) {
   background: #edf5ef;
 }

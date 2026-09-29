@@ -6,10 +6,11 @@ import streamlit as st
 from components.workpilot_ui import apply_theme, empty_state
 from services.application_outcome_repository import ApplicationOutcomeRepository
 from services.candidate_product_state_repository import CandidateProductStateRepository
-from services.profile_snapshot_repository import ProfileSnapshotRepository
 from services.product_mode_policy import product_mode_policy
 from services.database import list_candidate_jobs
 from services.candidate_market_runtime import load_candidate_market_runtime
+from services.profile_readiness_service import profile_readiness
+from services.runtime_timing import timed_block, timed_page
 
 
 def _greeting() -> str:
@@ -93,19 +94,6 @@ def render_dashboard(active_user):
 
     state = CandidateProductStateRepository().get(candidate_id)
     policy = product_mode_policy(state)
-    profile = ProfileSnapshotRepository().current_candidate(candidate_id)
-    applications = ApplicationOutcomeRepository().list_applications(candidate_id)
-    opportunities = list_candidate_jobs(candidate_id, "in_review")
-
-    try:
-        runtime = load_candidate_market_runtime(candidate_id)
-        improvement_items = [
-            item
-            for segment in runtime.get("segments", ())
-            for item in segment["plan"].improvements
-        ]
-    except Exception:
-        improvement_items = []
 
     name = escape(_first_name(active_user))
     st.html(
@@ -121,6 +109,13 @@ def render_dashboard(active_user):
         """
     )
 
+    with timed_block("profile"):
+        readiness = profile_readiness(candidate_id)
+        profile = readiness.snapshot
+    with timed_block("applications"):
+        applications = ApplicationOutcomeRepository().list_applications(candidate_id)
+    with timed_block("opportunities"):
+        opportunities = list_candidate_jobs(candidate_id, "in_review")
     ready = [item for item in applications if item.get("application_group") == "ready_to_apply"]
     applied = [item for item in applications if item.get("application_group") == "applied"]
     interviews = [item for item in applications if item.get("application_group") == "interview"]
@@ -130,39 +125,7 @@ def render_dashboard(active_user):
         if item.get("application_group") in {"applied", "interview", "offer"}
     ]
 
-    st.html(
-        '<div class="wp-section-heading"><div><span class="wp-section-icon">!</span>'
-        '<h2>Needs your attention</h2></div><span>Up to 3 items</span></div>'
-    )
-
-    attention = []
-    if offers:
-        attention.append(("Offer waiting for your decision", "Review the offer and choose your next step.", "applications"))
-    if interviews:
-        attention.append(("Interview to prepare for", "Your application is in interview stage.", "applications"))
-    if ready:
-        attention.append(("Application ready to review", "Your tailored application is ready for the next step.", "applications"))
-    if improvement_items:
-        item = improvement_items[0]
-        attention.append((f"{item.label} is worth focusing on", str(item.why), "improvements"))
-    if applied and len(attention) < 3:
-        attention.append(("Application waiting for an update", "Keep the status current when you hear back.", "applications"))
-
-    attention = attention[:3]
-    if attention:
-        columns = st.columns(3, gap="medium")
-        for index, (title, copy, destination) in enumerate(attention):
-            with columns[index]:
-                _attention_card(title, copy)
-                if destination == "improvements":
-                    st.page_link("pages/4_Improvements.py", label="View improvement →")
-                else:
-                    st.page_link("pages/5_Applications.py", label="Open applications →")
-    else:
-        st.html(
-            '<div class="wp-caught-up"><strong>You’re all caught up ✓</strong>'
-            '<span>Nothing needs an immediate decision.</span></div>'
-        )
+    render_attention(ready, applied, interviews, offers)
 
     st.html('<div class="wp-dashboard-grid-marker"></div>')
     left, right = st.columns([1.15, 0.85], gap="large")
@@ -219,6 +182,47 @@ def render_dashboard(active_user):
             st.caption("No active application needs attention right now.")
         st.page_link("pages/5_Applications.py", label="View applications →")
 
+    render_market_sections(candidate_id)
+
+    if profile:
+        position = escape(str(profile.checkpoint.current_position or "Professional profile"))
+        st.html(
+            '<section class="wp-profile-strip"><div>'
+            '<span class="wp-mini-label">YOUR PROFILE</span>'
+            f'<h3>{position}</h3>'
+            '<p>Up to date with your latest confirmed evidence.</p>'
+            '</div></section>'
+        )
+        st.page_link("pages/3_Profile.py", label="Review profile →")
+    else:
+        st.html(
+            '<section class="wp-profile-strip"><div>'
+            '<span class="wp-mini-label">YOUR PROFILE</span>'
+            '<h3>Needs attention</h3>'
+            '<p>Complete your professional profile before relying on opportunity matching.</p>'
+            '</div></section>'
+        )
+        st.page_link("pages/3_Profile.py", label="Continue profile →")
+
+    if not policy.can_mutate:
+        st.info("Read-only access. Your career and application history is preserved.")
+
+
+@st.fragment
+@timed_page("Dashboard")
+def render_market_sections(candidate_id):
+    if not st.button("Load market and next improvement", key=f"dashboard_market_{candidate_id}"):
+        st.caption("Market right now and Your next improvement")
+        return
+    authorize_dashboard_candidate(candidate_id)
+    with st.spinner("Loading current market evidence..."), timed_block("market"):
+        try:
+            runtime = load_candidate_market_runtime(candidate_id)
+            improvement_items = [item for segment in runtime.get("segments", ())
+                                 for item in segment["plan"].improvements]
+        except Exception:
+            st.info("Market context is temporarily unavailable. Your history is preserved.")
+            return
     lower_left, lower_right = st.columns(2, gap="large")
     with lower_left:
         if improvement_items:
@@ -258,25 +262,45 @@ def render_dashboard(active_user):
                 '</section>'
             )
 
-    if profile:
-        position = escape(str(profile.checkpoint.current_position or "Professional profile"))
-        st.html(
-            '<section class="wp-profile-strip"><div>'
-            '<span class="wp-mini-label">YOUR PROFILE</span>'
-            f'<h3>{position}</h3>'
-            '<p>Up to date with your latest confirmed evidence.</p>'
-            '</div></section>'
-        )
-        st.page_link("pages/3_Profile.py", label="Review profile →")
-    else:
-        st.html(
-            '<section class="wp-profile-strip"><div>'
-            '<span class="wp-mini-label">YOUR PROFILE</span>'
-            '<h3>Needs attention</h3>'
-            '<p>Complete your professional profile before relying on opportunity matching.</p>'
-            '</div></section>'
-        )
-        st.page_link("pages/3_Profile.py", label="Continue profile →")
 
-    if not policy.can_mutate:
-        st.info("Read-only access. Your career and application history is preserved.")
+def render_attention(ready, applied, interviews, offers):
+    with st.container(key="dashboard_attention"):
+        st.html(
+            '<div class="wp-section-heading"><div><span class="wp-section-icon">!</span>'
+            '<h2>Needs your attention</h2></div><span>Up to 3 items</span></div>'
+        )
+
+        attention = []
+        if offers:
+            attention.append(("Offer waiting for your decision", "Review the offer and choose your next step.", "applications"))
+        if interviews:
+            attention.append(("Interview to prepare for", "Your application is in interview stage.", "applications"))
+        if ready:
+            attention.append(("Application ready to review", "Your tailored application is ready for the next step.", "applications"))
+        if applied and len(attention) < 3:
+            attention.append(("Application waiting for an update", "Keep the status current when you hear back.", "applications"))
+
+        attention = attention[:3]
+        if attention:
+            columns = st.columns(3, gap="medium")
+            for index, (title, copy, destination) in enumerate(attention):
+                with columns[index]:
+                    _attention_card(title, copy)
+                    if destination == "improvements":
+                        st.page_link("pages/4_Improvements.py", label="View improvement →")
+                    else:
+                        st.page_link("pages/5_Applications.py", label="Open applications →")
+        else:
+            st.html(
+                '<div class="wp-caught-up"><strong>You’re all caught up ✓</strong>'
+                '<span>Nothing needs an immediate decision.</span></div>'
+            )
+
+
+def authorize_dashboard_candidate(candidate_id):
+    from services.session_auth import require_authenticated_user
+    from services.user_context_runtime import get_active_user_context
+    actor = require_authenticated_user()
+    context = get_active_user_context(authenticated_user=actor)
+    if context.active_user.candidate_id != candidate_id:
+        st.stop()
