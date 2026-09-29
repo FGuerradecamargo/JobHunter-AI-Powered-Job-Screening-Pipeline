@@ -26,7 +26,6 @@ def search(monkeypatch, discovery_pool, page_unit):
     service.career_update_repository = SimpleNamespace(list_for_candidate=lambda cid: [])
     service.career_memory_repository = SimpleNamespace(get_snapshot=lambda cid: None)
     service.enricher = SimpleNamespace(enrich=lambda job: setattr(job, "description", "Fixture"))
-    monkeypatch.setattr(analysis_module.time, "sleep", lambda _: None)
     profile_ai = Mock()
     profile_ai.build_job_profile.side_effect = lambda **kw: JobProfileDraft(needs=())
     service.job_profile_manager = JobProfileManager(profile_ai, source_repository=SimpleNamespace(

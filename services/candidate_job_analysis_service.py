@@ -2,7 +2,6 @@ import logging
 import hashlib
 from services.provider_failure import failure_code, ProviderRateLimit
 import json
-import time
 from dataclasses import asdict
 from typing import Any
 from uuid import uuid4
@@ -68,7 +67,6 @@ from services.profile_hiring_case_adapter import build_profile_hiring_case_input
 from services.hiring_case_engine import build_hiring_case
 
 ANALYSIS_VERSION = "candidate-job-analysis-v16-hiring-case"
-REQUEST_DELAY_SECONDS = 2
 ANALYSIS_CLAIM_TTL_SECONDS = 1800
 
 
@@ -1426,10 +1424,6 @@ class CandidateJobAnalysisService:
                         result[
                             "descriptions_failed"
                         ] += 1
-
-                    time.sleep(
-                        REQUEST_DELAY_SECONDS
-                    )
 
                 job_signature = (
                     build_job_signature(
