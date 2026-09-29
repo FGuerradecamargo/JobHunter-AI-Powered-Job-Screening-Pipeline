@@ -125,3 +125,115 @@ def test_retry_button_can_trigger_lazy_service_initialization():
         "disabled=analysis_service is None"
         not in retry
     )
+
+
+
+def test_prepare_application_service_is_not_built_during_passive_page_render():
+    text = source()
+
+    render_job = text.index(
+        "def render_job("
+    )
+
+    before_render_job = text[
+        :render_job
+    ]
+
+    assert (
+        "build_production_prepare_application_service()"
+        not in before_render_job
+    )
+
+
+def test_prepare_application_service_is_built_only_after_explicit_action():
+    text = source()
+
+    render_start = text.index(
+        "def render_job("
+    )
+
+    prepare_button = text.index(
+        'prepare_requested = st.button(',
+        render_start,
+    )
+
+    factory_call = text.index(
+        "build_production_prepare_application_service()",
+        prepare_button,
+    )
+
+    assert (
+        prepare_button
+        < factory_call
+    )
+
+    guarded_region = text[
+        prepare_button:
+        factory_call
+    ]
+
+    assert (
+        "prepare_requested"
+        in guarded_region
+    )
+
+    assert (
+        "preparation_service is None"
+        in guarded_region
+    )
+
+
+def test_prepare_button_does_not_require_eager_service():
+    text = source()
+
+    render_start = text.index(
+        "def render_job("
+    )
+
+    prepare_button = text.index(
+        'prepare_requested = st.button(',
+        render_start,
+    )
+
+    handle_call = text.index(
+        "handle_prepare_application_action(",
+        prepare_button,
+    )
+
+    button_block = text[
+        prepare_button:
+        handle_call
+    ]
+
+    assert (
+        "disabled=preparation_service is None"
+        not in button_block
+    )
+
+
+def test_injected_prepare_service_is_still_supported():
+    text = source()
+
+    render_start = text.index(
+        "def render_job("
+    )
+
+    handle_call = text.index(
+        "handle_prepare_application_action(",
+        render_start,
+    )
+
+    render_block = text[
+        render_start:
+        handle_call
+    ]
+
+    assert (
+        'st.session_state.get('
+        in render_block
+    )
+
+    assert (
+        '"_prepare_application_service"'
+        in render_block
+    )

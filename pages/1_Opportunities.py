@@ -93,18 +93,6 @@ application_lifecycle_service = ApplicationLifecycleService()
 analysis_service = None
 analysis_configuration_error = ""
 
-try:
-    production_preparation_service = (
-        build_production_prepare_application_service()
-    )
-    preparation_configuration_error = ""
-except Exception:
-    production_preparation_service = None
-    preparation_configuration_error = (
-        "Tailored CV generation is currently unavailable."
-    )
-
-
 
 if not active_user.candidate_id:
     st.error(
@@ -1134,21 +1122,42 @@ def render_job(
         eligible_for_preparation = is_prepare_application_eligible(analysis)
         if eligible_for_preparation:
             preparation_service = st.session_state.get(
-                "_prepare_application_service",
-                production_preparation_service,
+                "_prepare_application_service"
             )
+
+            preparation_configuration_error = ""
+
             st.caption(
                 "Generates a tailored CV for this opportunity using AI."
             )
-            if preparation_configuration_error:
-                st.caption(preparation_configuration_error)
+
             prepare_requested = st.button(
                 "Prepare Application",
                 key=f"prepare_application_{candidate_id}_{job_id}",
                 type="primary",
                 use_container_width=True,
-                disabled=preparation_service is None,
             )
+
+            if (
+                prepare_requested
+                and preparation_service is None
+            ):
+                try:
+                    preparation_service = (
+                        build_production_prepare_application_service()
+                    )
+
+                except Exception:
+                    preparation_service = None
+                    preparation_configuration_error = (
+                        "Tailored CV generation is currently unavailable."
+                    )
+
+            if preparation_configuration_error:
+                st.caption(
+                    preparation_configuration_error
+                )
+
             prepared_result = handle_prepare_application_action(
                 st.session_state,
                 candidate_id=candidate_id,
