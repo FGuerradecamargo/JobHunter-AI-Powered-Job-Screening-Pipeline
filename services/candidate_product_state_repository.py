@@ -18,15 +18,42 @@ class CandidateProductStateRepository:
             return self._get(connection, candidate_id)
 
     @staticmethod
-    def _get(connection, candidate_id):
-        if not candidate_id or not connection.execute(
-            "SELECT id FROM candidates WHERE id = ?", (candidate_id,)
-        ).fetchone():
-            raise ValueError("Candidate was not found.")
+    def _get(
+        connection,
+        candidate_id,
+    ):
+        if not candidate_id:
+            raise ValueError(
+                "Candidate was not found."
+            )
+
         row = connection.execute(
-            "SELECT state_json FROM candidate_product_state WHERE candidate_id = ?", (candidate_id,)
+            """
+            SELECT
+                c.id AS candidate_id,
+                s.state_json AS state_json
+            FROM candidates c
+            LEFT JOIN candidate_product_state s
+              ON s.candidate_id = c.id
+            WHERE c.id = ?
+            """,
+            (
+                candidate_id,
+            ),
         ).fetchone()
-        return _decode(row["state_json"]) if row else CandidateProductState(candidate_id)
+
+        if row is None:
+            raise ValueError(
+                "Candidate was not found."
+            )
+
+        return (
+            _decode(row["state_json"])
+            if row["state_json"] is not None
+            else CandidateProductState(
+                candidate_id
+            )
+        )
 
     def transition(self, candidate_id, decide):
         with get_connection() as connection:

@@ -57,7 +57,9 @@ user_context = (
 
 active_user = user_context.active_user
 
-render_logout_button()
+render_logout_button(
+    authenticated_user=authenticated_user
+)
 
 if active_user.candidate_id:
     product_state = CandidateProductStateRepository().get(

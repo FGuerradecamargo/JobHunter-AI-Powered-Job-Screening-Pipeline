@@ -10,7 +10,6 @@ from services.admin_access_session import AdminAccessSession
 from services.admin_reauthentication_service import (
     AdminReauthenticationService,
 )
-from services.candidate_repository import CandidateRepository
 from services.candidate_product_state_repository import (
     CandidateProductStateRepository,
 )
@@ -366,18 +365,17 @@ else:
         )
 
 
-    candidate = None
+    candidate_id = active_user.candidate_id
 
-    if active_user.candidate_id:
-        candidate = CandidateRepository().get(
-            active_user.candidate_id
-        )
-
-    profile_ready = profile_readiness(active_user.candidate_id).ready
+    profile_ready = profile_readiness(
+        candidate_id
+    ).ready
 
     product_state = (
-        CandidateProductStateRepository().get(candidate.id)
-        if candidate is not None
+        CandidateProductStateRepository().get(
+            candidate_id
+        )
+        if candidate_id
         else None
     )
 
@@ -419,7 +417,7 @@ else:
                 HiredTransitionService(
                     repository=CandidateProductStateRepository(),
                 ).return_to_search(
-                    candidate_id=candidate.id,
+                    candidate_id=candidate_id,
                 )
                 st.rerun()
 

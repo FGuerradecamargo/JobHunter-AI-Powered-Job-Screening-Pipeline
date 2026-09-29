@@ -3,7 +3,6 @@ from components.public_landing import render_public_landing
 
 from components.job_analysis_view import render_job_analysis
 
-from services.candidate_repository import CandidateRepository
 from services.session_auth import (
     get_authenticated_user,
     get_authenticated_user_if_ready,
@@ -907,9 +906,9 @@ def applications_main() -> None:
 
     active_user = user_context.active_user
 
-    render_logout_button()
-
-    candidate_repository = CandidateRepository()
+    render_logout_button(
+        authenticated_user=authenticated_user
+    )
 
     from components.workpilot_ui import (
         apply_theme,
@@ -930,21 +929,22 @@ def applications_main() -> None:
         )
         return
 
-    selected_candidate_id = active_user.candidate_id
-
-    candidate = candidate_repository.get(
-        selected_candidate_id
+    selected_candidate_id = (
+        active_user.candidate_id
     )
 
-    if candidate is None:
+    try:
+        product_state = (
+            CandidateProductStateRepository()
+            .get(
+                selected_candidate_id
+            )
+        )
+    except ValueError:
         st.warning(
             "The professional profile could not be found."
         )
         return
-
-    product_state = CandidateProductStateRepository().get(
-        selected_candidate_id
-    )
 
     product_policy = product_mode_policy(product_state)
     read_only = not product_policy.can_mutate
