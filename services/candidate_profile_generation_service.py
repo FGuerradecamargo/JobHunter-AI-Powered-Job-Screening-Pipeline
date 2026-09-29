@@ -63,7 +63,7 @@ class CandidateProfileGenerationService:
                          ensure_ascii=True)
         )
         structured_generate = getattr(
-            self.llm_client,
+            type(self.llm_client),
             "generate_structured",
             None,
         )
@@ -72,9 +72,12 @@ class CandidateProfileGenerationService:
             structured_generate
         ):
             try:
-                raw_payload = structured_generate(
-                    prompt,
-                    CandidateProfileOutput,
+                raw_payload = (
+                    self.llm_client
+                    .generate_structured(
+                        prompt,
+                        CandidateProfileOutput,
+                    )
                 )
 
             except ProfileGenerationFailure:
