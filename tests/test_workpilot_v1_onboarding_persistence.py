@@ -119,3 +119,62 @@ def test_postgres_migration_is_additive(monkeypatch):
     assert any("ADD COLUMN IF NOT EXISTS onboarding_status TEXT NOT NULL DEFAULT 'confirmed'" in sql for sql in statements)
     assert any('ADD COLUMN IF NOT EXISTS onboarding_interview_version TEXT' in sql for sql in statements)
     assert not any(sql.lstrip().upper().startswith(('DROP ', 'DELETE ', 'TRUNCATE ')) for sql in statements)
+
+
+def test_listing_multiple_experiences_uses_single_repository_connection(
+    repo,
+    monkeypatch,
+):
+    from contextlib import contextmanager
+    import services.candidate_onboarding_repository as module
+
+    for experience_id in (
+        "experience-one",
+        "experience-two",
+    ):
+        repo.confirm_company_interview(
+            candidate_id="a",
+            company=experience_id,
+            start_date="2020-01",
+            end_date=None,
+            answers=[
+                response(index)
+                for index in range(1, 5)
+            ],
+            experience_id=experience_id,
+        )
+
+    original_get_connection = (
+        module.get_connection
+    )
+
+    connection_count = 0
+
+    @contextmanager
+    def counted_connection():
+        nonlocal connection_count
+        connection_count += 1
+
+        with original_get_connection() as connection:
+            yield connection
+
+    monkeypatch.setattr(
+        module,
+        "get_connection",
+        counted_connection,
+    )
+
+    experiences = repo.list_work_experiences(
+        "a"
+    )
+
+    assert len(experiences) == 2
+
+    assert all(
+        len(
+            item.confirmed_interview_answers
+        ) == 4
+        for item in experiences
+    )
+
+    assert connection_count == 1

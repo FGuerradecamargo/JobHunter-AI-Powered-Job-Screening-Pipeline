@@ -116,6 +116,43 @@ class ProfileSnapshotRepository:
             ).fetchone()
         return _candidate_from_json(row["profile_json"]) if row else None
 
+    def candidate_for_readiness(
+        self,
+        candidate_id: str,
+        memory_signature: str,
+        schema_version: str,
+    ) -> CandidateProfileSnapshot | None:
+        with get_connection() as connection:
+            row = connection.execute(
+                '''
+                SELECT profile_json
+                FROM candidate_profile_snapshots
+                WHERE candidate_id = ?
+                ORDER BY
+                    CASE
+                        WHEN memory_signature = ?
+                         AND schema_version = ?
+                        THEN 0
+                        ELSE 1
+                    END,
+                    profile_version DESC
+                LIMIT 1
+                ''',
+                (
+                    candidate_id,
+                    memory_signature,
+                    schema_version,
+                ),
+            ).fetchone()
+
+        return (
+            _candidate_from_json(
+                row["profile_json"]
+            )
+            if row
+            else None
+        )
+
     def candidate_for_signature(
         self, candidate_id: str, memory_signature: str, schema_version: str,
     ) -> CandidateProfileSnapshot | None:

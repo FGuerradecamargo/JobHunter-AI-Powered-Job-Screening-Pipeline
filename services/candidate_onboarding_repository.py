@@ -149,17 +149,68 @@ class CandidateOnboardingRepository:
                     (candidate_id, experience_id, a.interview_version, a.question_id, a.question_version,
                      a.question_text, a.answer_mode, a.confirmed_text, int(a.skipped), now, a.source_kind))
 
-    def list_company_answers(self, candidate_id, experience_id, *, include_history=False):
-        with get_connection() as connection:
-            rows = connection.execute('''SELECT a.* FROM company_interview_answers a
-                JOIN candidate_work_experiences e ON e.id = a.work_experience_id AND e.candidate_id = a.candidate_id
-                WHERE a.candidate_id = ? AND a.work_experience_id = ? ORDER BY a.question_id''',
-                (candidate_id, experience_id)).fetchall()
-        edits = [r for r in rows if r['source_kind'] == 'USER_CONFIRMED_EDIT']
+    @staticmethod
+    def _answers_from_rows(
+        rows,
+        *,
+        include_history=False,
+    ):
+        rows = list(rows)
+
+        edits = [
+            row
+            for row in rows
+            if row["source_kind"]
+            == "USER_CONFIRMED_EDIT"
+        ]
+
         if edits and not include_history:
             rows = [edits[-1]]
-        return [ConfirmedCompanyAnswer(r['question_id'], r['question_text'], r['answer_mode'],
-            r['confirmed_text'], bool(r['skipped']), r['interview_version'], r['question_version'], r['source_kind']) for r in rows]
+
+        return [
+            ConfirmedCompanyAnswer(
+                row["question_id"],
+                row["question_text"],
+                row["answer_mode"],
+                row["confirmed_text"],
+                bool(row["skipped"]),
+                row["interview_version"],
+                row["question_version"],
+                row["source_kind"],
+            )
+            for row in rows
+        ]
+
+    def list_company_answers(
+        self,
+        candidate_id,
+        experience_id,
+        *,
+        include_history=False,
+    ):
+        with get_connection() as connection:
+            rows = connection.execute(
+                '''
+                SELECT a.*
+                FROM company_interview_answers a
+                JOIN candidate_work_experiences e
+                  ON e.id = a.work_experience_id
+                 AND e.candidate_id = a.candidate_id
+                WHERE
+                    a.candidate_id = ?
+                    AND a.work_experience_id = ?
+                ORDER BY a.question_id
+                ''',
+                (
+                    candidate_id,
+                    experience_id,
+                ),
+            ).fetchall()
+
+        return self._answers_from_rows(
+            rows,
+            include_history=include_history,
+        )
 
     def save_onboarding(
         self,
@@ -318,15 +369,40 @@ class CandidateOnboardingRepository:
     ) -> list[WorkExperience]:
         with get_connection() as connection:
             rows = connection.execute(
-                """
+                '''
                 SELECT *
                 FROM candidate_work_experiences
                 WHERE candidate_id = ?
                   AND onboarding_status = 'confirmed'
                 ORDER BY start_date DESC
-                """,
+                ''',
                 (candidate_id,),
             ).fetchall()
+
+            answer_rows = connection.execute(
+                '''
+                SELECT a.*
+                FROM company_interview_answers a
+                JOIN candidate_work_experiences e
+                  ON e.id = a.work_experience_id
+                 AND e.candidate_id = a.candidate_id
+                WHERE
+                    a.candidate_id = ?
+                    AND e.onboarding_status = 'confirmed'
+                ORDER BY
+                    a.work_experience_id,
+                    a.question_id
+                ''',
+                (candidate_id,),
+            ).fetchall()
+
+        answers_by_experience = {}
+
+        for answer_row in answer_rows:
+            answers_by_experience.setdefault(
+                answer_row["work_experience_id"],
+                [],
+            ).append(answer_row)
 
         return [
             WorkExperience(
@@ -339,7 +415,14 @@ class CandidateOnboardingRepository:
                 day_to_day_narrative=row[
                     "day_to_day_narrative"
                 ],
-                confirmed_interview_answers=self.list_company_answers(candidate_id, row['id']),
+                confirmed_interview_answers=(
+                    self._answers_from_rows(
+                        answers_by_experience.get(
+                            row["id"],
+                            (),
+                        )
+                    )
+                ),
             )
             for row in rows
         ]

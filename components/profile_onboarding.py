@@ -941,13 +941,6 @@ def render_profile_onboarding(
                         type="primary",
                         use_container_width=True,
                     ):
-                        experiences = (
-                            onboarding_repository
-                            .list_work_experiences(
-                                candidate_id
-                            )
-                        )
-
                         if not experiences:
                             st.warning(
                                 "Add at least one work "
@@ -1099,17 +1092,7 @@ def render_profile_onboarding(
             # ---------------------------------------------------------
 
             elif step == 4:
-                onboarding = (
-                    onboarding_repository.get_onboarding(
-                        candidate_id
-                    )
-                )
-
-                experiences = (
-                    onboarding_repository.list_work_experiences(
-                        candidate_id
-                    )
-                )
+                onboarding = existing_onboarding
 
                 st.subheader("BUILD YOUR PROFILE")
 

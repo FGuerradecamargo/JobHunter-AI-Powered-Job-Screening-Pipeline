@@ -108,10 +108,6 @@ if not product_mode_policy(product_state).can_mutate:
     )
     st.stop()
 
-generated_candidate = candidate_repository.get(
-    candidate_id
-)
-
 readiness = profile_readiness(candidate_id)
 profile_ready = readiness.ready
 
@@ -147,6 +143,10 @@ if not profile_ready:
     )
     st.stop()
 
+
+generated_candidate = candidate_repository.get(
+    candidate_id
+)
 
 existing_onboarding = onboarding_repository.get_onboarding(candidate_id)
 
