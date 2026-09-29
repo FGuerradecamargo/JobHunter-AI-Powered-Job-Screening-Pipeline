@@ -90,14 +90,8 @@ repository = JobSearchRepository()
 candidate_repository = CandidateRepository()
 application_lifecycle_service = ApplicationLifecycleService()
 
-try:
-    analysis_service = CandidateJobAnalysisService()
-    analysis_configuration_error = ""
-except Exception:
-    analysis_service = None
-    analysis_configuration_error = (
-        "Opportunity analysis is currently unavailable."
-    )
+analysis_service = None
+analysis_configuration_error = ""
 
 try:
     production_preparation_service = (
@@ -186,7 +180,6 @@ candidate_signature = build_candidate_signature(
     career_objective,
     career_updates,
 )
-
 
 
 OPPORTUNITIES_CSS = """
@@ -507,9 +500,41 @@ def merge_activation_result(
 
 
 search_scope = (
-    authenticated_user.id, active_user.id, candidate_id, candidate_signature,
+    authenticated_user.id,
+    active_user.id,
+    candidate_id,
+    candidate_signature,
 )
-search_run = st.session_state.get("opportunity_search_run")
+
+search_run = st.session_state.get(
+    "opportunity_search_run"
+)
+
+_analysis_requested = bool(
+    st.session_state.get(
+        "scan_requested"
+    )
+) or (
+    search_run is not None
+    and search_run.status == "running"
+    and search_run.scope == search_scope
+)
+
+if (
+    _analysis_requested
+    and analysis_service is None
+):
+    try:
+        analysis_service = (
+            CandidateJobAnalysisService()
+        )
+
+    except Exception:
+        analysis_service = None
+        analysis_configuration_error = (
+            "Opportunity analysis is "
+            "currently unavailable."
+        )
 if search_run is not None and search_run.scope != search_scope:
     # A changed actor, candidate or profile must not continue an older search.
     st.session_state.pop("opportunity_search_run", None)
@@ -619,8 +644,10 @@ with st.form("opportunity_search_controls"):
         else "Find opportunities for me",
         type="primary",
         use_container_width=True,
-        disabled=(st.session_state["scan_in_progress"] or analysis_service is None
-                  or not search_execution_ready),
+        disabled=(
+            st.session_state["scan_in_progress"]
+            or not search_execution_ready
+        ),
         on_click=request_opportunity_scan,
     )
 if analysis_configuration_error:
@@ -775,8 +802,11 @@ if scan_result and not st.session_state.get("scan_in_progress", False):
             "You can try again when you’re ready."
         )
     if provider_unavailable or search_failed:
-        st.button("Try again", key="retry_opportunity_search", on_click=request_opportunity_scan,
-                  disabled=analysis_service is None)
+        st.button(
+            "Try again",
+            key="retry_opportunity_search",
+            on_click=request_opportunity_scan,
+        )
 
 
 review_jobs = list_candidate_jobs(
