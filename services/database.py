@@ -650,6 +650,9 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "company_interview_answers",
         "candidate_product_state",
         "candidate_product_state_events",
+        "user_membership_state",
+        "user_membership_state_events",
+        "membership_usage_events",
         "job_observations",
         "job_content_authority",
     }
@@ -2758,6 +2761,8 @@ def initialize_database() -> None:
         create_company_interview_schema(connection)
         create_interview_round_schema(connection)
         create_product_state_schema(connection)
+        create_membership_schema(connection)
+        create_membership_usage_schema(connection)
         create_job_observation_schema(connection)
 
 
@@ -2811,6 +2816,151 @@ def create_product_state_schema(connection) -> None:
                     REVOKE ALL ON TABLE {table} FROM authenticated;
                 END IF;
             END $$""")
+
+
+def create_membership_schema(connection) -> None:
+    """
+    Additive Membership V1 foundation.
+
+    Existing users retain implicit Free membership until an
+    explicit membership transition occurs.
+    """
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS user_membership_state (
+            user_id TEXT PRIMARY KEY
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+            state_json TEXT NOT NULL
+        )"""
+    )
+
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS user_membership_state_events (
+            user_id TEXT NOT NULL
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+            sequence INTEGER NOT NULL
+                CHECK (sequence > 0),
+            before_json TEXT NOT NULL,
+            after_json TEXT NOT NULL,
+            PRIMARY KEY (user_id, sequence)
+        )"""
+    )
+
+    for table in (
+        "user_membership_state",
+        "user_membership_state_events",
+    ):
+        _enable_server_only_row_level_security(
+            connection,
+            table,
+        )
+
+        if is_postgres():
+            connection.execute(
+                f"REVOKE ALL ON TABLE {table} FROM PUBLIC"
+            )
+
+            connection.execute(
+                f"""DO $$ BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM pg_roles
+                        WHERE rolname = 'anon'
+                    ) THEN
+                        REVOKE ALL ON TABLE {table} FROM anon;
+                    END IF;
+
+                    IF EXISTS (
+                        SELECT 1
+                        FROM pg_roles
+                        WHERE rolname = 'authenticated'
+                    ) THEN
+                        REVOKE ALL ON TABLE {table} FROM authenticated;
+                    END IF;
+                END $$"""
+            )
+
+
+def create_membership_usage_schema(connection) -> None:
+    """
+    Additive quota-usage ledger.
+
+    Only metered capabilities create usage events.
+    """
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS membership_usage_events (
+            id TEXT PRIMARY KEY,
+
+            user_id TEXT NOT NULL
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+
+            capability TEXT NOT NULL,
+
+            quantity INTEGER NOT NULL
+                CHECK (quantity > 0),
+
+            idempotency_key TEXT NOT NULL,
+
+            window_start TEXT NOT NULL,
+            window_end TEXT NOT NULL,
+            occurred_at TEXT NOT NULL,
+
+            UNIQUE (
+                user_id,
+                capability,
+                idempotency_key
+            )
+        )"""
+    )
+
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS
+            idx_membership_usage_scope
+        ON membership_usage_events (
+            user_id,
+            capability,
+            occurred_at
+        )
+        """
+    )
+
+    _enable_server_only_row_level_security(
+        connection,
+        "membership_usage_events",
+    )
+
+    if is_postgres():
+        connection.execute(
+            "REVOKE ALL ON TABLE "
+            "membership_usage_events FROM PUBLIC"
+        )
+
+        connection.execute(
+            """DO $$ BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_roles
+                    WHERE rolname = 'anon'
+                ) THEN
+                    REVOKE ALL
+                    ON TABLE membership_usage_events
+                    FROM anon;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_roles
+                    WHERE rolname = 'authenticated'
+                ) THEN
+                    REVOKE ALL
+                    ON TABLE membership_usage_events
+                    FROM authenticated;
+                END IF;
+            END $$"""
+        )
 
 
 def create_company_interview_schema(connection):
