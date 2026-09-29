@@ -9,6 +9,10 @@ from google.auth.exceptions import GoogleAuthError
 from googleapiclient.errors import HttpError
 from oauthlib.oauth2 import OAuth2Error
 
+from services.profile_generation_failure import (
+    ProfileGenerationFailure,
+)
+
 
 class ProviderFailure(RuntimeError):
     def __init__(self, code):
@@ -22,6 +26,12 @@ class ProviderRateLimit(ProviderFailure):
 
 
 def failure_code(error):
+    if isinstance(
+        error,
+        ProfileGenerationFailure,
+    ):
+        return error.code
+
     if isinstance(error, ProviderFailure):
         return error.code
     if isinstance(error, RateLimitError):
@@ -39,8 +49,15 @@ def log_failure(logger, stage, error):
               'company_research', 'gmail_oauth', 'gmail_sync', 'gmail_background',
               'gmail_processing'}
     stage = stage if stage in stages else 'provider_operation'
-    kind = type(error).__name__ if type(error) in (TypeError, ValueError, KeyError,
-        AttributeError, RuntimeError, AssertionError) else 'ExternalOrOperationalError'
+    kind = type(error).__name__ if type(error) in (
+        TypeError,
+        ValueError,
+        KeyError,
+        AttributeError,
+        RuntimeError,
+        AssertionError,
+        ProfileGenerationFailure,
+    ) else 'ExternalOrOperationalError'
     logger.warning('operation_failed stage=%s code=%s kind=%s', stage, failure_code(error), kind)
 
 

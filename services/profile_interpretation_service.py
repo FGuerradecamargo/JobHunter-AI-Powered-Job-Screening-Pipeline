@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import sqlite3
+
+import psycopg
+
 from models.profile_interpretation import (
     AI_JOB_PROFILE_SCHEMA_VERSION,
     CANDIDATE_PROFILE_SCHEMA_VERSION,
@@ -12,6 +16,9 @@ from models.profile_interpretation import (
 from dataclasses import asdict
 from services.candidate_profile_source import load_confirmed_candidate_profile_input
 from services.database import utc_now
+from services.profile_generation_failure import (
+    ProfileGenerationFailure,
+)
 from services.profile_interpreter import ProfileInterpreter
 from services.profile_snapshot_repository import ProfileSnapshotRepository
 
@@ -24,7 +31,9 @@ class ProfileInterpretationService:
     def candidate_profile_from_onboarding(self, *, candidate_id, onboarding_repository, career_update_repository=None):
         snapshot, sources = load_confirmed_candidate_profile_input(candidate_id, onboarding_repository, career_update_repository)
         if not any(item.source_type in {"professional_experience", "career_update"} for item in sources):
-            raise ValueError("Confirmed candidate source evidence is not available.")
+            raise ProfileGenerationFailure(
+                "no_professional_evidence"
+            )
         return self.candidate_profile(candidate_id=candidate_id,
             memory_signature=snapshot.source_signature, memory_payload=snapshot.payload,
             source_evidence=sources)
@@ -55,12 +64,16 @@ class ProfileInterpretationService:
             state is CoverageState.CONFIRMED_COMPLETE for state in asdict(draft.fact_coverage).values()
         ):
             # Four narrative questions never certify an exhaustive finite fact set.
-            raise ValueError("Narrative onboarding cannot confirm complete finite-fact coverage.")
+            raise ProfileGenerationFailure(
+                "narrative_coverage_guard"
+            )
         available_refs = tuple(item.ref for item in source_evidence)
         capability_refs = {item.ref for item in source_evidence
                            if item.source_type in {"professional_experience", "career_update"}}
         if any(not set(cap.evidence_refs).issubset(capability_refs) for cap in draft.capabilities):
-            raise ValueError("Capability interpretation requires professional evidence from the source snapshot.")
+            raise ProfileGenerationFailure(
+                "capability_evidence_guard"
+            )
         profile = CandidateProfileSnapshot(
             candidate_id=candidate_id,
             profile_version=(previous.profile_version + 1 if previous else 1),
@@ -84,7 +97,25 @@ class ProfileInterpretationService:
             work_authorizations=draft.work_authorizations,
             fact_coverage=draft.fact_coverage,
         )
-        self.repository.save_candidate(profile)
+        try:
+            self.repository.save_candidate(
+                profile
+            )
+
+        except (
+            sqlite3.IntegrityError,
+            psycopg.IntegrityError,
+        ):
+            # Preserve the existing concurrent-writer recovery
+            # contract used by ProfileReadinessService.
+            raise
+
+        except Exception:
+            # Never propagate storage details into UI or logs.
+            raise ProfileGenerationFailure(
+                "snapshot_persistence_failed"
+            ) from None
+
         return profile
 
     def job_profile(self, *, hard_facts: JobHardFacts) -> AIJobProfileSnapshot:

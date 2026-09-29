@@ -144,3 +144,38 @@ def test_cv_failure_result_is_safe_even_for_hostile_parser_exception(caplog, par
     result = TailoredCVGenerationService(FakeGeneratorClient(error=error)).generate(_context())
     assert result.error_code in {'invalid_generator_output', 'generator_client_error'}
     assert_private_free((result, caplog.text))
+
+
+def test_profile_generation_failure_code_is_logged_without_private_payload(
+    caplog,
+):
+    from services.profile_generation_failure import (
+        ProfileGenerationFailure,
+    )
+    from services.provider_failure import (
+        log_failure,
+    )
+
+    error = ProfileGenerationFailure(
+        "invalid_structured_output"
+    )
+
+    with caplog.at_level(
+        logging.WARNING
+    ):
+        log_failure(
+            logging.getLogger(
+                "profile-test"
+            ),
+            "profile_generation",
+            error,
+        )
+
+    assert (
+        "code=invalid_structured_output"
+        in caplog.text
+    )
+
+    assert_private_free(
+        caplog.text
+    )

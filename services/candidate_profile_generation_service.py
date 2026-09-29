@@ -10,9 +10,15 @@ from models.structured_interpretation import (
 from services.candidate_profile_output_schema import (
     CandidateProfileOutput,
 )
+from services.profile_generation_failure import (
+    ProfileGenerationFailure,
+)
 from services.profile_interpretation_service import ProfileInterpretationService
 from services.profile_snapshot_repository import ProfileSnapshotRepository
-from services.structured_interpretation_validation import validate_output
+from services.structured_interpretation_validation import (
+    InterpretationValidationError,
+    validate_output,
+)
 
 
 class CandidateProfileGenerationService:
@@ -62,41 +68,58 @@ class CandidateProfileGenerationService:
             None,
         )
 
-        try:
-            if callable(
-                structured_generate
-            ):
+        if callable(
+            structured_generate
+        ):
+            try:
                 raw_payload = structured_generate(
                     prompt,
                     CandidateProfileOutput,
                 )
 
-            else:
-                # Offline fixtures and legacy LLM clients keep
-                # the original interface. Production OpenAI uses
-                # the structured provider boundary above.
+            except ProfileGenerationFailure:
+                raise
+
+            except ValueError:
+                # Provider returned no usable parsed structure.
+                # The exception payload is deliberately discarded.
+                raise ProfileGenerationFailure(
+                    "invalid_structured_output"
+                ) from None
+
+        else:
+            # Offline fixtures and legacy clients keep the original
+            # text interface. Production OpenAI uses structured output.
+            raw = self.llm_client.generate(
+                prompt
+            )
+
+            try:
                 raw_payload = json.loads(
-                    self.llm_client.generate(
-                        prompt
-                    )
+                    raw
                 )
 
+            except json.JSONDecodeError:
+                raise ProfileGenerationFailure(
+                    "invalid_json"
+                ) from None
+
+        try:
             draft, _ = validate_output(
                 request,
                 raw_payload,
             )
 
-            return draft
-
         except (
-            json.JSONDecodeError,
+            InterpretationValidationError,
             ValueError,
             TypeError,
         ):
-            raise ValueError(
-                "Invalid structured candidate "
-                "interpretation."
+            raise ProfileGenerationFailure(
+                "invalid_structured_output"
             ) from None
+
+        return draft
 
     def generate(self, candidate_id, candidate_name):
         onboarding = self.onboarding_repository.get_onboarding(candidate_id)
