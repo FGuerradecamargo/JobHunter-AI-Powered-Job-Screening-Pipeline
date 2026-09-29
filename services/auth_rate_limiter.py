@@ -10,7 +10,6 @@ from datetime import (
 from uuid import uuid4
 
 from services.database import (
-    create_auth_login_failure_schema,
     get_connection,
     is_postgres,
 )
@@ -97,10 +96,6 @@ class AuthRateLimiter:
                     "BEGIN IMMEDIATE"
                 )
 
-            cls._ensure_table(
-                connection
-            )
-
             yield connection
 
     @classmethod
@@ -134,15 +129,6 @@ class AuthRateLimiter:
         )
 
     @classmethod
-    def _ensure_table(
-        cls,
-        connection,
-    ) -> None:
-        create_auth_login_failure_schema(
-            connection
-        )
-
-    @classmethod
     def is_limited_with_connection(
         cls,
         connection,
@@ -169,10 +155,6 @@ class AuthRateLimiter:
 
         placeholder = (
             cls._placeholder()
-        )
-
-        cls._ensure_table(
-            connection
         )
 
         row = connection.execute(
@@ -277,10 +259,6 @@ class AuthRateLimiter:
             cls._placeholder()
         )
 
-        cls._ensure_table(
-            connection
-        )
-
         connection.execute(
             f"""
             DELETE FROM auth_login_failures
@@ -339,10 +317,6 @@ class AuthRateLimiter:
 
         placeholder = (
             cls._placeholder()
-        )
-
-        cls._ensure_table(
-            connection
         )
 
         connection.execute(

@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from services.database import (
-    create_account_action_request_schema,
     get_connection,
     is_postgres,
 )
@@ -122,10 +121,6 @@ class AccountActionRateLimiter:
                 connection.execute(
                     "BEGIN IMMEDIATE"
                 )
-
-            create_account_action_request_schema(
-                connection
-            )
 
             yield connection
 

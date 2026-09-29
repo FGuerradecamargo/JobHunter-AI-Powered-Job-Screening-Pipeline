@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
@@ -14,6 +14,9 @@ import services.auth_rate_limiter as limiter_module
 from services.auth_rate_limiter import (
     AuthRateLimiter,
 )
+from services.database import (
+    create_auth_login_failure_schema,
+)
 
 
 @pytest.fixture
@@ -26,6 +29,11 @@ def rate_limiter_db(
     connection.row_factory = (
         sqlite3.Row
     )
+
+    create_auth_login_failure_schema(
+        connection
+    )
+    connection.commit()
 
     @contextmanager
     def fake_get_connection():
@@ -454,6 +462,11 @@ def test_serialized_attempt_reuses_one_connection(
     connection.row_factory = (
         sqlite3.Row
     )
+
+    create_auth_login_failure_schema(
+        connection
+    )
+    connection.commit()
 
     connection_count = 0
 

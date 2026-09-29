@@ -6,7 +6,6 @@ from typing import Any
 from uuid import uuid4
 
 from services.database import (
-    create_security_audit_schema,
     get_connection,
     utc_now,
 )
@@ -91,8 +90,8 @@ class SecurityAuditRepository:
 
         event_id = uuid4().hex
 
-        create_security_audit_schema(connection)
-
+        # Schema lifecycle belongs to application bootstrap.
+        # Runtime audit writes must remain data-only operations.
         connection.execute(
             """
             INSERT INTO security_audit_events (

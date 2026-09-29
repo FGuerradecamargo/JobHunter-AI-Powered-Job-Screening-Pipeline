@@ -110,6 +110,11 @@ def test_records_event_in_sqlite(
         database_file,
     )
 
+    with database_module.get_connection() as connection:
+        database_module.create_security_audit_schema(
+            connection
+        )
+
     repository = SecurityAuditRepository()
     event_id = repository.record(
         event_type="admin.viewing_as.started",
