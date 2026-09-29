@@ -99,10 +99,14 @@ def _job_from_json(raw: str) -> AIJobProfileSnapshot:
     return AIJobProfileSnapshot(**data)
 
 
+from services.runtime_timing import timed
+
+
 class ProfileSnapshotRepository:
     def __init__(self) -> None:
         initialize_database()
 
+    @timed("profile")
     def current_candidate(self, candidate_id: str) -> CandidateProfileSnapshot | None:
         with get_connection() as connection:
             row = connection.execute(

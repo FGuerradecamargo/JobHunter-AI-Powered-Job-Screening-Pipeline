@@ -6,6 +6,10 @@ from services.profile_snapshot_repository import ProfileSnapshotRepository
 from services.role_family_normalizer import role_family_key
 
 
+from services.runtime_timing import timed
+
+
+@timed("market")
 def load_candidate_market_runtime(
     candidate_id: str,
     *,

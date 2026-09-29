@@ -21,6 +21,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from services.global_source_schema import ensure_global_source_schema
+from services.runtime_timing import TimedConnection, timed
 
 load_dotenv()
 
@@ -112,9 +113,9 @@ def get_connection():
         )
 
         with pool.connection() as connection:
-            yield PostgresConnectionAdapter(
+            yield TimedConnection(PostgresConnectionAdapter(
                 connection
-            )
+            ))
 
         return
 
@@ -137,7 +138,7 @@ def get_connection():
 
     try:
         with connection:
-            yield connection
+            yield TimedConnection(connection)
     finally:
         connection.close()
 
@@ -3139,6 +3140,7 @@ def update_job_notes(
         )
 
 
+@timed("opportunities")
 def list_candidate_jobs(
     candidate_id: str,
     status: str,

@@ -7,7 +7,11 @@ from models.application_outcome import ApplicationOutcome
 from services.database import get_connection
 
 
+from services.runtime_timing import timed
+
+
 class ApplicationOutcomeRepository:
+    @timed("applications")
     def list_applications(self, candidate_id: str) -> list[dict[str, Any]]:
         """Read lifecycle and explicit outcomes together; age never changes an outcome."""
         from services.application_outcome_service import ApplicationOutcomeService

@@ -55,37 +55,15 @@ def test_runtime_has_no_unsafe_direct_oidc_access():
         assert "st.user.is_logged_in" not in source
 
 
-def test_public_navigation_runs_before_shell_auth_resolution():
+def test_cookie_resolution_precedes_navigation_and_preserves_oidc_route():
     from pathlib import Path
-
-    source = Path(
-        "streamlit_app.py"
-    ).read_text(
-        encoding="utf-8"
-    )
-
-    public_guard = source.index(
-        'if st.session_state.get("current_user") is None:'
-    )
-
-    public_run = source.index(
-        "navigation.run()",
-        public_guard,
-    )
-
-    authentication = source.index(
-        "authenticated_user = get_authenticated_user()",
-        public_guard,
-    )
-
-    assert public_run < authentication
-
-    guarded_source = source[
-        public_guard:authentication
-    ]
-
-    assert "st.stop()" in guarded_source
-    assert "oidc_logged_in()" in guarded_source
+    source = Path("streamlit_app.py").read_text(encoding="utf-8")
+    authentication = source.index("authenticated_user = get_authenticated_user()")
+    assert authentication < source.index("st.navigation(")
+    assert authentication < source.index("run_page(navigation)")
+    assert "oidc_logged_in()" in source[authentication:]
+    assert "st.switch_page(" in source[authentication:]
+    assert 'if st.session_state.get("current_user") is None:' not in source
 
 
 def test_private_shell_revalidates_cached_identity():

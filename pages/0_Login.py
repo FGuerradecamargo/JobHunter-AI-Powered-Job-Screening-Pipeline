@@ -1,4 +1,5 @@
 import streamlit as st
+from services.oidc_diagnostics import oidc_call, oidc_stage
 from components.public_landing import render_auth_intro, render_public_theme
 
 from services.account_recovery_service import (
@@ -46,29 +47,30 @@ def render_authentication(authenticated_user, auth_service) -> None:
             st.stop()
 
         if oidc_logged_in():
-            google_claims = {
-                "sub": st.user.get(
-                    "sub",
-                    "",
-                ),
-                "email": st.user.get(
-                    "email",
-                    "",
-                ),
-                "email_verified": st.user.get(
-                    "email_verified",
-                    False,
-                ),
-                "name": st.user.get(
-                    "name",
-                    "",
-                ),
-            }
-
+            with oidc_stage("callback"):
+                pass
             try:
+                with oidc_stage("claims_received"):
+                    google_claims = {
+                        "sub": st.user.get(
+                            "sub",
+                            "",
+                        ),
+                        "email": st.user.get(
+                            "email",
+                            "",
+                        ),
+                        "email_verified": st.user.get(
+                            "email_verified",
+                            False,
+                        ),
+                        "name": st.user.get(
+                            "name",
+                            "",
+                        ),
+                    }
                 google_resolution = (
-                    GoogleIdentityService()
-                    .resolve(
+                    oidc_call("identity_resolution", lambda claims: GoogleIdentityService().resolve(claims),
                         google_claims
                     )
                 )
@@ -94,7 +96,7 @@ def render_authentication(authenticated_user, auth_service) -> None:
                 google_resolution.status
                 == GoogleIdentityService.LINKED
             ):
-                login_user(
+                oidc_call("login_user", login_user,
                     google_resolution.user
                 )
 
@@ -107,8 +109,7 @@ def render_authentication(authenticated_user, auth_service) -> None:
             ):
                 try:
                     google_user = (
-                        GoogleAccountService()
-                        .register(
+                        oidc_call("account_register", lambda resolution: GoogleAccountService().register(resolution),
                             google_resolution
                         )
                     )
@@ -122,7 +123,7 @@ def render_authentication(authenticated_user, auth_service) -> None:
 
                     st.stop()
 
-                login_user(
+                oidc_call("login_user", login_user,
                     google_user
                 )
 
@@ -187,8 +188,7 @@ def render_authentication(authenticated_user, auth_service) -> None:
                     else:
                         try:
                             linked_user = (
-                                GoogleAccountService()
-                                .link_existing_account(
+                                oidc_call("account_link", lambda **kw: GoogleAccountService().link_existing_account(**kw),
                                     resolution=(
                                         google_resolution
                                     ),
@@ -205,7 +205,7 @@ def render_authentication(authenticated_user, auth_service) -> None:
                             )
 
                         else:
-                            login_user(
+                            oidc_call("login_user", login_user,
                                 linked_user
                             )
 
@@ -228,7 +228,8 @@ def render_authentication(authenticated_user, auth_service) -> None:
                     key="google_oidc_login",
                 )
             ):
-                st.login("google")
+                with oidc_stage("start"):
+                    st.login("google")
 
 
     # ---------------------------------------------------------

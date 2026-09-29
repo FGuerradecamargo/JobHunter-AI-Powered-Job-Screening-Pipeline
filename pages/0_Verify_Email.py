@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import streamlit as st
+from services.profile_readiness_service import profile_readiness
 
 from services.candidate_repository import (
     CandidateRepository,
@@ -103,11 +104,7 @@ if result is True:
                 )
             )
 
-        profile_ready = bool(
-            candidate
-            and candidate.professional_summary.strip()
-            and candidate.current_role.strip()
-        )
+        profile_ready = profile_readiness(authenticated_user.candidate_id).ready
 
         if profile_ready:
             st.switch_page(
@@ -151,11 +148,7 @@ if (
                 )
             )
 
-        profile_ready = bool(
-            candidate
-            and candidate.professional_summary.strip()
-            and candidate.current_role.strip()
-        )
+        profile_ready = profile_readiness(authenticated_user.candidate_id).ready
 
         if profile_ready:
             st.switch_page(

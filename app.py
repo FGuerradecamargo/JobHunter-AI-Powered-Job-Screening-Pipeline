@@ -1079,15 +1079,16 @@ def applications_main() -> None:
     for item in visible:
         _render_application_summary(item)
 
-        with st.expander(
-            "View application details",
-            expanded=False,
-        ):
-            _render_application_details(
-                selected_candidate_id,
-                item,
-                read_only=read_only,
-            )
+        # A server action, not a client-only expander that opens before content
+        # has arrived. Never render an empty interactive details panel.
+        details_key = f"application_details_{selected_candidate_id}_{item['id']}"
+        if st.button("View application details", key=details_key):
+            st.session_state[details_key + "_open"] = True
+        if st.session_state.get(details_key + "_open", False):
+            with st.spinner("Loading application details..."):
+                _render_application_details(
+                    selected_candidate_id, item, read_only=read_only,
+                )
 
 
 

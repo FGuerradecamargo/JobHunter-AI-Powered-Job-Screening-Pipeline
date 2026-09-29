@@ -452,7 +452,7 @@ if (
             )
 
             with st.spinner(
-                "Checking Gmail for job alerts..."
+                "Scanning job-alert emails in Gmail..."
             ):
                 sync_result = (
                     gmail_sync_service
@@ -461,6 +461,7 @@ if (
                     )
                 )
 
+            with st.spinner("Extracting jobs and checking for existing jobs..."):
                 processing_result = (
                     gmail_job_processor
                     .process_pending_messages(
@@ -476,7 +477,7 @@ if (
             sync_columns = st.columns(4)
 
             sync_columns[0].metric(
-                "Emails found",
+                "Emails scanned",
                 sync_result.total_messages_found,
             )
 
@@ -491,9 +492,10 @@ if (
             )
 
             sync_columns[3].metric(
-                "Already known",
+                "Jobs already present",
                 processing_result.jobs_unchanged,
             )
+            st.caption("One email can contain several jobs. Job totals may also include previously queued emails.")
 
         except Exception as error:
             st.error(

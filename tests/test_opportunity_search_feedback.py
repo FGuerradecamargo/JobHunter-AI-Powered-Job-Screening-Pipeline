@@ -17,7 +17,9 @@ def render_feedback(status, *, quota=False, saved=True, found=0):
     feedback = source[source.index("\nif search_run is not None:\n"):
                       source.index("review_jobs = list_candidate_jobs(")]
     result_list = source[source.index("\nif (\n    best_matches\n"):
-                         source.index("# Render partial opportunities")]
+                         source.index("@st.fragment")]
+    progress = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                    and n.name == "render_search_progress")
     script = '''
 import streamlit as st
 from types import SimpleNamespace
@@ -37,6 +39,16 @@ ANALYSIS_VERSION = "version"
 repository = SimpleNamespace(count_jobs_to_analyze_for_candidate=lambda **kw: 1322)
 pool_available = repository.count_jobs_to_analyze_for_candidate()
 stop_opportunity_scan = lambda *args: None
+request_opportunity_scan = lambda: None
+analysis_service = object()
+from services.runtime_timing import timed
+readiness = SimpleNamespace(ready=True, snapshot=SimpleNamespace(memory_signature="current"))
+profile_readiness = lambda _: readiness
+require_authenticated_user = lambda: SimpleNamespace(id="actor")
+get_active_user_context = lambda **kw: SimpleNamespace(active_user=SimpleNamespace(id="owner", candidate_id="candidate"))
+CandidateProductStateRepository = lambda: SimpleNamespace(get=lambda _: None)
+product_mode_policy = lambda _: SimpleNamespace(can_search=True)
+advance_opportunity_search = lambda: True
 ''' + ast.get_source_segment(source, empty) + f'''
 aggregate = empty_scan_result()
 aggregate.update(selected=22, hard_rejected=2, ai_eligible=20,
@@ -56,7 +68,7 @@ _compact_job_card = lambda job: st.write(
 )
 render_opportunity_category_header = lambda *args: None
 render_empty_category = lambda text: st.caption(text)
-''' + feedback + result_list
+''' + feedback + result_list + ast.get_source_segment(source, progress) + '\nrender_search_progress()\n'
     app = AppTest.from_string(script).run()
     assert not app.exception
     return app
@@ -73,7 +85,8 @@ def test_running_search_shows_actual_progress_not_final_summary():
 
     text = visible_text(app)
 
-    assert "Go grab a coffee" in text
+    assert "Reviewed: 22" in text
+    assert "Preparing deeper analysis: 3/10" in text
     assert "Worth reviewing" not in text
 
     assert any(
@@ -122,6 +135,13 @@ def test_completed_search_still_shows_normal_summary():
     )
 
     assert not app.warning
+
+
+def test_exception_without_per_job_errors_has_one_retry_and_keeps_results():
+    app = render_feedback("failed", found=2)
+    assert len(app.warning) == 1
+    assert sum(button.label == "Try again" for button in app.button) == 1
+    assert "Saved opportunity: saved-job" in visible_text(app)
 
 
 @pytest.mark.parametrize("status,quota", [("running", False), ("failed", True)])

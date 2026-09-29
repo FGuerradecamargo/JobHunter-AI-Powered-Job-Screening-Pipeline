@@ -1,5 +1,6 @@
 import logging
 import streamlit as st
+from services.profile_readiness_service import profile_readiness, ProfileReadinessService
 from components.workpilot_ui import apply_theme, page_header, render_profile_snapshot
 
 logger = logging.getLogger(__name__)
@@ -111,11 +112,29 @@ generated_candidate = candidate_repository.get(
     candidate_id
 )
 
-profile_ready = bool(
-    generated_candidate
-    and generated_candidate.professional_summary.strip()
-    and generated_candidate.current_role.strip()
-)
+readiness = profile_readiness(candidate_id)
+profile_ready = readiness.ready
+
+if readiness.status in {"missing", "stale", "unavailable"}:
+    st.info(readiness.message)
+    if st.button("Generate current profile", key="generate_current_snapshot"):
+        try:
+            with st.spinner("Building your profile from confirmed evidence..."):
+                if readiness.status == "missing":
+                    ProfileReadinessService().backfill_missing(candidate_id, profile_generation_service)
+                else:
+                    from services.profile_interpretation_service import ProfileInterpretationService
+                    ProfileInterpretationService(
+                        profile_generation_service.snapshot_repository, profile_generation_service,
+                    ).candidate_profile_from_onboarding(
+                        candidate_id=candidate_id, onboarding_repository=onboarding_repository,
+                        career_update_repository=career_update_repository,
+                    )
+            st.rerun()
+        except Exception as error:
+            log_failure(logger, 'profile_generation', error)
+            st.error("Your profile could not be generated. Your saved experience is unchanged.")
+    st.stop()
 
 if not profile_ready:
     render_profile_onboarding(
@@ -830,6 +849,8 @@ with direction_tab:
 
 
         st.markdown("### Current priorities")
+        st.caption("Priorities — things WorkPilot should favor")
+        st.caption("Deal breakers — conditions that rule a job out")
 
         st.write(
             "Tell WorkPilot what matters particularly to you right now. "
