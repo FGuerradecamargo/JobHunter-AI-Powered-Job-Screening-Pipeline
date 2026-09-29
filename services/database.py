@@ -7,6 +7,7 @@ from services.analysis_signatures import build_job_signature_from_values
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -21,7 +22,11 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from services.global_source_schema import ensure_global_source_schema
-from services.runtime_timing import TimedConnection, timed
+from services.runtime_timing import (
+    TimedConnection,
+    log_timing,
+    timed,
+)
 
 load_dotenv()
 
@@ -84,6 +89,15 @@ def utc_now() -> str:
     ).isoformat()
 
 
+@timed("database.pool.check")
+def _check_postgres_connection(
+    connection,
+) -> None:
+    ConnectionPool.check_connection(
+        connection
+    )
+
+
 @lru_cache(maxsize=1)
 def _get_postgres_pool(
     database_url: str,
@@ -95,7 +109,7 @@ def _get_postgres_pool(
         kwargs={
             "row_factory": dict_row,
         },
-        check=ConnectionPool.check_connection,
+        check=_check_postgres_connection,
         max_idle=60,
         open=True,
     )
@@ -112,10 +126,41 @@ def get_connection():
             database_url
         )
 
-        with pool.connection() as connection:
-            yield TimedConnection(PostgresConnectionAdapter(
-                connection
-            ))
+        checkout_started = perf_counter()
+        checkout_succeeded = False
+
+        try:
+            with pool.connection() as connection:
+                checkout_succeeded = True
+
+                log_timing(
+                    "database.pool.checkout",
+                    (
+                        perf_counter()
+                        - checkout_started
+                    )
+                    * 1000,
+                )
+
+                yield TimedConnection(
+                    PostgresConnectionAdapter(
+                        connection
+                    )
+                )
+
+        except Exception:
+            if not checkout_succeeded:
+                log_timing(
+                    "database.pool.checkout",
+                    (
+                        perf_counter()
+                        - checkout_started
+                    )
+                    * 1000,
+                    "failed",
+                )
+
+            raise
 
         return
 

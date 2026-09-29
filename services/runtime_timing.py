@@ -13,6 +13,20 @@ _page = ContextVar("workpilot_timing_page", default="shell")
 _block = ContextVar("workpilot_timing_block", default="runtime")
 
 
+def log_timing(
+    name: str,
+    elapsed_ms: float,
+    outcome: str = "ok",
+) -> None:
+    logger.info(
+        "runtime_timing page=%s block=%s elapsed_ms=%.2f outcome=%s",
+        _page.get(),
+        name,
+        elapsed_ms,
+        outcome,
+    )
+
+
 @contextmanager
 def timed_block(name):
     token = _block.set(name)
@@ -24,8 +38,11 @@ def timed_block(name):
         outcome = "failed"
         raise
     finally:
-        logger.info("runtime_timing page=%s block=%s elapsed_ms=%.2f outcome=%s",
-                    _page.get(), name, (perf_counter() - start) * 1000, outcome)
+        log_timing(
+            name,
+            (perf_counter() - start) * 1000,
+            outcome,
+        )
         _block.reset(token)
 
 
