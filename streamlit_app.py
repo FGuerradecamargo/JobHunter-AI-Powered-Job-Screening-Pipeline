@@ -71,6 +71,7 @@ login_page = st.Page(
     "pages/0_Login.py",
     title="Log in",
     icon=":material/login:",
+    visibility="hidden",
 )
 
 sources_page = st.Page("pages/2_Sources.py", title="Sources", url_path="Sources",
@@ -85,6 +86,21 @@ public_pages = [
 
 
 def _require_sign_in():
+    # A protected deep link may arrive before the encrypted
+    # browser-cookie component has completed its handshake.
+    #
+    # Wait for durable session recovery before deciding that
+    # the visitor is unauthenticated. This is especially
+    # important for OAuth callbacks such as:
+    #
+    # /Sources?code=...&state=...
+    #
+    # st.stop() inside get_authenticated_user() preserves the
+    # current URL/query parameters while cookie recovery
+    # completes.
+    if get_authenticated_user() is not None:
+        st.rerun()
+
     st.switch_page(login_page)
 
 
@@ -394,7 +410,7 @@ else:
             st.Page("pages/6_Settings.py", title="Settings", url_path="Settings"),
             sources_page,
             st.Page("pages/4_Improvements.py", title="Improvements", visibility="hidden"),
-            password_reset_page, email_verification_page,
+            password_reset_page, email_verification_page, login_page,
         ])
 
     else:
@@ -476,6 +492,7 @@ else:
             [
                 password_reset_page,
                 email_verification_page,
+                login_page,
             ]
         )
 
