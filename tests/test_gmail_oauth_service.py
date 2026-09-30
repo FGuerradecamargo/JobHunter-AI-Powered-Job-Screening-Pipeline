@@ -106,3 +106,42 @@ def test_requires_redirect_uri():
             client_secret="example-secret",
             redirect_uri="",
         )
+
+
+def test_default_redirect_uses_canonical_public_base(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "WORKPILOT_PUBLIC_BASE_URL",
+        "https://workpilot-felipe-test.streamlit.app/",
+    )
+
+    # Deliberately wrong legacy value. It must not control
+    # the generated Gmail authorization request anymore.
+    monkeypatch.setenv(
+        "GOOGLE_OAUTH_REDIRECT_URI",
+        "https://workpilot-felipe-test.streamlit.app/",
+    )
+
+    service = GmailOAuthService(
+        client_id="example-client-id",
+        client_secret="example-client-secret",
+    )
+
+    authorization_request = (
+        service.create_authorization_url()
+    )
+
+    parsed_url = urlparse(
+        authorization_request.authorization_url
+    )
+
+    query_parameters = parse_qs(
+        parsed_url.query
+    )
+
+    assert query_parameters[
+        "redirect_uri"
+    ] == [
+        "https://workpilot-felipe-test.streamlit.app/Sources"
+    ]

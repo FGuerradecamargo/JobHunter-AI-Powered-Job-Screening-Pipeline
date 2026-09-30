@@ -71,6 +71,15 @@ class PublicUrlService:
         return value
 
     @classmethod
+    def gmail_oauth_redirect_url(
+        cls,
+    ) -> str:
+        return (
+            f"{cls._base_url()}"
+            "/Sources"
+        )
+
+    @classmethod
     def password_reset_url(
         cls,
         token: str,

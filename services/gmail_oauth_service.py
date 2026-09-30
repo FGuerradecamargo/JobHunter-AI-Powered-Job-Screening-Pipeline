@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 from services.provider_failure import provider_operation
+from services.public_url_service import PublicUrlService
 from dataclasses import dataclass
 from datetime import timezone
 from typing import Optional
@@ -51,8 +51,13 @@ class GmailOAuthService:
             else client_secret
         )
 
+        # Production callbacks derive from the same canonical
+        # public base URL used by external WorkPilot links.
+        #
+        # This prevents GOOGLE_OAUTH_REDIRECT_URI from drifting
+        # away from the deployed hostname or callback route.
         self._redirect_uri = (
-            os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
+            PublicUrlService.gmail_oauth_redirect_url()
             if redirect_uri is None
             else redirect_uri
         )
