@@ -18,10 +18,10 @@ from services.candidate_product_state_service import (
 )
 from services.product_mode_policy import product_mode_policy
 from services.session_auth import (
+    authentication_continuation_required,
     get_authenticated_user,
     get_authenticated_user_if_ready,
 )
-from services.streamlit_oidc import oidc_logged_in
 from services.user_context_runtime import (
     get_active_user_context,
     set_active_user,
@@ -130,9 +130,9 @@ else:
     # Never authorize the private shell from session_state alone.
     authenticated_user = get_authenticated_user()
 
-google_oidc_pending = bool(
+authentication_pending = bool(
     authenticated_user is None
-    and oidc_logged_in()
+    and authentication_continuation_required()
 )
 
 
@@ -144,7 +144,7 @@ if authenticated_user is None:
     )
 
     if (
-        google_oidc_pending
+        authentication_pending
         and navigation.url_path
         != login_page.url_path
     ):

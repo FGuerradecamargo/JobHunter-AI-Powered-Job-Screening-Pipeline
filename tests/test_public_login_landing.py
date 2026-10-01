@@ -42,6 +42,7 @@ def login_page(monkeypatch):
     recovery = Mock(return_value="Check your inbox if your account supports password sign-in.")
     verification = Mock()
     events = []
+    continuation = Mock(return_value=False)
 
     class FakeAuthService:
         def __new__(cls):
@@ -62,6 +63,7 @@ def login_page(monkeypatch):
 
     module(
         "services.session_auth",
+        authentication_continuation_required=continuation,
         get_authenticated_user=lambda: st.session_state.get("test_user"),
         get_authenticated_user_if_ready=lambda: st.session_state.get("test_user"),
         login_user=login,
@@ -92,7 +94,7 @@ def login_page(monkeypatch):
                            auth=auth, google=google, identity=identity, recovery=recovery,
                            verification=verification, events=events,
                            coordinator=coordinator, coordinator_factory=coordinator_factory,
-                           session_login=session_login)
+                           session_login=session_login, continuation=continuation)
 
 
 def html(app):
@@ -426,10 +428,11 @@ def test_production_shell_routes_public_default_to_app(root_page):
     root_page.context.assert_not_called()
 
 
-def test_production_shell_preserves_pending_google_routing(root_page):
-    root_page.login.oidc.is_logged_in = True
+def test_production_shell_preserves_pending_authentication_routing(root_page):
+    root_page.login.continuation.return_value = True
     app = AppTest.from_file(str(PAGE.parents[1] / "streamlit_app.py")).run()
     assert not app.exception
     assert len(root_page.login.events) == 1
     assert root_page.login.events[0].url_path == "Login"
+    root_page.login.continuation.assert_called_once_with()
     root_page.bootstrap.assert_not_called()

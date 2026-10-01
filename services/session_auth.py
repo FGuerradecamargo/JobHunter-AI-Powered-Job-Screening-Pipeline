@@ -381,6 +381,11 @@ def get_authenticated_user_if_ready() -> AppUser | None:
     )
 
 
+def authentication_continuation_required() -> bool:
+    """Request Login routing for an unfinished flow, never authorization."""
+    return oidc_logged_in()
+
+
 def get_current_user() -> AppUser | None:
     """
     Backward-compatible alias.
