@@ -6,11 +6,9 @@ from services.account_recovery_service import (
     AccountRecoveryService,
 )
 from services.auth_service import AuthService
+from services.authentication_coordinator import AuthenticationCoordinator
 from services.email_verification_delivery_service import (
     EmailVerificationDeliveryService,
-)
-from services.google_account_service import (
-    GoogleAccountService,
 )
 from services.google_identity_service import (
     GoogleIdentityService,
@@ -28,6 +26,7 @@ from services.streamlit_oidc import (
 
 
 def render_authentication(authenticated_user, auth_service) -> None:
+    coordinator = AuthenticationCoordinator(auth_service=auth_service)
     authentication_notice = st.session_state.pop(
         "authentication_notice",
         None,
@@ -70,8 +69,8 @@ def render_authentication(authenticated_user, auth_service) -> None:
                             "",
                         ),
                     }
-                google_resolution = (
-                    oidc_call("identity_resolution", lambda claims: GoogleIdentityService().resolve(claims),
+                google_result = (
+                    oidc_call("identity_resolution", coordinator.authenticate_with_google,
                         google_claims
                     )
                 )
@@ -93,43 +92,20 @@ def render_authentication(authenticated_user, auth_service) -> None:
 
                 st.stop()
 
-            if (
-                google_resolution.status
-                == GoogleIdentityService.LINKED
-            ):
-                oidc_call("login_user", login_user,
-                    google_resolution.user
+            except Exception:
+                st.error(
+                    "We could not verify your Google "
+                    "identity. Please try again."
                 )
+                st.stop()
 
+            if google_result.status in (
+                GoogleIdentityService.LINKED,
+                GoogleIdentityService.REGISTRATION_REQUIRED,
+            ):
                 st.rerun()
 
-            if (
-                google_resolution.status
-                == GoogleIdentityService
-                .REGISTRATION_REQUIRED
-            ):
-                try:
-                    google_user = (
-                        oidc_call("account_register", lambda resolution: GoogleAccountService().register(resolution),
-                            google_resolution
-                        )
-                    )
-
-                except Exception:
-                    st.error(
-                        "We could not create your "
-                        "WorkPilot account. "
-                        "Please try again."
-                    )
-
-                    st.stop()
-
-                oidc_call("login_user", login_user,
-                    google_user
-                )
-
-                st.rerun()
-
+            google_resolution = google_result.resolution
             if (
                 google_resolution.status
                 == GoogleIdentityService
@@ -171,45 +147,20 @@ def render_authentication(authenticated_user, auth_service) -> None:
                     )
 
                 if link_submitted:
-                    authenticated_user = (
-                        auth_service.authenticate(
-                            email=(
-                                google_resolution
-                                .email
-                            ),
-                            password=link_password,
+                    try:
+                        linked_user = oidc_call(
+                            "account_link", coordinator.link_google_with_password,
+                            google_resolution, link_password,
                         )
-                    )
-
-                    if authenticated_user is None:
+                    except ValueError:
                         st.error(
-                            "Invalid email or password."
+                            "We could not connect "
+                            "this Google account."
                         )
-
                     else:
-                        try:
-                            linked_user = (
-                                oidc_call("account_link", lambda **kw: GoogleAccountService().link_existing_account(**kw),
-                                    resolution=(
-                                        google_resolution
-                                    ),
-                                    authenticated_user=(
-                                        authenticated_user
-                                    ),
-                                )
-                            )
-
-                        except ValueError:
-                            st.error(
-                                "We could not connect "
-                                "this Google account."
-                            )
-
+                        if linked_user is None:
+                            st.error("Invalid email or password.")
                         else:
-                            oidc_call("login_user", login_user,
-                                linked_user
-                            )
-
                             st.rerun()
 
                 if st.button(
@@ -304,7 +255,7 @@ def render_authentication(authenticated_user, auth_service) -> None:
             )
 
             if submitted:
-                user = auth_service.authenticate(
+                user = coordinator.authenticate_with_password(
                     email=email,
                     password=password,
                 )
@@ -315,8 +266,6 @@ def render_authentication(authenticated_user, auth_service) -> None:
                     )
 
                 else:
-                    login_user(user)
-
                     st.success(
                         "Login successful."
                     )

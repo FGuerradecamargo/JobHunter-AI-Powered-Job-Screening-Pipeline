@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
+from services.authentication_coordinator import AuthenticationCoordinator
 
 
 PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Login.py"
@@ -73,13 +74,20 @@ def login_page(monkeypatch):
     factory.REGISTRATION_REQUIRED = "registration_required"
     factory.LINK_REQUIRED = "link_required"
     module("services.google_identity_service", GoogleIdentityService=factory)
+    coordinator = Mock(wraps=AuthenticationCoordinator(
+        auth_service=auth, google_identity_service=identity,
+        google_account_service=google, session_login=login,
+    ))
+    coordinator_factory = Mock(return_value=coordinator)
+    module("services.authentication_coordinator", AuthenticationCoordinator=coordinator_factory)
     monkeypatch.setattr(st, "user", oidc)
     monkeypatch.setattr(st, "login", lambda provider: events.append(provider))
     monkeypatch.setattr(st, "logout", lambda: events.append("oidc_logout"))
     monkeypatch.setattr(st, "switch_page", lambda page: events.append(page))
     return SimpleNamespace(app=AppTest.from_file(str(PAGE)), user=user, oidc=oidc,
                            auth=auth, google=google, identity=identity, recovery=recovery,
-                           verification=verification, events=events)
+                           verification=verification, events=events,
+                           coordinator=coordinator, coordinator_factory=coordinator_factory)
 
 
 def html(app):
@@ -142,7 +150,10 @@ def test_email_login_preserved(login_page):
     app.text_input[0].input("test@example.invalid")
     app.text_input[1].input("test-password")
     button(app, "Log in").click().run()
-    login_page.auth.authenticate.assert_called_once_with(email="test@example.invalid", password="test-password")
+    login_page.coordinator.authenticate_with_password.assert_called_once_with(
+        email="test@example.invalid", password="test-password")
+    login_page.auth.authenticate.assert_called_once_with("test@example.invalid", "test-password")
+    login_page.coordinator_factory.assert_called_with(auth_service=login_page.auth)
     assert login_page.events == ["login"]
     assert "Find jobs that make sense for you." not in html(app)
 
@@ -153,6 +164,7 @@ def test_invalid_login_still_rejected(login_page):
     button(app, "Log in").click().run()
     assert app.error[0].value == "Invalid email or password."
     assert not login_page.events
+    login_page.coordinator.authenticate_with_password.assert_called_once()
 
 
 def test_signup_and_verification_preserved(login_page):
@@ -164,6 +176,8 @@ def test_signup_and_verification_preserved(login_page):
     assert login_page.auth.register.call_count == 1
     login_page.verification.assert_called_once_with(7)
     assert login_page.events == ["login"]
+    login_page.coordinator.authenticate_with_password.assert_not_called()
+    login_page.coordinator.authenticate_with_google.assert_not_called()
 
 
 def test_password_recovery_preserved(login_page):
@@ -188,6 +202,7 @@ def test_google_callback_preserved_without_public_hero(login_page, status):
     assert login_page.events == ["login"]
     assert "Find jobs that make sense for you." not in html(app)
     assert login_page.google.register.call_count == (status == "registration_required")
+    login_page.coordinator.authenticate_with_google.assert_called_once()
 
 
 def test_existing_account_google_linking_preserved(login_page):
@@ -200,7 +215,46 @@ def test_existing_account_google_linking_preserved(login_page):
     button(app, "Connect Google account").click().run()
     assert not app.exception
     login_page.google.link_existing_account.assert_called_once()
+    login_page.coordinator.link_google_with_password.assert_called_once_with(
+        login_page.identity.resolve.return_value, "test-password")
     assert login_page.events == ["login"]
+
+
+@pytest.mark.parametrize("failure", ["password", "link"])
+def test_google_link_failure_preserves_message_and_no_session(login_page, failure):
+    login_page.oidc.is_logged_in = True
+    login_page.identity.resolve.return_value = SimpleNamespace(
+        status="link_required", email="test@example.invalid")
+    if failure == "password":
+        login_page.auth.authenticate.return_value = None
+    else:
+        login_page.google.link_existing_account.side_effect = ValueError("Rejected")
+    app = login_page.app.run()
+    assert not login_page.events
+    login_page.google.register.assert_not_called()
+    button(app, "Connect Google account").click().run()
+    assert not app.exception
+    assert app.error[0].value == (
+        "Invalid email or password." if failure == "password"
+        else "We could not connect this Google account.")
+    assert not login_page.events
+    login_page.coordinator.link_google_with_password.assert_called_once()
+    if failure == "password":
+        login_page.google.link_existing_account.assert_not_called()
+
+
+@pytest.mark.parametrize("status", ["linked", "unknown"])
+def test_invalid_google_resolution_has_generic_error_and_no_session(login_page, status):
+    login_page.oidc.is_logged_in = True
+    login_page.identity.resolve.return_value = SimpleNamespace(status=status, user=None)
+    app = login_page.app.run()
+    assert not app.exception
+    assert app.error[0].value == "We could not verify your Google identity. Please try again."
+    assert not login_page.events
+    login_page.google.register.assert_not_called()
+    login_page.google.link_existing_account.assert_not_called()
+    button(app, "Restart Google sign-in").click().run()
+    assert login_page.events == ["oidc_logout"]
 
 
 def test_expired_google_session_guard_preserved(login_page):
