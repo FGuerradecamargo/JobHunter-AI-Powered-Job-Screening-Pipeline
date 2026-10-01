@@ -4,6 +4,7 @@ import hashlib
 import json
 
 from models.candidate import Candidate
+from models.profile_interpretation import CandidateProfileSnapshot
 from models.structured_interpretation import (
     StructuredInterpretationInput, InterpretationOperation, RegisteredSourceRef, SourceRefClass,
 )
@@ -124,14 +125,18 @@ class CandidateProfileGenerationService:
 
         return draft
 
-    def generate(self, candidate_id, candidate_name):
+    def generate_snapshot(self, candidate_id: str) -> CandidateProfileSnapshot:
         onboarding = self.onboarding_repository.get_onboarding(candidate_id)
         if onboarding is None:
             raise ValueError("Candidate onboarding was not found.")
-        snapshot = ProfileInterpretationService(self.snapshot_repository, self).candidate_profile_from_onboarding(
+        return ProfileInterpretationService(self.snapshot_repository, self).candidate_profile_from_onboarding(
             candidate_id=candidate_id, onboarding_repository=self.onboarding_repository,
             career_update_repository=self.career_update_repository,
         )
+
+    def generate(self, candidate_id, candidate_name):
+        snapshot = self.generate_snapshot(candidate_id)
+        onboarding = self.onboarding_repository.get_onboarding(candidate_id)
         existing = self.candidate_repository.get(candidate_id)
         candidate = existing or Candidate(candidate_id, candidate_name, "", "", "")
         # Transitional presentation projection, never an independent source record.
