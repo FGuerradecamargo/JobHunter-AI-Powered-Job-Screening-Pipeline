@@ -7,7 +7,9 @@ from unittest.mock import Mock
 import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
-from services.authentication_coordinator import AuthenticationCoordinator, GoogleRegistrationError
+from services.authentication_coordinator import (
+    AuthenticationCoordinator, GoogleRegistrationError, GoogleSessionError,
+)
 
 
 PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Login.py"
@@ -74,13 +76,14 @@ def login_page(monkeypatch):
     factory.REGISTRATION_REQUIRED = "registration_required"
     factory.LINK_REQUIRED = "link_required"
     module("services.google_identity_service", GoogleIdentityService=factory)
+    session_login = Mock(side_effect=login)
     coordinator = Mock(wraps=AuthenticationCoordinator(
         auth_service=auth, google_identity_service=identity,
-        google_account_service=google, session_login=login,
+        google_account_service=google, session_login=session_login,
     ))
     coordinator_factory = Mock(return_value=coordinator)
     module("services.authentication_coordinator", AuthenticationCoordinator=coordinator_factory,
-           GoogleRegistrationError=GoogleRegistrationError)
+           GoogleRegistrationError=GoogleRegistrationError, GoogleSessionError=GoogleSessionError)
     monkeypatch.setattr(st, "user", oidc)
     monkeypatch.setattr(st, "login", lambda provider: events.append(provider))
     monkeypatch.setattr(st, "logout", lambda: events.append("oidc_logout"))
@@ -88,7 +91,8 @@ def login_page(monkeypatch):
     return SimpleNamespace(app=AppTest.from_file(str(PAGE)), user=user, oidc=oidc,
                            auth=auth, google=google, identity=identity, recovery=recovery,
                            verification=verification, events=events,
-                           coordinator=coordinator, coordinator_factory=coordinator_factory)
+                           coordinator=coordinator, coordinator_factory=coordinator_factory,
+                           session_login=session_login)
 
 
 def html(app):
@@ -192,6 +196,23 @@ def test_google_sign_in_control_preserved(login_page):
     app = login_page.app.run()
     button(app, "Continue with Google").click().run()
     assert login_page.events == ["google"]
+
+
+@pytest.mark.parametrize("status", ["linked", "registration_required"])
+def test_google_session_failure_has_session_message(login_page, status):
+    login_page.oidc.is_logged_in = True
+    login_page.identity.resolve.return_value.status = status
+    login_page.session_login.side_effect = RuntimeError("Private session detail")
+    app = login_page.app.run()
+    assert not app.exception
+    assert [error.value for error in app.error] == [
+        "We could not sign you in to WorkPilot. Please try again."
+    ]
+    login_page.coordinator.authenticate_with_google.assert_called_once()
+    login_page.session_login.assert_called_once_with(login_page.user)
+    assert login_page.google.register.call_count == (status == "registration_required")
+    assert not login_page.events
+    assert not app.tabs
 
 
 def test_google_registration_failure_has_account_creation_message(login_page):

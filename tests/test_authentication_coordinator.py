@@ -5,7 +5,9 @@ from unittest.mock import Mock, create_autospec
 import pytest
 
 from models.app_user import AppUser
-from services.authentication_coordinator import AuthenticationCoordinator, GoogleRegistrationError
+from services.authentication_coordinator import (
+    AuthenticationCoordinator, GoogleRegistrationError, GoogleSessionError,
+)
 from services.auth_service import AuthService
 from services.google_account_service import GoogleAccountService
 from services.google_identity_service import GoogleIdentityResolution, GoogleIdentityService
@@ -166,6 +168,7 @@ def test_registration_failure_is_translated_and_chained(deps, error_type):
     with pytest.raises(GoogleRegistrationError) as raised:
         deps.coordinator.authenticate_with_google({})
     assert raised.value.__cause__ is original
+    assert not isinstance(raised.value, GoogleSessionError)
     assert "Private implementation details" not in str(raised.value)
     deps.account.register.assert_called_once_with(resolved)
     deps.login.assert_not_called()
@@ -183,13 +186,21 @@ def test_identity_failure_is_not_translated(deps):
     assert_no_account_calls(deps)
 
 
-def test_session_failure_after_registration_is_not_translated(deps, user):
-    deps.identity.resolve.return_value = resolution(GoogleIdentityService.REGISTRATION_REQUIRED)
+@pytest.mark.parametrize("status", ["linked", "registration_required"])
+@pytest.mark.parametrize("error_type", [ValueError, RuntimeError, Exception])
+def test_google_session_failure_is_translated_and_chained(deps, user, status, error_type):
+    deps.identity.resolve.return_value = resolution(status, user)
     deps.account.register.return_value = user
-    original = RuntimeError("Session failure")
+    original = error_type("Private session implementation details")
     deps.login.side_effect = original
-    with pytest.raises(RuntimeError) as raised:
+    with pytest.raises(GoogleSessionError) as raised:
         deps.coordinator.authenticate_with_google({})
-    assert raised.value is original
-    deps.account.register.assert_called_once()
+    assert raised.value.__cause__ is original
+    assert "Private session implementation details" not in str(raised.value)
+    assert not isinstance(raised.value, GoogleRegistrationError)
+    if status == "registration_required":
+        deps.account.register.assert_called_once_with(deps.identity.resolve.return_value)
+    else:
+        deps.account.register.assert_not_called()
     deps.login.assert_called_once_with(user)
+    deps.account.link_existing_account.assert_not_called()

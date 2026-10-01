@@ -20,6 +20,10 @@ class GoogleRegistrationError(RuntimeError):
     """Google identity resolved, but WorkPilot account creation failed."""
 
 
+class GoogleSessionError(RuntimeError):
+    """Google authentication succeeded, but WorkPilot session creation failed."""
+
+
 class AuthenticationCoordinator:
     def __init__(
         self,
@@ -71,7 +75,10 @@ class AuthenticationCoordinator:
             return GoogleAuthenticationResult(resolution.status, resolution, None)
         else:
             raise RuntimeError("Unknown Google identity status.")
-        self._login(user)
+        try:
+            self._login(user)
+        except Exception as exc:
+            raise GoogleSessionError("WorkPilot session establishment failed.") from exc
         return GoogleAuthenticationResult(resolution.status, resolution, user)
 
     def link_google_with_password(
