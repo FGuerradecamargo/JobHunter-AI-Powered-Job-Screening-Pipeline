@@ -6,7 +6,7 @@ from services.account_recovery_service import (
     AccountRecoveryService,
 )
 from services.auth_service import AuthService
-from services.authentication_coordinator import AuthenticationCoordinator
+from services.authentication_coordinator import AuthenticationCoordinator, GoogleRegistrationError
 from services.email_verification_delivery_service import (
     EmailVerificationDeliveryService,
 )
@@ -74,6 +74,12 @@ def render_authentication(authenticated_user, auth_service) -> None:
                         google_claims
                     )
                 )
+
+            except GoogleRegistrationError:
+                st.error(
+                    "We could not create your WorkPilot account. Please try again."
+                )
+                st.stop()
 
             except (
                 ValueError,

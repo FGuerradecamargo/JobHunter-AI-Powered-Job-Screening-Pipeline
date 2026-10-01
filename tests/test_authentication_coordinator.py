@@ -5,7 +5,7 @@ from unittest.mock import Mock, create_autospec
 import pytest
 
 from models.app_user import AppUser
-from services.authentication_coordinator import AuthenticationCoordinator
+from services.authentication_coordinator import AuthenticationCoordinator, GoogleRegistrationError
 from services.auth_service import AuthService
 from services.google_account_service import GoogleAccountService
 from services.google_identity_service import GoogleIdentityResolution, GoogleIdentityService
@@ -155,3 +155,41 @@ def test_link_service_failure_does_not_create_session(deps, user):
         )
     deps.login.assert_not_called()
     deps.account.register.assert_not_called()
+
+
+@pytest.mark.parametrize("error_type", [ValueError, RuntimeError, Exception])
+def test_registration_failure_is_translated_and_chained(deps, error_type):
+    resolved = resolution(GoogleIdentityService.REGISTRATION_REQUIRED)
+    deps.identity.resolve.return_value = resolved
+    original = error_type("Private implementation details")
+    deps.account.register.side_effect = original
+    with pytest.raises(GoogleRegistrationError) as raised:
+        deps.coordinator.authenticate_with_google({})
+    assert raised.value.__cause__ is original
+    assert "Private implementation details" not in str(raised.value)
+    deps.account.register.assert_called_once_with(resolved)
+    deps.login.assert_not_called()
+    deps.auth.authenticate.assert_not_called()
+    deps.account.link_existing_account.assert_not_called()
+
+
+def test_identity_failure_is_not_translated(deps):
+    original = ValueError("Invalid identity")
+    deps.identity.resolve.side_effect = original
+    with pytest.raises(ValueError) as raised:
+        deps.coordinator.authenticate_with_google({})
+    assert raised.value is original
+    deps.login.assert_not_called()
+    assert_no_account_calls(deps)
+
+
+def test_session_failure_after_registration_is_not_translated(deps, user):
+    deps.identity.resolve.return_value = resolution(GoogleIdentityService.REGISTRATION_REQUIRED)
+    deps.account.register.return_value = user
+    original = RuntimeError("Session failure")
+    deps.login.side_effect = original
+    with pytest.raises(RuntimeError) as raised:
+        deps.coordinator.authenticate_with_google({})
+    assert raised.value is original
+    deps.account.register.assert_called_once()
+    deps.login.assert_called_once_with(user)

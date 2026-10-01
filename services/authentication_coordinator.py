@@ -16,6 +16,10 @@ class GoogleAuthenticationResult:
     user: AppUser | None
 
 
+class GoogleRegistrationError(RuntimeError):
+    """Google identity resolved, but WorkPilot account creation failed."""
+
+
 class AuthenticationCoordinator:
     def __init__(
         self,
@@ -59,7 +63,10 @@ class AuthenticationCoordinator:
             if user is None:
                 raise RuntimeError("Linked Google identity has no user.")
         elif resolution.status == GoogleIdentityService.REGISTRATION_REQUIRED:
-            user = self.google_account_service.register(resolution)
+            try:
+                user = self.google_account_service.register(resolution)
+            except Exception as exc:
+                raise GoogleRegistrationError("Google account registration failed.") from exc
         elif resolution.status == GoogleIdentityService.LINK_REQUIRED:
             return GoogleAuthenticationResult(resolution.status, resolution, None)
         else:

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
-from services.authentication_coordinator import AuthenticationCoordinator
+from services.authentication_coordinator import AuthenticationCoordinator, GoogleRegistrationError
 
 
 PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Login.py"
@@ -79,7 +79,8 @@ def login_page(monkeypatch):
         google_account_service=google, session_login=login,
     ))
     coordinator_factory = Mock(return_value=coordinator)
-    module("services.authentication_coordinator", AuthenticationCoordinator=coordinator_factory)
+    module("services.authentication_coordinator", AuthenticationCoordinator=coordinator_factory,
+           GoogleRegistrationError=GoogleRegistrationError)
     monkeypatch.setattr(st, "user", oidc)
     monkeypatch.setattr(st, "login", lambda provider: events.append(provider))
     monkeypatch.setattr(st, "logout", lambda: events.append("oidc_logout"))
@@ -191,6 +192,36 @@ def test_google_sign_in_control_preserved(login_page):
     app = login_page.app.run()
     button(app, "Continue with Google").click().run()
     assert login_page.events == ["google"]
+
+
+def test_google_registration_failure_has_account_creation_message(login_page):
+    login_page.oidc.is_logged_in = True
+    login_page.identity.resolve.return_value.status = "registration_required"
+    login_page.google.register.side_effect = RuntimeError("Private database detail")
+    app = login_page.app.run()
+    assert not app.exception
+    assert [error.value for error in app.error] == [
+        "We could not create your WorkPilot account. Please try again."
+    ]
+    login_page.coordinator.authenticate_with_google.assert_called_once()
+    login_page.google.register.assert_called_once_with(login_page.identity.resolve.return_value)
+    assert not login_page.events
+    assert not app.tabs
+
+
+def test_google_identity_resolution_failure_keeps_verification_message(login_page):
+    login_page.oidc.is_logged_in = True
+    login_page.identity.resolve.side_effect = ValueError("Private identity detail")
+    app = login_page.app.run()
+    assert not app.exception
+    assert [error.value for error in app.error] == [
+        "We could not verify your Google identity. Please try again."
+    ]
+    login_page.coordinator.authenticate_with_google.assert_called_once()
+    login_page.google.register.assert_not_called()
+    login_page.google.link_existing_account.assert_not_called()
+    assert not login_page.events
+    assert not app.tabs
 
 
 @pytest.mark.parametrize("status", ["linked", "registration_required"])
