@@ -18,7 +18,6 @@ from services.session_store import (
     revoke_user_sessions_with_connection,
 )
 from services.user_repository import UserRepository
-from services.streamlit_oidc import oidc_logged_in
 
 
 SESSION_COOKIE = "jobhunter_session"
@@ -381,11 +380,6 @@ def get_authenticated_user_if_ready() -> AppUser | None:
     )
 
 
-def authentication_continuation_required() -> bool:
-    """Request Login routing for an unfinished flow, never authorization."""
-    return oidc_logged_in()
-
-
 def get_current_user() -> AppUser | None:
     """
     Backward-compatible alias.
@@ -531,29 +525,4 @@ def require_login() -> AppUser:
     require_authenticated_user().
     """
     return require_authenticated_user()
-
-
-def render_logout_button(*, authenticated_user: AppUser | None = None) -> None:
-    # Callers may reuse authentication resolved during this same render only.
-    user = authenticated_user if authenticated_user is not None else get_authenticated_user()
-
-    if user is None:
-        return
-
-    with st.sidebar:
-        st.caption(
-            f"Signed in as {user.display_name}"
-        )
-
-        if st.button(
-            "Log out",
-            use_container_width=True,
-            key="global_logout_button",
-        ):
-            logout_user()
-
-            if oidc_logged_in():
-                st.logout()
-
-            st.rerun()
 

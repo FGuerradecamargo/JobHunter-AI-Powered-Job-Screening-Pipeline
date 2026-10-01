@@ -3,10 +3,10 @@ from components.public_landing import render_public_landing
 
 from components.job_analysis_view import render_job_analysis
 
+from components.auth_controls import render_logout_button
 from services.session_auth import (
     get_authenticated_user,
     get_authenticated_user_if_ready,
-    render_logout_button,
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context

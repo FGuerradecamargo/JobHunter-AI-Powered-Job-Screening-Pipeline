@@ -9,8 +9,8 @@ from services.candidate_market_runtime import (
 from services.market_profile_refresh_service import (
     MarketProfileRefreshService,
 )
+from components.auth_controls import render_logout_button
 from services.session_auth import (
-    render_logout_button,
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context

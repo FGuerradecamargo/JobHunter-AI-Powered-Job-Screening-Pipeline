@@ -17,8 +17,8 @@ from services.candidate_product_state_service import (
     HiredTransitionService,
 )
 from services.product_mode_policy import product_mode_policy
+from services.authentication_runtime import authentication_continuation_required
 from services.session_auth import (
-    authentication_continuation_required,
     get_authenticated_user,
     get_authenticated_user_if_ready,
 )

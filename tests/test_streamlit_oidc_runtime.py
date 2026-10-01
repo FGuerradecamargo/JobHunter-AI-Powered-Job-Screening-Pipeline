@@ -111,7 +111,7 @@ def test_shell_has_no_provider_auth_dependency():
 
 @pytest.mark.parametrize("pending", [False, True])
 def test_session_boundary_reports_continuation_without_session_authorization(pending):
-    tree = ast.parse(Path("services/session_auth.py").read_text(encoding="utf-8"))
+    tree = ast.parse(Path("services/authentication_runtime.py").read_text(encoding="utf-8"))
     helper = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                   and node.name == "authentication_continuation_required")
     provider = Mock(return_value=pending)

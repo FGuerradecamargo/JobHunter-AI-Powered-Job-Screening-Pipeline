@@ -32,8 +32,8 @@ from services.gmail_oauth_service import GmailOAuthService
 from services.oauth_state_repository import (
     OAuthStateRepository,
 )
+from components.auth_controls import render_logout_button
 from services.session_auth import (
-    render_logout_button,
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context

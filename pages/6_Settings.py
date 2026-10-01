@@ -1,7 +1,8 @@
 import streamlit as st
 
 from components.workpilot_ui import apply_theme, page_header, status_badge
-from services.session_auth import require_authenticated_user, render_logout_button
+from services.session_auth import require_authenticated_user
+from components.auth_controls import render_logout_button
 from services.user_context_runtime import get_active_user_context
 from services.candidate_product_state_repository import CandidateProductStateRepository
 from services.candidate_product_state_service import HiredTransitionService

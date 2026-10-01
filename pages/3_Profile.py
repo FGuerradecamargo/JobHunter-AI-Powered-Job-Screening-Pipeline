@@ -24,8 +24,8 @@ from services.candidate_repository import CandidateRepository
 from models.career_objective import CareerObjective
 from services.career_objective_repository import CareerObjectiveRepository
 from services.access_policy import AccessPolicy
+from components.auth_controls import render_logout_button
 from services.session_auth import (
-    render_logout_button,
     require_authenticated_user,
 )
 from services.user_context_runtime import get_active_user_context

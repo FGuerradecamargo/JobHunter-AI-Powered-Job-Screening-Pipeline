@@ -63,13 +63,15 @@ def login_page(monkeypatch):
 
     module(
         "services.session_auth",
-        authentication_continuation_required=continuation,
         get_authenticated_user=lambda: st.session_state.get("test_user"),
         get_authenticated_user_if_ready=lambda: st.session_state.get("test_user"),
         login_user=login,
         logout_user=logout,
     )
     module("services.auth_service", AuthService=FakeAuthService)
+    module("services.authentication_runtime", authentication_continuation_required=continuation,
+           logout_external_identity_if_active=Mock(return_value=False))
+    module("components.auth_controls", render_logout_button=Mock())
     module("services.account_recovery_service", AccountRecoveryService=SimpleNamespace(request_password_reset=recovery))
     module("services.email_verification_delivery_service", EmailVerificationDeliveryService=SimpleNamespace(send_verification_email=verification))
     module("services.google_account_service", GoogleAccountService=lambda: google)
@@ -337,7 +339,6 @@ def root_page(login_page, monkeypatch):
     require_user = Mock(return_value=login_page.user)
     session = sys.modules["services.session_auth"]
     monkeypatch.setattr(session, "require_authenticated_user", require_user, raising=False)
-    monkeypatch.setattr(session, "render_logout_button", Mock(), raising=False)
     monkeypatch.setattr(database, "initialize_database", bootstrap)
     monkeypatch.setattr(candidates, "CandidateRepository", lambda: candidate_repository)
     monkeypatch.setattr(context, "get_active_user_context", dashboard_context)
