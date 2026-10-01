@@ -34,7 +34,8 @@ from services.candidate_product_state_repository import (
 )
 from services.product_mode_policy import product_mode_policy
 from services.provider_failure import log_failure
-from components.profile_onboarding import render_profile_onboarding
+from components.onboarding import render_onboarding
+from services.profile_gateway import CandidateProfileGateway
 
 authenticated_user = (
     require_authenticated_user()
@@ -133,11 +134,11 @@ if readiness.status in {"missing", "stale", "unavailable"}:
     st.stop()
 
 if not profile_ready:
-    render_profile_onboarding(
+    render_onboarding(
         candidate_id=candidate_id,
         candidate_name=selected_user.display_name,
         onboarding_repository=onboarding_repository,
-        profile_generation_service=profile_generation_service,
+        profile_gateway=CandidateProfileGateway(profile_generation_service),
         authenticated_user=authenticated_user,
         active_user=active_user,
     )

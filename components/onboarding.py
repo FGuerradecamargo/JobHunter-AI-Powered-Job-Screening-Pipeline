@@ -9,6 +9,7 @@ from models.candidate_onboarding import CandidateOnboarding
 from components.voice_text_input import VoiceTextInputs, bind_scope
 from services.onboarding_events import OnboardingEventRepository
 from services.access_policy import AccessPolicy
+from services.profile_gateway import ProfileGateway
 
 
 logger = logging.getLogger(__name__)
@@ -551,12 +552,12 @@ from components.company_interview import render_company_interview
 from services.company_interview import start_interview, resume_interview
 
 
-def render_profile_onboarding(
+def render_onboarding(
     *,
     candidate_id,
     candidate_name,
     onboarding_repository,
-    profile_generation_service,
+    profile_gateway: ProfileGateway,
     authenticated_user,
     active_user,
     voice_inputs=None,
@@ -1174,7 +1175,7 @@ def render_profile_onboarding(
                             with st.spinner(
                                 "Building your Career Profile..."
                             ):
-                                profile_generation_service.generate(
+                                profile_gateway.create_initial_profile(
                                     candidate_id=candidate_id,
                                     candidate_name=candidate_name,
                                 )

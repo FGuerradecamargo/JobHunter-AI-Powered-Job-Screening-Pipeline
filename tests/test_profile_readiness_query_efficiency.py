@@ -31,7 +31,7 @@ def test_readiness_uses_single_snapshot_lookup():
 
 def test_onboarding_step_four_reuses_loaded_records():
     source = Path(
-        "components/profile_onboarding.py"
+        "components/onboarding.py"
     ).read_text(
         encoding="utf-8"
     )
