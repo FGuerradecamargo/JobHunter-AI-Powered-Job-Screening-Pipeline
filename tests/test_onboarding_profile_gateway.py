@@ -45,7 +45,9 @@ def test_canonical_onboarding_boundary():
                    and node.func.attr == "generate" for node in ast.walk(tree))
     page = Path("pages/3_Profile.py").read_text(encoding="utf-8")
     assert "from components.onboarding import render_onboarding" in page
-    assert "profile_gateway=CandidateProfileGateway(profile_generation_service)" in page
+    assert "profile_gateway=profile_runtime.onboarding_gateway" in page
+    runtime = Path("services/candidate_profile_runtime.py").read_text(encoding="utf-8")
+    assert "onboarding_gateway=CandidateProfileGateway(generation)" in runtime
 
 
 @pytest.mark.parametrize("fails", [False, True])

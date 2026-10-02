@@ -94,9 +94,10 @@ def test_candidate_only_public_architecture_and_onboarding_port():
     assert imports == {"models.profile_interpretation", "services.candidate_profile_generation_service",
                        "services.profile_readiness_service", "services.profile_snapshot_repository"}
     methods = {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
-    assert methods == {"__init__", "current", "check_readiness", "generate_snapshot"}
+    assert methods == {"__init__", "current", "check_readiness", "generate_snapshot", "refresh_current"}
     attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
-    assert attributes == {"_snapshots", "_readiness", "_generation", "current_candidate", "check", "generate_snapshot"}
+    assert attributes == {"_snapshots", "_readiness", "_generation", "current_candidate", "check", "generate_snapshot",
+                          "check_readiness", "backfill_missing", "status", "snapshot", "ready"}
     for forbidden in ("JobProfile", "HiringCase", "models.candidate", "match", "job_"):
         assert forbidden not in source
     onboarding = Path("components/onboarding.py").read_text(encoding="utf-8")
@@ -104,3 +105,50 @@ def test_candidate_only_public_architecture_and_onboarding_port():
     for forbidden in ("CandidateProfileService", "CandidateProfileGenerationService", "ProfileSnapshotRepository",
                       "ProfileReadinessService", "CandidateRepository"):
         assert forbidden not in onboarding
+
+
+def test_readiness_exception_is_safe_and_unavailable():
+    readiness = Mock()
+    readiness.check.side_effect = RuntimeError("private evidence")
+    boundary = CandidateProfileService(snapshot_repository=Mock(),
+        readiness_service=readiness, generation_service=Mock())
+    result = boundary.check_readiness("a")
+    assert result == ProfileReadiness("unavailable")
+    assert "private evidence" not in result.message
+
+
+@pytest.mark.parametrize("status", ["missing", "stale", "unavailable", "ready", "no_evidence"])
+def test_refresh_routes_only_eligible_states(status):
+    readiness, generation, snapshots = Mock(), Mock(), Mock()
+    snapshot = Mock(spec=CandidateProfileSnapshot)
+    readiness.check.return_value = ProfileReadiness(status, snapshot if status == "ready" else None)
+    boundary = CandidateProfileService(snapshot_repository=snapshots,
+        readiness_service=readiness, generation_service=generation)
+    result = boundary.refresh_current("a")
+    if status == "missing":
+        readiness.backfill_missing.assert_called_once_with("a", generation)
+        assert result is readiness.backfill_missing.return_value
+        generation.generate_snapshot.assert_not_called()
+    elif status == "stale":
+        generation.generate_snapshot.assert_called_once_with("a")
+        assert result is generation.generate_snapshot.return_value
+        readiness.backfill_missing.assert_not_called()
+    else:
+        assert result is (snapshot if status == "ready" else None)
+        readiness.backfill_missing.assert_not_called()
+        generation.generate_snapshot.assert_not_called()
+    assert not snapshots.mock_calls
+
+
+def test_refresh_readiness_exception_does_not_generate_or_backfill():
+    readiness, generation, snapshots = Mock(), Mock(), Mock()
+    readiness.check.side_effect = RuntimeError("private evidence")
+    boundary = CandidateProfileService(snapshot_repository=snapshots,
+        readiness_service=readiness, generation_service=generation)
+
+    assert boundary.refresh_current("a") is None
+
+    readiness.check.assert_called_once_with("a")
+    readiness.backfill_missing.assert_not_called()
+    assert not generation.mock_calls
+    assert not snapshots.mock_calls

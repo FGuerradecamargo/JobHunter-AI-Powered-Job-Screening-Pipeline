@@ -1,6 +1,6 @@
 import logging
 import streamlit as st
-from services.profile_readiness_service import profile_readiness, ProfileReadinessService
+from services.candidate_profile_runtime import create_candidate_profile_runtime
 from components.workpilot_ui import apply_theme, page_header, render_profile_snapshot
 
 logger = logging.getLogger(__name__)
@@ -16,10 +16,6 @@ from services.career_update_repository import (
     CareerUpdateRepository,
 )
 
-from services.ai.openai_client import OpenAIClient
-from services.candidate_profile_generation_service import (
-    CandidateProfileGenerationService,
-)
 from services.candidate_repository import CandidateRepository
 from models.career_objective import CareerObjective
 from services.career_objective_repository import CareerObjectiveRepository
@@ -35,7 +31,6 @@ from services.candidate_product_state_repository import (
 from services.product_mode_policy import product_mode_policy
 from services.provider_failure import log_failure
 from components.onboarding import render_onboarding
-from services.profile_gateway import CandidateProfileGateway
 
 authenticated_user = (
     require_authenticated_user()
@@ -66,19 +61,12 @@ candidate_repository = CandidateRepository()
 career_update_repository = CareerUpdateRepository()
 career_objective_repository = CareerObjectiveRepository()
 
-class _OnDemandProfileClient:
-    def generate(self, prompt):
-        return OpenAIClient().generate(prompt)
-
-
-profile_generation_service = (
-    CandidateProfileGenerationService(
-        llm_client=_OnDemandProfileClient(),
-        onboarding_repository=onboarding_repository,
-        candidate_repository=candidate_repository,
-        career_update_repository=career_update_repository,
-    )
+profile_runtime = create_candidate_profile_runtime(
+    onboarding_repository=onboarding_repository,
+    candidate_repository=candidate_repository,
+    career_update_repository=career_update_repository,
 )
+candidate_profile_service = profile_runtime.service
 
 selected_user = active_user
 
@@ -102,14 +90,14 @@ product_state = CandidateProductStateRepository().get(
 )
 
 if not product_mode_policy(product_state).can_mutate:
-    render_profile_snapshot(candidate_id)
+    render_profile_snapshot(candidate_profile_service.current(candidate_id))
     st.info(
         "WorkPilot is currently read-only. "
         "Your professional profile is preserved but cannot be edited."
     )
     st.stop()
 
-readiness = profile_readiness(candidate_id)
+readiness = candidate_profile_service.check_readiness(candidate_id)
 profile_ready = readiness.ready
 
 if readiness.status in {"missing", "stale", "unavailable"}:
@@ -117,16 +105,7 @@ if readiness.status in {"missing", "stale", "unavailable"}:
     if st.button("Generate current profile", key="generate_current_snapshot"):
         try:
             with st.spinner("Building your profile from confirmed evidence..."):
-                if readiness.status == "missing":
-                    ProfileReadinessService().backfill_missing(candidate_id, profile_generation_service)
-                else:
-                    from services.profile_interpretation_service import ProfileInterpretationService
-                    ProfileInterpretationService(
-                        profile_generation_service.snapshot_repository, profile_generation_service,
-                    ).candidate_profile_from_onboarding(
-                        candidate_id=candidate_id, onboarding_repository=onboarding_repository,
-                        career_update_repository=career_update_repository,
-                    )
+                candidate_profile_service.refresh_current(candidate_id)
             st.rerun()
         except Exception as error:
             log_failure(logger, 'profile_generation', error)
@@ -138,13 +117,14 @@ if not profile_ready:
         candidate_id=candidate_id,
         candidate_name=selected_user.display_name,
         onboarding_repository=onboarding_repository,
-        profile_gateway=CandidateProfileGateway(profile_generation_service),
+        profile_gateway=profile_runtime.onboarding_gateway,
         authenticated_user=authenticated_user,
         active_user=active_user,
     )
     st.stop()
 
 
+current_profile = candidate_profile_service.current(candidate_id)
 generated_candidate = candidate_repository.get(
     candidate_id
 )
@@ -780,7 +760,7 @@ with direction_tab:
                     "Describe your career direction before saving."
                 )
 
-            elif generated_candidate is None:
+            elif current_profile is None:
                 st.warning(
                     "Generate your professional profile before "
                     "creating a career objective."
@@ -1041,7 +1021,7 @@ with direction_tab:
 
 
 with overview_tab:
-    render_profile_snapshot(candidate_id)
+    render_profile_snapshot(current_profile)
 
 
 with details_tab:
@@ -1051,7 +1031,7 @@ with details_tab:
 
 
         profile_exists = (
-            generated_candidate is not None
+            current_profile is not None
         )
 
         if not profile_exists:
@@ -1187,7 +1167,7 @@ with details_tab:
                         spinner_message
                     ):
                         candidate = (
-                            profile_generation_service.generate(
+                            profile_runtime.onboarding_gateway.create_initial_profile(
                                 candidate_id=candidate_id,
                                 candidate_name=(
                                     selected_user.display_name

@@ -99,7 +99,7 @@ def test_public_theme_has_no_seasonal_assets_or_authority_logic():
 def test_profile_uses_official_strengths_not_absence_of_transferable_flag(monkeypatch):
     import services.profile_snapshot_repository as snapshots
     repository = Mock()
-    repository.current_candidate.return_value = SimpleNamespace(
+    profile = SimpleNamespace(
         profile_version=2, objectives=("Support operations",), evidence_gaps=("Licence not documented",),
         capabilities=(SimpleNamespace(label="Not proven by default", transferable=False),),
         checkpoint=SimpleNamespace(current_position="Support specialist", proven_strengths=("Incident triage",),
@@ -107,15 +107,18 @@ def test_profile_uses_official_strengths_not_absence_of_transferable_flag(monkey
     )
     monkeypatch.setattr(snapshots, "ProfileSnapshotRepository", lambda: repository)
     app = AppTest.from_string('''
+import streamlit as st
 from components.workpilot_ui import render_profile_snapshot
-render_profile_snapshot("active")
-''').run()
+render_profile_snapshot(st.session_state.profile)
+''')
+    app.session_state.profile = profile
+    app.run()
     assert not app.exception
     text = "\n".join(item.value for item in app.markdown)
     assert "Incident triage" in text and "Stakeholder communication" in text
     assert "Not proven by default" not in text
     assert "Licence not documented" in text
-    repository.current_candidate.assert_called_once_with("active")
+    repository.current_candidate.assert_not_called()
 
 
 def test_applications_workspace_uses_list_filters_and_same_page_details():

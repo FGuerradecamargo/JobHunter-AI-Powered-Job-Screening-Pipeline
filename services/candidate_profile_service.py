@@ -21,7 +21,18 @@ class CandidateProfileService:
         return self._snapshots.current_candidate(candidate_id)
 
     def check_readiness(self, candidate_id: str) -> ProfileReadiness:
-        return self._readiness.check(candidate_id)
+        try:
+            return self._readiness.check(candidate_id)
+        except Exception:
+            return ProfileReadiness("unavailable")
 
     def generate_snapshot(self, candidate_id: str) -> CandidateProfileSnapshot:
         return self._generation.generate_snapshot(candidate_id)
+
+    def refresh_current(self, candidate_id: str) -> CandidateProfileSnapshot | None:
+        readiness = self.check_readiness(candidate_id)
+        if readiness.status == "missing":
+            return self._readiness.backfill_missing(candidate_id, self._generation)
+        if readiness.status == "stale":
+            return self.generate_snapshot(candidate_id)
+        return readiness.snapshot if readiness.ready else None

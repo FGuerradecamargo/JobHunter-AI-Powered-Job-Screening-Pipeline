@@ -23,9 +23,7 @@ def empty_state(title, description):
     st.html(f'<section class="wp-empty"><h3>{escape(title)}</h3><p>{escape(description)}</p></section>')
 
 
-def render_profile_snapshot(candidate_id):
-    from services.profile_snapshot_repository import ProfileSnapshotRepository
-    profile = ProfileSnapshotRepository().current_candidate(candidate_id)
+def render_profile_snapshot(profile):
     if profile is None:
         empty_state("Your professional story starts here", "No confirmed profile snapshot is available yet.")
         return
