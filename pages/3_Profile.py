@@ -1190,7 +1190,7 @@ with details_tab:
 
 
 
-    if generated_candidate is not None:
+    if current_profile is not None or generated_candidate is not None:
         with st.expander("Capabilities & strengths", expanded=False):
             st.divider()
 
@@ -1208,9 +1208,9 @@ with details_tab:
                 )
 
                 for capability in (
-                    generated_candidate
-                    .proven_capabilities
-                ):
+                    item.label for item in current_profile.capabilities
+                    if not item.transferable
+                ) if current_profile is not None else ():
                     st.write(
                         f"- {capability}"
                     )
@@ -1221,15 +1221,15 @@ with details_tab:
                 )
 
                 for capability in (
-                    generated_candidate
-                    .transferable_capabilities
-                ):
+                    item.label for item in current_profile.capabilities
+                    if item.transferable
+                ) if current_profile is not None else ():
                     st.write(
                         f"- {capability}"
                     )
 
             if (
-                generated_candidate
+                generated_candidate is not None and generated_candidate
                 .developing_capabilities
             ):
                 st.markdown(
@@ -1244,19 +1244,19 @@ with details_tab:
                         f"- {capability}"
                     )
 
-            if generated_candidate.strengths:
+            if current_profile is not None and current_profile.checkpoint.proven_strengths:
                 st.markdown(
                     "**Professional strengths**"
                 )
 
                 for strength in (
-                    generated_candidate.strengths
+                    current_profile.checkpoint.proven_strengths
                 ):
                     st.write(
                         f"- {strength}"
                     )
 
-
+    if generated_candidate is not None:
         with st.expander("Tools & domain experience", expanded=False):
             st.divider()
 
@@ -1384,19 +1384,18 @@ with details_tab:
                                 f"- {evidence}"
                             )
 
-        if generated_candidate.spoken_languages:
-            st.divider()
+    if current_profile is not None and current_profile.languages:
+        st.divider()
 
-            st.markdown(
-                "**Languages**"
-            )
+        st.markdown(
+            "**Languages**"
+        )
 
-            st.write(
-                ", ".join(
-                    generated_candidate
-                    .spoken_languages
-                )
+        st.write(
+            ", ".join(
+                language.name for language in current_profile.languages
             )
+        )
 
 
 
