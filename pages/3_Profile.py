@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
-from models.candidate_priority import CandidatePriority
+from services.candidate_profile_priority_service import CandidateProfilePriorityNotFoundError
 from models.career_update import CareerUpdate
 from services.candidate_onboarding_repository import (
     CandidateOnboardingRepository,
@@ -844,9 +844,12 @@ with direction_tab:
             "Negative priorities flag trade-offs that you may want to review."
         )
 
-        priority_candidate = generated_candidate
+        try:
+            current_priorities = profile_runtime.priorities.list(candidate_id)
+        except CandidateProfilePriorityNotFoundError:
+            current_priorities = None
 
-        if priority_candidate is not None:
+        if current_priorities is not None:
             priority_text = st.text_input(
                 "Add a priority",
                 placeholder=(
@@ -882,16 +885,11 @@ with direction_tab:
                     )
 
                 else:
-                    priority_candidate.priorities.append(
-                        CandidatePriority(
-                            text=cleaned_priority,
-                            direction=priority_direction,
-                            active=True,
-                        )
-                    )
-
-                    candidate_repository.save(
-                        priority_candidate
+                    profile_runtime.priorities.add(
+                        candidate_id,
+                        text=cleaned_priority,
+                        direction=priority_direction,
+                        active=True,
                     )
 
                     st.success(
@@ -900,11 +898,11 @@ with direction_tab:
 
                     st.rerun()
 
-            if priority_candidate.priorities:
+            if current_priorities:
                 st.markdown("**Your priorities**")
 
                 for index, priority in enumerate(
-                    priority_candidate.priorities
+                    current_priorities
                 ):
                     with st.container(border=True):
                         priority_edit_text = st.text_input(
@@ -970,18 +968,14 @@ with direction_tab:
                                     )
 
                                 else:
-                                    priority_candidate.priorities[
-                                        index
-                                    ] = CandidatePriority(
+                                    profile_runtime.priorities.update(
+                                        candidate_id,
+                                        index,
                                         text=cleaned_text,
                                         direction=(
                                             priority_edit_direction
                                         ),
                                         active=priority_active,
-                                    )
-
-                                    candidate_repository.save(
-                                        priority_candidate
                                     )
 
                                     st.success(
@@ -999,12 +993,8 @@ with direction_tab:
                                 ),
                                 use_container_width=True,
                             ):
-                                priority_candidate.priorities.pop(
-                                    index
-                                )
-
-                                candidate_repository.save(
-                                    priority_candidate
+                                profile_runtime.priorities.remove(
+                                    candidate_id, index
                                 )
 
                                 st.success(

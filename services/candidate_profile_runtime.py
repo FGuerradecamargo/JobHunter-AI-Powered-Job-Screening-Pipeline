@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from services.candidate_profile_generation_service import CandidateProfileGenerationService
 from services.candidate_profile_service import CandidateProfileService
+from services.candidate_profile_priority_service import CandidateProfilePriorityService
 from services.profile_gateway import CandidateProfileGateway, ProfileGateway
 from services.profile_readiness_service import ProfileReadinessService
 from services.profile_snapshot_repository import ProfileSnapshotRepository
@@ -19,6 +20,7 @@ class _OnDemandProfileClient:
 class CandidateProfileRuntime:
     service: CandidateProfileService
     onboarding_gateway: ProfileGateway
+    priorities: CandidateProfilePriorityService
 
 
 def create_candidate_profile_runtime(
@@ -36,4 +38,5 @@ def create_candidate_profile_runtime(
         service=CandidateProfileService(snapshot_repository=snapshots,
             readiness_service=readiness, generation_service=generation),
         onboarding_gateway=CandidateProfileGateway(generation),
+        priorities=CandidateProfilePriorityService(candidate_repository),
     )

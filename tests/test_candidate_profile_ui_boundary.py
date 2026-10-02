@@ -7,6 +7,8 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from services import candidate_profile_runtime as runtime
+from services.candidate_profile_priority_service import CandidateProfilePriorityService
+from models.candidate import Candidate
 
 
 def test_profile_page_is_orchestration_light():
@@ -31,12 +33,13 @@ def test_renderer_receives_data_not_persistence_key():
 
 
 def test_runtime_composes_shared_repositories_without_calling_ai(monkeypatch):
-    snapshots, generation, readiness, service, gateway = (Mock() for _ in range(5))
+    snapshots, generation, readiness, service, gateway, priorities = (Mock() for _ in range(6))
     factories = []
     for name, value in (("ProfileSnapshotRepository", snapshots),
                         ("CandidateProfileGenerationService", generation),
                         ("ProfileReadinessService", readiness),
-                        ("CandidateProfileService", service), ("CandidateProfileGateway", gateway)):
+                        ("CandidateProfileService", service), ("CandidateProfileGateway", gateway),
+                        ("CandidateProfilePriorityService", priorities)):
         factory = Mock(return_value=value)
         monkeypatch.setattr(runtime, name, factory)
         factories.append(factory)
@@ -45,6 +48,7 @@ def test_runtime_composes_shared_repositories_without_calling_ai(monkeypatch):
         career_update_repository=updates, candidate_repository=candidate)
     assert result.service is service
     assert result.onboarding_gateway is gateway
+    assert result.priorities is priorities
     kwargs = factories[1].call_args.kwargs
     assert kwargs["onboarding_repository"] is onboarding
     assert kwargs["career_update_repository"] is updates
@@ -54,7 +58,9 @@ def test_runtime_composes_shared_repositories_without_calling_ai(monkeypatch):
     factories[3].assert_called_once_with(snapshot_repository=snapshots,
         readiness_service=readiness, generation_service=generation)
     factories[4].assert_called_once_with(generation)
+    factories[5].assert_called_once_with(candidate)
     assert not generation.mock_calls
+    assert not priorities.mock_calls
 
 
 def test_profile_presentation_has_no_duplicate_canonical_candidate_reads():
@@ -67,10 +73,71 @@ def test_profile_presentation_has_no_duplicate_canonical_candidate_reads():
             "professional_experiences"} <= reads
     source = ast.unparse(tree)
     assert "candidate_repository.get(" in source
-    assert "priority_candidate = generated_candidate" in source
-    assert "priority_candidate.priorities.append(" in source
-    assert "priority_candidate.priorities.pop(" in source
-    assert "candidate_repository.save(priority_candidate)" in source
+    assert "CandidatePriority" not in source
+    assert "priority_candidate" not in source
+    assert "candidate_repository.save(" not in source
+    assert ".priorities.append(" not in source
+    assert ".priorities.pop(" not in source
+    for operation in ("list", "add", "update", "remove"):
+        assert f"profile_runtime.priorities.{operation}(" in source
+    assert not any(isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store)
+                   and isinstance(node.value, ast.Attribute) and node.value.attr == "priorities"
+                   for node in ast.walk(tree))
+
+
+@pytest.mark.parametrize("candidate_exists", [True, False])
+def test_current_priorities_ui_uses_service_for_crud(candidate_exists):
+    tree = ast.parse(Path("pages/3_Profile.py").read_text(encoding="utf-8"))
+    section = next(node for node in ast.walk(tree) if isinstance(node, ast.With)
+                   and any(isinstance(item.context_expr, ast.Call)
+                           and item.context_expr.args
+                           and isinstance(item.context_expr.args[0], ast.Constant)
+                           and item.context_expr.args[0].value == "Current priorities"
+                           for item in node.items))
+    repository = Mock()
+    repository.get.return_value = (Candidate(id="a", name="Fixture", current_role="Support",
+        current_level="Senior", professional_summary="Unchanged") if candidate_exists else None)
+    repository.save.side_effect = lambda value: setattr(repository.get, "return_value", value)
+    service = CandidateProfilePriorityService(repository)
+    app = AppTest.from_string(
+        "import streamlit as st\n"
+        "from types import SimpleNamespace\n"
+        "from services.candidate_profile_priority_service import CandidateProfilePriorityNotFoundError\n"
+        "candidate_id = 'a'\n"
+        "profile_runtime = SimpleNamespace(priorities=st.session_state.priorities)\n"
+        + ast.unparse(section)
+    )
+    app.session_state.priorities = service
+    app.run()
+    assert not app.exception
+    if not candidate_exists:
+        assert not app.button
+        repository.save.assert_not_called()
+        return
+    assert any(item.value == "No current priorities added yet." for item in app.info)
+    app.button[0].click().run()
+    assert any(item.value == "Write a priority before adding it." for item in app.warning)
+    repository.save.assert_not_called()
+    app.text_input(key="new_priority_text").set_value("  More flexibility  ")
+    app.selectbox(key="new_priority_direction").select("negative")
+    app.button[0].click().run()
+    assert not app.exception
+    assert service.list("a")[0].text == "More flexibility"
+    assert service.list("a")[0].direction == "negative"
+    assert service.list("a")[0].active is True
+    app.text_input(key="priority_text_a_0").set_value("New direction")
+    app.selectbox(key="priority_direction_a_0").select("positive")
+    app.checkbox(key="priority_active_a_0").uncheck()
+    app.button(key="save_priority_a_0").click().run()
+    assert not app.exception
+    assert service.list("a")[0].text == "New direction"
+    assert service.list("a")[0].direction == "positive"
+    assert service.list("a")[0].active is False
+    app.button(key="remove_priority_a_0").click().run()
+    assert not app.exception
+    assert service.list("a") == ()
+    assert repository.save.call_count == 3
+    assert repository.get.return_value.professional_summary == "Unchanged"
 
 
 @pytest.mark.parametrize("has_snapshot,has_legacy", [(True, True), (True, False),
