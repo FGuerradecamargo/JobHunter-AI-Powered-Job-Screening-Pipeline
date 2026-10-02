@@ -69,10 +69,17 @@ def test_profile_presentation_has_no_duplicate_canonical_candidate_reads():
              and isinstance(node.value, ast.Name) and node.value.id == "generated_candidate"}
     assert not reads & {"proven_capabilities", "transferable_capabilities", "strengths",
                         "development_areas", "spoken_languages"}
-    assert {"developing_capabilities", "technical_tools", "domain_experience",
-            "professional_experiences"} <= reads
     source = ast.unparse(tree)
-    assert "candidate_repository.get(" in source
+    assert "generated_candidate" not in source
+    assert "candidate_repository.get(" not in source
+    for field in ("developing_capabilities", "technical_tools", "domain_experience",
+                  "professional_experiences"):
+        assert not any(isinstance(node, ast.Attribute) and node.attr == field for node in ast.walk(tree))
+    composition = next(node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                       and isinstance(node.func, ast.Name)
+                       and node.func.id == "create_candidate_profile_runtime")
+    assert any(kw.arg == "candidate_repository" and isinstance(kw.value, ast.Name)
+               and kw.value.id == "candidate_repository" for kw in composition.keywords)
     assert "CandidatePriority" not in source
     assert "priority_candidate" not in source
     assert "candidate_repository.save(" not in source
@@ -140,6 +147,23 @@ def test_current_priorities_ui_uses_service_for_crud(candidate_exists):
     assert repository.get.return_value.professional_summary == "Unchanged"
 
 
+def test_experience_tab_retains_explicit_source_record_boundary():
+    tree = ast.parse(Path("pages/3_Profile.py").read_text(encoding="utf-8"))
+    tab = next(node for node in ast.walk(tree) if isinstance(node, ast.With)
+               and any(isinstance(item.context_expr, ast.Name)
+                       and item.context_expr.id == "experience_tab" for item in node.items))
+    source = ast.unparse(tab)
+    assert "onboarding_repository.list_work_experiences(candidate_id)" in source
+    assert "onboarding_repository.update_work_experience(" in source
+    assert "confirmed_source_edit=source_edit_confirmed" in source
+    assert "onboarding_repository.delete_work_experience(" in source
+    assert "experience.confirmed_interview_answers" in source
+    assert "experience.career_story" in source
+    assert "experience.day_to_day_narrative" in source
+    assert "current_profile" not in source
+    assert "generated_candidate" not in source
+
+
 @pytest.mark.parametrize("has_snapshot,has_legacy", [(True, True), (True, False),
                                                        (False, True), (False, False)])
 def test_profile_details_present_canonical_data_without_legacy_fallback(has_snapshot, has_legacy):
@@ -147,11 +171,10 @@ def test_profile_details_present_canonical_data_without_legacy_fallback(has_snap
     # Run the actual presentation statements without bootstrapping the authenticated page.
     details = [node for node in ast.walk(tree) if isinstance(node, ast.If) and (
         ast.unparse(node.test) in {
-            "current_profile is not None or generated_candidate is not None",
+            "current_profile is not None",
             "current_profile is not None and current_profile.languages",
-        } or (ast.unparse(node.test) == "generated_candidate is not None"
-              and "Tools & domain experience" in ast.unparse(node)))]
-    assert len(details) == 3
+        })]
+    assert len(details) == 2
     presentation = "\n".join(ast.unparse(node) for node in sorted(details, key=lambda node: node.lineno))
     profile = SimpleNamespace(
         profile_version=1, objectives=(), evidence_gaps=("Canonical evidence gap",),
@@ -188,7 +211,10 @@ def test_profile_details_present_canonical_data_without_legacy_fallback(has_snap
     for value in ("Legacy proven", "Legacy transferable", "Legacy strength", "Legacy gap", "Legacy language"):
         assert value not in text
     for value in ("Legacy developing", "Legacy tool", "Legacy domain", "Legacy experience"):
-        assert (value in text) == has_legacy
+        assert value not in text
+    for label in ("Tools & domain experience", "Currently developing", "Professional evidence"):
+        assert label not in text
+        assert label not in [item.label for item in app.expander]
     if has_snapshot:
         proven = "\n".join(item.value for item in app.columns[0].markdown)
         transferable = "\n".join(item.value for item in app.columns[1].markdown)

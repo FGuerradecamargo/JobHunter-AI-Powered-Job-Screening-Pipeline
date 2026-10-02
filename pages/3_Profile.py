@@ -125,9 +125,6 @@ if not profile_ready:
 
 
 current_profile = candidate_profile_service.current(candidate_id)
-generated_candidate = candidate_repository.get(
-    candidate_id
-)
 
 existing_onboarding = onboarding_repository.get_onboarding(candidate_id)
 
@@ -1180,7 +1177,7 @@ with details_tab:
 
 
 
-    if current_profile is not None or generated_candidate is not None:
+    if current_profile is not None:
         with st.expander("Capabilities & strengths", expanded=False):
             st.divider()
 
@@ -1200,7 +1197,7 @@ with details_tab:
                 for capability in (
                     item.label for item in current_profile.capabilities
                     if not item.transferable
-                ) if current_profile is not None else ():
+                ):
                     st.write(
                         f"- {capability}"
                     )
@@ -1213,28 +1210,12 @@ with details_tab:
                 for capability in (
                     item.label for item in current_profile.capabilities
                     if item.transferable
-                ) if current_profile is not None else ():
-                    st.write(
-                        f"- {capability}"
-                    )
-
-            if (
-                generated_candidate is not None and generated_candidate
-                .developing_capabilities
-            ):
-                st.markdown(
-                    "**Currently developing**"
-                )
-
-                for capability in (
-                    generated_candidate
-                    .developing_capabilities
                 ):
                     st.write(
                         f"- {capability}"
                     )
 
-            if current_profile is not None and current_profile.checkpoint.proven_strengths:
+            if current_profile.checkpoint.proven_strengths:
                 st.markdown(
                     "**Professional strengths**"
                 )
@@ -1246,133 +1227,6 @@ with details_tab:
                         f"- {strength}"
                     )
 
-    if generated_candidate is not None:
-        with st.expander("Tools & domain experience", expanded=False):
-            st.divider()
-
-            col_tools, col_domains = st.columns(2)
-
-            with col_tools:
-                st.markdown(
-                    "**Tools & technologies**"
-                )
-
-                if generated_candidate.technical_tools:
-                    for tool in (
-                        generated_candidate
-                        .technical_tools
-                    ):
-                        st.write(
-                            f"- {tool}"
-                        )
-                else:
-                    st.caption(
-                        "No tools identified yet."
-                    )
-
-            with col_domains:
-                st.markdown(
-                    "**Domain experience**"
-                )
-
-                if generated_candidate.domain_experience:
-                    for domain in (
-                        generated_candidate
-                        .domain_experience
-                    ):
-                        st.write(
-                            f"- {domain}"
-                        )
-                else:
-                    st.caption(
-                        "No domains identified yet."
-                    )
-
-
-        if (
-            generated_candidate
-            .professional_experiences
-        ):
-            st.divider()
-
-            st.markdown(
-                "### Professional evidence"
-            )
-
-            st.caption(
-                "How your work history supports "
-                "the profile above."
-            )
-
-            for experience in (
-                generated_candidate
-                .professional_experiences
-            ):
-                role_label = (
-                    experience.stated_role
-                    or experience.inferred_role
-                    or "Professional experience"
-                )
-
-                expander_title = (
-                    f"{experience.company} ? "
-                    f"{role_label}"
-                )
-
-                with st.expander(
-                    expander_title
-                ):
-                    if experience.inferred_role:
-                        st.markdown(
-                            "**Functional role**"
-                        )
-                        st.write(
-                            experience.inferred_role
-                        )
-
-                    if experience.role_family:
-                        st.markdown(
-                            "**Role family**"
-                        )
-                        st.write(
-                            experience.role_family
-                        )
-
-                    if experience.summary:
-                        st.markdown(
-                            "**What you did**"
-                        )
-                        st.write(
-                            experience.summary
-                        )
-
-                    if (
-                        experience
-                        .demonstrated_capabilities
-                    ):
-                        st.markdown(
-                            "**Capabilities demonstrated**"
-                        )
-
-                        for capability in (
-                            experience
-                            .demonstrated_capabilities
-                        ):
-                            st.write(
-                                f"- {capability}"
-                            )
-
-                    if experience.evidence:
-                        st.markdown(
-                            "**Evidence**"
-                        )
-
-                        for evidence in (
-                            experience.evidence
-                        ):
-                            st.write(
-                                f"- {evidence}"
-                            )
 
     if current_profile is not None and current_profile.languages:
         st.divider()
