@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from models.source_reference import RegisteredSourceRef
 
 from models.hiring_case import (
     EvidenceRequirement,
@@ -251,6 +252,7 @@ class CandidateProfileSnapshot:
     fact_coverage: CandidateFactCoverage = field(default_factory=CandidateFactCoverage)
     supersedes_version: int | None = None
     schema_version: str = CANDIDATE_PROFILE_SCHEMA_VERSION
+    source_registry: tuple[RegisteredSourceRef, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_refs", _refs(self.source_refs))
@@ -259,6 +261,11 @@ class CandidateProfileSnapshot:
         if not _clean(self.memory_signature) or not _clean(self.created_at):
             raise ValueError("Candidate profile signature and timestamp are required.")
         available = set(self.source_refs)
+        registered = [item.ref for item in self.source_registry]
+        if len(registered) != len(set(registered)) or not set(registered).issubset(available):
+            raise ValueError("Snapshot provenance must uniquely reference snapshot sources.")
+        if any(item.owner_id != self.candidate_id for item in self.source_registry):
+            raise ValueError("Snapshot provenance must belong to the candidate.")
         for capability in self.capabilities:
             if not set(capability.evidence_refs).issubset(available):
                 raise ValueError("Capability evidence refs must exist in the source snapshot.")

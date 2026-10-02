@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
+from models.source_reference import RegisteredSourceRef, SourceRefClass
+from models.candidate_profile_update import CandidateProfileUpdateInput
 
 from models.hiring_case import OpportunitySignalKind, OpportunitySignalState, RequirementEvidenceState, RequirementImportance
 from models.hiring_case import TemporalApplicability
@@ -13,6 +15,7 @@ from models.profile_interpretation import (
 
 class InterpretationOperation(str, Enum):
     BUILD_CANDIDATE_PROFILE = "build_candidate_profile"
+    UPDATE_CANDIDATE_PROFILE = "update_candidate_profile"
     BUILD_JOB_PROFILE = "build_job_profile"
     ANALYZE_HIRING_CASE = "analyze_hiring_case"
     INTERPRET_OPPORTUNITY_VALUE = "interpret_opportunity_value"
@@ -47,14 +50,6 @@ class ValidationIssue(str, Enum):
     FIXTURE_UNAVAILABLE = "fixture_unavailable"
 
 
-class SourceRefClass(str, Enum):
-    CANDIDATE_EVIDENCE = "candidate_evidence"
-    CAREER_MEMORY_SOURCE = "career_memory_source"
-    JOB_HARD_FACT = "job_hard_fact"
-    DERIVED_CHECKPOINT = "derived_checkpoint"
-    UNKNOWN = "unknown"
-
-
 class FactState(str, Enum):
     KNOWN = "known"
     UNKNOWN = "unknown"
@@ -74,19 +69,6 @@ class LinkReason(str, Enum):
     NEEDS_EXAMPLE = "needs_example"
     CONFIRMED_ABSENCE = "confirmed_absence"
     UNCERTAIN = "uncertain"
-
-
-@dataclass(frozen=True)
-class RegisteredSourceRef:
-    ref: str
-    source_class: SourceRefClass
-    owner_id: str
-    source_type: str
-    usable_evidence: bool = False
-    confirmed_absence_for: tuple[str, ...] = ()
-    temporal_need_id: str = ""
-    temporal_version: str = ""
-    performed_on: str = ""
 
 
 @dataclass(frozen=True)
@@ -153,6 +135,7 @@ class StructuredInterpretationInput:
     schema_version: str = "structured-interpretation-input-v1"
     # Trusted source-layer detection of an existing record with broken provenance.
     source_repair_need_ids: tuple[str, ...] = ()
+    candidate_update: CandidateProfileUpdateInput | None = None
 
 
 @dataclass(frozen=True)

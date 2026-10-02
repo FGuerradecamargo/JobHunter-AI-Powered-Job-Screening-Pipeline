@@ -130,6 +130,21 @@ class SourceRefRegistry:
 def validate_inputs(request, registry):
     if request.schema_version != "structured-interpretation-input-v1":
         fail(Issue.INVALID_SCHEMA)
+    if request.operation is Operation.UPDATE_CANDIDATE_PROFILE:
+        profile, event = request.candidate_profile, request.candidate_update
+        if profile is None or event is None or not request.memory_signature:
+            fail(Issue.INVALID_SCHEMA)
+        if event.candidate_id != request.candidate_id:
+            fail(Issue.INVALID_SCOPE)
+        if (request.memory_projection is not None or request.previous_checkpoint is not None
+                or request.job_profile is not None or request.hard_facts is not None):
+            fail(Issue.INVALID_SCHEMA)
+        if set(profile.source_refs) != {item.ref for item in profile.source_registry}:
+            fail(Issue.UNKNOWN_REF)
+        if event.source.ref in profile.source_refs:
+            fail(Issue.INVALID_SCHEMA)
+        if request.source_registry != (*profile.source_registry, event.source):
+            fail(Issue.WRONG_SOURCE_CLASS)
     if request.operation is Operation.BUILD_CANDIDATE_PROFILE and (
         not request.candidate_id.strip() or not request.memory_signature.strip()
         or request.memory_projection is None
@@ -162,6 +177,19 @@ def validate_candidate(draft, request, registry, issues):
     unique([item.capability_id for item in draft.capabilities])
     for capability in draft.capabilities:
         registry.evidence(capability.evidence_refs)
+    if request.operation is Operation.UPDATE_CANDIDATE_PROFILE:
+        previous = request.candidate_profile
+        if (not set(draft.confirmed_gaps) <= set(previous.confirmed_gaps)
+                or not set(draft.checkpoint.confirmed_gaps) <= set(previous.checkpoint.confirmed_gaps)):
+            fail(Issue.UNCONFIRMED_GAP)
+        for field in fields(draft.fact_coverage):
+            value = getattr(draft.fact_coverage, field.name)
+            if value.value == "confirmed_complete" and value != getattr(previous.fact_coverage, field.name):
+                fail(Issue.UNCONFIRMED_GAP)
+        for item in (*draft.structured_preferences, *draft.languages,
+                     *draft.licences, *draft.work_authorizations):
+            registry.require(item.evidence_refs, {RefClass.CANDIDATE_EVIDENCE, RefClass.CAREER_MEMORY_SOURCE})
+        return draft
     gaps = tuple(gap for gap in draft.confirmed_gaps if registry.confirms(gap))
     unconfirmed = set(draft.confirmed_gaps) - set(gaps)
     if unconfirmed:
@@ -315,6 +343,7 @@ def validate_output(request, raw):
     validate_inputs(request, registry)
     schemas = {
         Operation.BUILD_CANDIDATE_PROFILE: CandidateProfileDraft,
+        Operation.UPDATE_CANDIDATE_PROFILE: CandidateProfileDraft,
         Operation.BUILD_JOB_PROFILE: JobProfileDraft,
         Operation.ANALYZE_HIRING_CASE: SemanticLinks,
         Operation.INTERPRET_OPPORTUNITY_VALUE: OpportunityInterpretation,
@@ -326,7 +355,7 @@ def validate_output(request, raw):
                 fail(Issue.UNSUPPORTED_BLOCKER)
     payload = decode_structure(raw, schemas[request.operation])
     issues = []
-    if request.operation is Operation.BUILD_CANDIDATE_PROFILE:
+    if request.operation in {Operation.BUILD_CANDIDATE_PROFILE, Operation.UPDATE_CANDIDATE_PROFILE}:
         payload = validate_candidate(payload, request, registry, issues)
     elif request.operation is Operation.BUILD_JOB_PROFILE:
         payload = validate_job(payload, request, registry)

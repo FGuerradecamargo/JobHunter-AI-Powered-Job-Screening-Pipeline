@@ -23,6 +23,7 @@ from models.profile_interpretation import (
     RequirementSubstitutability,
 )
 from services.database import get_connection, initialize_database
+from models.source_reference import RegisteredSourceRef, SourceRefClass
 
 
 def _json(value) -> str:
@@ -31,6 +32,13 @@ def _json(value) -> str:
 
 def _candidate_from_json(raw: str) -> CandidateProfileSnapshot:
     data = json.loads(raw)
+    data["source_registry"] = tuple(
+        RegisteredSourceRef(**{
+            **item,
+            "source_class": SourceRefClass(item["source_class"]),
+            "confirmed_absence_for": tuple(item.get("confirmed_absence_for", ())),
+        }) for item in data.get("source_registry", ())
+    )
     data["capabilities"] = tuple(
         ProfileCapability(**{
             **item,

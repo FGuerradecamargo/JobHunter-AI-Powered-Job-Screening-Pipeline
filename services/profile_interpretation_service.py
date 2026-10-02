@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 import psycopg
+from models.source_reference import RegisteredSourceRef, SourceRefClass
 
 from models.profile_interpretation import (
     AI_JOB_PROFILE_SCHEMA_VERSION,
@@ -81,6 +82,12 @@ class ProfileInterpretationService:
             memory_signature=memory_signature,
             created_at=utc_now(),
             source_refs=available_refs,
+            source_registry=tuple(
+                RegisteredSourceRef(item.ref, SourceRefClass.CAREER_MEMORY_SOURCE,
+                    candidate_id, item.source_type,
+                    item.source_type in {"professional_experience", "career_update"})
+                for item in source_evidence
+            ),
             capabilities=draft.capabilities,
             checkpoint=draft.checkpoint,
             contexts=draft.contexts,
