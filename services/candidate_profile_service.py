@@ -33,6 +33,4 @@ class CandidateProfileService:
         readiness = self.check_readiness(candidate_id)
         if readiness.status == "missing":
             return self._readiness.backfill_missing(candidate_id, self._generation)
-        if readiness.status == "stale":
-            return self.generate_snapshot(candidate_id)
         return readiness.snapshot if readiness.ready else None

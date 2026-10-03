@@ -5,25 +5,6 @@ from models.source_reference import RegisteredSourceRef, SourceRefClass
 
 
 @dataclass(frozen=True)
-class CandidateProfileSourceSync:
-    """Trusted caller attestation of the complete raw state incorporated by this update.
-
-    The caller must establish that the base plus this event covers that state;
-    merely hashing current raw data is not sufficient when other changes are pending.
-    This is never interpreter output and contains no raw history.
-    """
-    candidate_id: str
-    update_id: str
-    raw_source_signature: str
-
-    def __post_init__(self):
-        if any(not isinstance(value, str) or not value.strip() for value in (
-            self.candidate_id, self.update_id, self.raw_source_signature
-        )):
-            raise ValueError("Source synchronization identity and signature are required.")
-
-
-@dataclass(frozen=True)
 class CandidateProfileUpdateInput:
     update_id: str
     candidate_id: str

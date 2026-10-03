@@ -23,7 +23,7 @@ class ProfileReadiness:
     def message(self):
         return {
             "ready": "Your profile is ready.",
-            "stale": "Your evidence has changed. Regenerate your profile before searching.",
+            "stale": "Your profile version is not supported. Open Profile for assistance.",
             "missing": "Generate your profile from your confirmed experience before searching.",
             "no_evidence": "Confirm your experience in Profile before searching.",
             "unavailable": "Your profile could not be verified. Open Profile and try again.",
@@ -43,38 +43,19 @@ class ProfileReadinessService:
     def check(self, candidate_id):
         if not candidate_id:
             return ProfileReadiness("no_evidence")
-        source, evidence = load_confirmed_candidate_profile_input(candidate_id, self.onboarding, self.updates)
+        profile = self.snapshots.current_candidate(candidate_id)
+        if profile is not None:
+            if (isinstance(profile, CandidateProfileSnapshot)
+                    and profile.candidate_id == candidate_id
+                    and profile.schema_version == CANDIDATE_PROFILE_SCHEMA_VERSION):
+                return ProfileReadiness("ready", profile)
+            return ProfileReadiness("stale")
+
+        # RAW determines whether V1 can be created, never whether Vn remains valid.
+        _, evidence = load_confirmed_candidate_profile_input(candidate_id, self.onboarding, self.updates)
         if not any(e.source_type in {"professional_experience", "career_update"} for e in evidence):
             return ProfileReadiness("no_evidence")
-        profile = self.snapshots.current_candidate(candidate_id)
-
-        if isinstance(
-            profile,
-            CandidateProfileSnapshot,
-        ) and (
-            profile.candidate_id == candidate_id
-            and bool(profile.raw_source_signature)
-            and profile.raw_source_signature
-            == source.source_signature
-            and profile.schema_version
-            == CANDIDATE_PROFILE_SCHEMA_VERSION
-            and set(profile.source_refs).issubset(
-                {
-                    item.ref
-                    for item in evidence
-                }
-            )
-        ):
-            return ProfileReadiness(
-                "ready",
-                profile,
-            )
-
-        return ProfileReadiness(
-            "stale"
-            if profile is not None
-            else "missing"
-        )
+        return ProfileReadiness("missing")
 
     def backfill_missing(self, candidate_id, interpreter):
         """Explicit migration only; never replace a Candidate or an existing snapshot."""

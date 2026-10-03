@@ -126,6 +126,9 @@ class CandidateProfileGenerationService:
         return draft
 
     def generate_snapshot(self, candidate_id: str) -> CandidateProfileSnapshot:
+        current = self.snapshot_repository.current_candidate(candidate_id)
+        if current is not None:
+            return current
         onboarding = self.onboarding_repository.get_onboarding(candidate_id)
         if onboarding is None:
             raise ValueError("Candidate onboarding was not found.")

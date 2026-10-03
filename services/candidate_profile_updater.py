@@ -7,7 +7,7 @@ import sqlite3
 
 import psycopg
 
-from models.candidate_profile_update import CandidateProfileSourceSync, CandidateProfileUpdateInput
+from models.candidate_profile_update import CandidateProfileUpdateInput
 from models.profile_interpretation import CandidateProfileDraft, CandidateProfileSnapshot
 from models.structured_interpretation import (
     InterpretationOperation, StructuredInterpretationInput, StructuredInterpreter,
@@ -31,18 +31,13 @@ class CandidateProfileUpdater:
         self._clock = clock or (lambda: datetime.now(timezone.utc).isoformat())
 
     def update(self, current_snapshot: CandidateProfileSnapshot,
-               update_input: CandidateProfileUpdateInput, *,
-               source_sync: CandidateProfileSourceSync | None = None) -> CandidateProfileSnapshot:
+               update_input: CandidateProfileUpdateInput) -> CandidateProfileSnapshot:
         if current_snapshot.candidate_id != update_input.candidate_id:
             raise InterpretationValidationError(ValidationIssue.INVALID_SCOPE)
-        if source_sync is not None and (
-            source_sync.candidate_id != current_snapshot.candidate_id
-            or source_sync.update_id != update_input.update_id
-        ):
-            raise InterpretationValidationError(ValidationIssue.INVALID_SCOPE)
-        identity = {"snapshot": asdict(current_snapshot), "update": asdict(update_input)}
-        if source_sync is not None:
-            identity["source_sync"] = asdict(source_sync)
+        snapshot_identity = asdict(current_snapshot)
+        # V1 raw provenance is audit metadata, not incremental update identity.
+        snapshot_identity.pop("raw_source_signature", None)
+        identity = {"snapshot": snapshot_identity, "update": asdict(update_input)}
         signature = _signature(identity)
         request = StructuredInterpretationInput(
             operation=InterpretationOperation.UPDATE_CANDIDATE_PROFILE,
@@ -73,7 +68,6 @@ class CandidateProfileUpdater:
             profile_version=current_snapshot.profile_version + 1,
             supersedes_version=current_snapshot.profile_version,
             memory_signature=signature,
-            raw_source_signature=source_sync.raw_source_signature if source_sync is not None else "",
             created_at=self._clock(),
             schema_version=current_snapshot.schema_version,
             source_refs=(*current_snapshot.source_refs, update_input.source.ref),

@@ -27,13 +27,13 @@ def test_legacy_summary_is_not_ready_and_backfill_preserves_candidate(repo):
     assert ProfileSnapshotRepository().current_candidate("b") is None
 
 
-def test_changed_evidence_is_stale_and_backfill_never_replaces_history(repo):
+def test_changed_raw_evidence_keeps_materialized_profile_ready(repo):
     generator = service(repo, Client())
     gate = ProfileReadinessService()
     first = gate.backfill_missing("a", generator)
     repo.save_onboarding(CandidateOnboarding("a", desired_next_work="New direction"))
-    assert gate.check("a").status == "stale"
-    assert not gate.check("a").ready
+    assert gate.check("a").status == "ready"
+    assert gate.check("a").snapshot == first
     assert gate.backfill_missing("a", generator) == first
     assert len(generator.llm_client.calls) == 1
     assert gate.snapshots.candidate_version("a", 1) == first

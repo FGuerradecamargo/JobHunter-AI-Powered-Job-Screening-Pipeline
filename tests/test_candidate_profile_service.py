@@ -78,12 +78,15 @@ def test_legacy_generation_uses_canonical_path_and_saves_projection(repo, monkey
 def test_missing_onboarding_still_fails_before_interpretation():
     onboarding, candidate, updates, snapshots, client = (Mock() for _ in range(5))
     onboarding.get_onboarding.return_value = None
+    snapshots.current_candidate.return_value = None
     generator = CandidateProfileGenerationService(client, onboarding, candidate, updates,
                                                   snapshot_repository=snapshots)
     for operation in (lambda: generator.generate_snapshot("a"), lambda: generator.generate("a", "Name")):
         with pytest.raises(ValueError, match="Candidate onboarding was not found"):
             operation()
-    for dependency in (candidate, updates, snapshots, client):
+    assert snapshots.current_candidate.call_count == 2
+    snapshots.save_candidate.assert_not_called()
+    for dependency in (candidate, updates, client):
         assert not dependency.mock_calls
 
 
@@ -129,10 +132,6 @@ def test_refresh_routes_only_eligible_states(status):
         readiness.backfill_missing.assert_called_once_with("a", generation)
         assert result is readiness.backfill_missing.return_value
         generation.generate_snapshot.assert_not_called()
-    elif status == "stale":
-        generation.generate_snapshot.assert_called_once_with("a")
-        assert result is generation.generate_snapshot.return_value
-        readiness.backfill_missing.assert_not_called()
     else:
         assert result is (snapshot if status == "ready" else None)
         readiness.backfill_missing.assert_not_called()

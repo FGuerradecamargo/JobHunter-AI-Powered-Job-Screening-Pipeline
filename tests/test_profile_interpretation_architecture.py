@@ -126,7 +126,7 @@ def test_same_memory_signature_reuses_candidate_profile():
     assert len(interpreter.candidate_calls) == 1
 
 
-def test_memory_change_creates_v2_and_preserves_v1():
+def test_memory_change_cannot_rebuild_existing_profile_from_raw():
     repository = FakeRepository()
     service = ProfileInterpretationService(repository, FakeInterpreter())
     v1 = service.candidate_profile(
@@ -138,33 +138,29 @@ def test_memory_change_creates_v2_and_preserves_v1():
         candidate_id="candidate-a", memory_signature="memory-2",
         memory_payload={}, source_evidence=(source(), source("experience:2", "Investigated fraud alert")),
     )
-    assert (v2.profile_version, v2.supersedes_version) == (2, 1)
+    assert v2 is v1
     assert repository.candidates[0] == frozen_v1
-    assert v2.source_refs == ("experience:1", "experience:2")
-    assert not v2.evidence_gaps
+    assert len(repository.candidates) == 1
+    assert len(service.interpreter.candidate_calls) == 1
 
 
-def test_checkpoint_cannot_become_evidence_for_next_profile():
+def test_checkpoint_cannot_become_evidence_for_initial_profile():
     repository = FakeRepository()
 
     class Malicious(FakeInterpreter):
         def build_candidate_profile(self, **kwargs):
-            if kwargs["previous_checkpoint"]:
-                return CandidateProfileDraft(
-                    capabilities=(ProfileCapability("api", "API troubleshooting", ("checkpoint:v1",)),),
-                    checkpoint=checkpoint(),
-                )
-            return super().build_candidate_profile(**kwargs)
+            return CandidateProfileDraft(
+                capabilities=(ProfileCapability("api", "API troubleshooting", ("checkpoint:v1",)),),
+                checkpoint=checkpoint(),
+            )
 
     service = ProfileInterpretationService(repository, Malicious())
-    service.candidate_profile(
-        candidate_id="candidate-a", memory_signature="m1", memory_payload={}, source_evidence=(source(),),
-    )
     with pytest.raises(ValueError, match="source snapshot"):
         service.candidate_profile(
             candidate_id="candidate-a", memory_signature="m2", memory_payload={},
             source_evidence=(source(), source("experience:2")),
         )
+    assert repository.candidates == []
 
 
 def test_source_projection_ignores_checkpoint_and_unreferenced_profile_claims():

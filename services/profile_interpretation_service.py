@@ -7,7 +7,6 @@ from models.source_reference import RegisteredSourceRef, SourceRefClass
 
 from models.profile_interpretation import (
     AI_JOB_PROFILE_SCHEMA_VERSION,
-    CANDIDATE_PROFILE_SCHEMA_VERSION,
     AIJobProfileSnapshot,
     CandidateProfileSnapshot,
     JobHardFacts,
@@ -30,6 +29,9 @@ class ProfileInterpretationService:
         self.interpreter = interpreter
 
     def candidate_profile_from_onboarding(self, *, candidate_id, onboarding_repository, career_update_repository=None):
+        current = self.repository.current_candidate(candidate_id)
+        if current is not None:
+            return current
         snapshot, sources = load_confirmed_candidate_profile_input(candidate_id, onboarding_repository, career_update_repository)
         if not any(item.source_type in {"professional_experience", "career_update"} for item in sources):
             raise ProfileGenerationFailure(
@@ -47,19 +49,16 @@ class ProfileInterpretationService:
         memory_payload: dict,
         source_evidence: tuple[SourceEvidence, ...],
     ) -> CandidateProfileSnapshot:
-        existing = self.repository.candidate_for_signature(
-            candidate_id, memory_signature, CANDIDATE_PROFILE_SCHEMA_VERSION,
-        )
+        # Heavy source interpretation creates V1 only. Later versions belong to
+        # CandidateProfileUpdater, even when historical RAW has changed.
+        existing = self.repository.current_candidate(candidate_id)
         if existing is not None:
             return existing
-        previous = self.repository.current_candidate(candidate_id)
-        # Only source memory and source evidence enter interpretation. The previous
-        # checkpoint is separate and may describe change, never satisfy evidence.
         draft = self.interpreter.build_candidate_profile(
             candidate_id=candidate_id,
             memory_payload=memory_payload,
             source_evidence=source_evidence,
-            previous_checkpoint=(previous.checkpoint if previous else None),
+            previous_checkpoint=None,
         )
         if memory_payload.get("source_schema") == "confirmed-onboarding-v1" and any(
             state is CoverageState.CONFIRMED_COMPLETE for state in asdict(draft.fact_coverage).values()
@@ -77,8 +76,8 @@ class ProfileInterpretationService:
             )
         profile = CandidateProfileSnapshot(
             candidate_id=candidate_id,
-            profile_version=(previous.profile_version + 1 if previous else 1),
-            supersedes_version=(previous.profile_version if previous else None),
+            profile_version=1,
+            supersedes_version=None,
             memory_signature=memory_signature,
             created_at=utc_now(),
             raw_source_signature=memory_signature,
