@@ -81,6 +81,7 @@ class ProfileInterpretationService:
             supersedes_version=(previous.profile_version if previous else None),
             memory_signature=memory_signature,
             created_at=utc_now(),
+            raw_source_signature=memory_signature,
             source_refs=available_refs,
             source_registry=tuple(
                 RegisteredSourceRef(item.ref, SourceRefClass.CAREER_MEMORY_SOURCE,

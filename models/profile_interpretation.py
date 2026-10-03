@@ -253,6 +253,8 @@ class CandidateProfileSnapshot:
     supersedes_version: int | None = None
     schema_version: str = CANDIDATE_PROFILE_SCHEMA_VERSION
     source_registry: tuple[RegisteredSourceRef, ...] = ()
+    # Exact raw-source state incorporated, separate from transformation identity.
+    raw_source_signature: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_refs", _refs(self.source_refs))

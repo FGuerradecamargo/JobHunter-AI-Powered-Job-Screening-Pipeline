@@ -14,7 +14,7 @@ def test_readiness_uses_single_snapshot_lookup():
     ]
 
     assert (
-        "candidate_for_readiness("
+        "current_candidate("
         in check_source
     )
 
@@ -24,7 +24,7 @@ def test_readiness_uses_single_snapshot_lookup():
     )
 
     assert (
-        "current_candidate("
+        "candidate_for_readiness("
         not in check_source
     )
 

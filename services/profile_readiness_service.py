@@ -46,18 +46,15 @@ class ProfileReadinessService:
         source, evidence = load_confirmed_candidate_profile_input(candidate_id, self.onboarding, self.updates)
         if not any(e.source_type in {"professional_experience", "career_update"} for e in evidence):
             return ProfileReadiness("no_evidence")
-        profile = self.snapshots.candidate_for_readiness(
-            candidate_id,
-            source.source_signature,
-            CANDIDATE_PROFILE_SCHEMA_VERSION,
-        )
+        profile = self.snapshots.current_candidate(candidate_id)
 
         if isinstance(
             profile,
             CandidateProfileSnapshot,
         ) and (
             profile.candidate_id == candidate_id
-            and profile.memory_signature
+            and bool(profile.raw_source_signature)
+            and profile.raw_source_signature
             == source.source_signature
             and profile.schema_version
             == CANDIDATE_PROFILE_SCHEMA_VERSION
