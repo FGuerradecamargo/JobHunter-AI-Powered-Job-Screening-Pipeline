@@ -1,7 +1,8 @@
 """Provider-neutral, private in-memory contracts. Diagnostics are a separate projection."""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol
+from typing import TypeAlias
+from models.interpretation_boundary import StructuredInterpreter as GenericStructuredInterpreter
 from models.source_reference import RegisteredSourceRef, SourceRefClass
 from models.candidate_profile_update import CandidateProfileUpdateInput
 
@@ -151,5 +152,7 @@ class InterpretationResult:
     authoritative: bool = False
 
 
-class StructuredInterpreter(Protocol):
-    def interpret(self, request: StructuredInterpretationInput) -> InterpretationResult: ...
+# Compatibility specialization; existing payloads and runtime validation stay intact.
+StructuredInterpreter: TypeAlias = GenericStructuredInterpreter[
+    StructuredInterpretationInput, InterpretationResult
+]
