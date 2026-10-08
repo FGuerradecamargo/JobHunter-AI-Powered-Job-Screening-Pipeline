@@ -9,13 +9,12 @@ from models.interpretation_boundary import InterpretationRequest
 from services.interpretation_operation_spec import InterpretationOperationSpec
 from services.professional_facts_operation import (
     INSTRUCTIONS, OPERATION, ProfessionalFactsInput, ProfessionalFactsOutput,
-    build_request, validate_response,
+    build_request, validate_response, professional_fact_id,
 )
 
 
 class _FactOutput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    id: str
     statement: str
     candidate_input_id: str
 
@@ -37,7 +36,8 @@ def _serialize_input(payload: ProfessionalFactsInput) -> str:
 def _parse_output(raw: dict) -> ProfessionalFactsOutput:
     structured = ProfessionalFactsStructuredOutput.model_validate(raw)
     return ProfessionalFactsOutput(tuple(
-        ProfessionalFact(item.id, item.statement, item.candidate_input_id)
+        ProfessionalFact(professional_fact_id(item.candidate_input_id, item.statement),
+                         item.statement, item.candidate_input_id)
         for item in structured.facts
     ))
 

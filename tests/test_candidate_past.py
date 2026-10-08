@@ -19,6 +19,30 @@ def education(**kwargs):
     return Education("edu-1", "College", "Diploma", "Computing", **kwargs)
 
 
+@pytest.mark.parametrize("second_kind", ["experience", "education"])
+@pytest.mark.parametrize("collision", ["input", "fact", "cross_kind"])
+def test_global_provenance_ids_are_unique_and_disjoint(second_kind, collision):
+    first = experience(inputs=(CandidateInput("i1", "Original"),),
+                       facts=(ProfessionalFact("f1", "Fact", "i1"),))
+    source = "i1" if collision == "input" else "f1" if collision == "cross_kind" else "i2"
+    fact_id = "f1" if collision == "fact" else "f2"
+    values = dict(inputs=(CandidateInput(source, "Other original"),),
+                  facts=(ProfessionalFact(fact_id, "Other fact", source),))
+    second = Experience("exp-2", "Other", "Role", **values) if second_kind == "experience" else education(**values)
+    with pytest.raises(ValueError):
+        CandidatePast((first, second)) if second_kind == "experience" else CandidatePast((first,), (second,))
+
+
+def test_independent_provenance_across_multiple_entities():
+    first = experience(inputs=(CandidateInput("i1", "Original"),), facts=(ProfessionalFact("f1", "Fact", "i1"),))
+    second = Experience("exp-2", "Other", "Role", inputs=(CandidateInput("i2", "Other"),),
+                        facts=(ProfessionalFact("f2", "Another fact", "i2"),))
+    third = education(inputs=(CandidateInput("i3", "Study"),), facts=(ProfessionalFact("f3", "Project", "i3"),))
+    assert CandidatePast((first, second), (third,)).education == (third,)
+    with pytest.raises(ValueError, match="same entity"):
+        education(inputs=(CandidateInput("i3", "Study"),), facts=(ProfessionalFact("f3", "Fact", "i1"),))
+
+
 def test_past_encapsulates_independent_entities_and_serializes():
     exp = experience(start_date="2020-01")
     edu = education(start_date="2018", end_date="2019", status="completed")

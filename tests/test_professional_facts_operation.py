@@ -8,7 +8,7 @@ import pytest
 from models.candidate_past import CandidateInput, ProfessionalFact
 from models.interpretation_boundary import InterpretationRequest, InterpretationResponse, StructuredInterpreter
 from services.professional_facts_operation import (
-    INSTRUCTIONS, OPERATION, ProfessionalFactsInput, ProfessionalFactsOutput, build_request, validate_response,
+    INSTRUCTIONS, OPERATION, ProfessionalFactsInput, ProfessionalFactsOutput, build_request, validate_response, professional_fact_id,
 )
 
 
@@ -34,7 +34,7 @@ def run(inputs, facts):
 ])
 def test_one_original_input_supports_one_or_multiple_facts(statements):
     source = CandidateInput("input-1", "  I answered customers by phone, investigated account history, consulted policies and decided resolution.  ")
-    facts = tuple(ProfessionalFact(f"fact-{i}", text, source.id) for i, text in enumerate(statements))
+    facts = tuple(ProfessionalFact(professional_fact_id(source.id, text), text, source.id) for text in statements)
     result = run((source,), facts)
     assert result.operation == OPERATION
     assert result.output_payload.facts == facts
@@ -45,17 +45,19 @@ def test_one_original_input_supports_one_or_multiple_facts(statements):
 
 def test_multiple_inputs_keep_explicit_separate_provenance():
     inputs = (CandidateInput("a", "I investigated history."), CandidateInput("b", "I consulted policies."))
-    facts = (ProfessionalFact("f1", "Investigated history", "a"), ProfessionalFact("f2", "Consulted policies", "b"))
+    facts = tuple(ProfessionalFact(professional_fact_id(source, text), text, source)
+                  for source, text in (("a", "Investigated history"), ("b", "Consulted policies")))
     assert [(f.statement, f.candidate_input_id) for f in run(inputs, facts).output_payload.facts] == [
         ("Investigated history", "a"), ("Consulted policies", "b"),
     ]
 
 
-@pytest.mark.parametrize("reference", ["unknown", "f1"])
+@pytest.mark.parametrize("reference", ["unknown", professional_fact_id("input", "First")])
 def test_unknown_refs_and_fact_to_fact_chains_fail(reference):
     with pytest.raises(ValueError, match="supplied original"):
         run((CandidateInput("input", "Original"),), (
-            ProfessionalFact("f1", "First", "input"), ProfessionalFact("f2", "Second", reference),
+            ProfessionalFact(professional_fact_id("input", "First"), "First", "input"),
+            ProfessionalFact(professional_fact_id(reference, "Second"), "Second", reference),
         ))
 
 
@@ -131,7 +133,7 @@ def forbidden(*args, **kwargs):
     raise AssertionError('Unexpected domain construction')
 past.CandidatePast = past.Experience = past.Education = forbidden
 request = build_request(ProfessionalFactsInput((CandidateInput('a', 'Original'),)))
-result = InterpretationResponse(OPERATION, request.input_signature, ProfessionalFactsOutput((ProfessionalFact('f', 'Original', 'a'),)))
+result = InterpretationResponse(OPERATION, request.input_signature, ProfessionalFactsOutput((ProfessionalFact(professional_fact_id('a', 'Original'), 'Original', 'a'),)))
 assert validate_response(request, result) is result
 """
     result = subprocess.run(
@@ -139,3 +141,16 @@ assert validate_response(request, result) is result
         capture_output=True, text=True, timeout=30, check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_system_owned_lexical_identity():
+    identity = professional_fact_id("source", "Used SQL.")
+    assert identity.startswith("professional-fact-v1:")
+    assert identity == professional_fact_id("source", "  USED\n SQL. ")
+    assert identity == professional_fact_id("source", "Used \uff33\uff31\uff2c.")
+    assert identity != professional_fact_id("source", "Used SQL")
+    assert identity != professional_fact_id("source ", "Used SQL.")
+    assert identity != professional_fact_id("other", "Used SQL.")
+    assert identity != professional_fact_id("source", "Used Python.")
+    with pytest.raises(ValueError, match="system-generated"):
+        run((CandidateInput("source", "I used SQL."),), (ProfessionalFact("ai-id", "Used SQL.", "source"),))

@@ -41,7 +41,7 @@ def test_references_can_trace_to_past_facts_and_original_input(count):
         assert fact.candidate_input_id == past.inputs[0].id
     assert {field.name for field in fields(item)} == {"skill", "level", "evidence_refs"}
     assert {field.name for field in fields(ProfessionalFactRef)} == {"fact_id"}
-    assert {field.name for field in fields(CandidatePresent)} == {"skills"}
+    assert {field.name for field in fields(CandidatePresent)} == {"skills", "country", "city", "languages"}
 
 
 def test_unknown_is_an_identified_skill_not_absence_or_zero():
@@ -121,3 +121,25 @@ assert CandidatePresent((item,)).skills[0] is item
         capture_output=True, text=True, timeout=30, check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_basic_state_preserves_unknown_and_declared_values():
+    assert (CandidatePresent().country, CandidatePresent().city, CandidatePresent().languages) == (None, None, ())
+    present = CandidatePresent(country=" Ireland ", city="Limerick", languages=("English", "Portuguese"))
+    assert (present.country, present.city, present.languages) == (" Ireland ", "Limerick", ("English", "Portuguese"))
+    for name in ("country", "city", "languages"):
+        with pytest.raises(FrozenInstanceError):
+            setattr(present, name, None)
+
+
+@pytest.mark.parametrize("name", ["country", "city"])
+@pytest.mark.parametrize("value", ["", " \t", 0, []])
+def test_location_requires_optional_nonblank_text(name, value):
+    with pytest.raises(ValueError):
+        CandidatePresent(**{name: value})
+
+
+@pytest.mark.parametrize("languages", [[], ("",), (" \t",), (None,), ("English", "English")])
+def test_language_tuple_nonblank_unique_values(languages):
+    with pytest.raises((ValueError, TypeError)):
+        CandidatePresent(languages=languages)

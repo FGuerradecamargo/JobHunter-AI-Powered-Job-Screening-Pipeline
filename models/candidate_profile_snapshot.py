@@ -36,3 +36,9 @@ class CandidateProfileSnapshot:
         ):
             if type(getattr(self, name)) is not branch_type:
                 raise TypeError(f"{name} must be a {branch_type.__name__}.")
+        fact_ids = {
+            fact.id for entity in (*self.past.experiences, *self.past.education)
+            for fact in entity.facts
+        }
+        if any(ref.fact_id not in fact_ids for skill in self.present.skills for ref in skill.evidence_refs):
+            raise ValueError("Present evidence must resolve to a ProfessionalFact in this Snapshot's Past.")

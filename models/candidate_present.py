@@ -49,8 +49,21 @@ class CandidateSkill:
 @dataclass(frozen=True)
 class CandidatePresent:
     skills: tuple[CandidateSkill, ...] = ()
+    country: str | None = None
+    city: str | None = None
+    languages: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        for name in ("country", "city"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"{name} must be None or a nonblank string.")
+        if not isinstance(self.languages, tuple):
+            raise TypeError("languages must be a tuple.")
+        if any(not isinstance(value, str) or not value.strip() for value in self.languages):
+            raise ValueError("Every language must be a nonblank string.")
+        if len(set(self.languages)) != len(self.languages):
+            raise ValueError("Duplicate language values.")
         if not isinstance(self.skills, tuple) or any(type(item) is not CandidateSkill for item in self.skills):
             raise TypeError("skills must be a tuple of CandidateSkill values.")
         if len({item.skill.id for item in self.skills}) != len(self.skills):

@@ -2,6 +2,7 @@
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import unicodedata
 
 from models.candidate_past import CandidateInput, ProfessionalFact
 from models.interpretation_boundary import InterpretationRequest, InterpretationResponse
@@ -16,12 +17,24 @@ into skills. Do not use employer/title assumptions, market meaning or external c
 For 'I investigated account history and decided the resolution', valid facts are
 'investigated account history' and 'decided the resolution', not 'fraud investigation',
 'advanced analytical reasoning' or 'expert decision making'.
-Return facts with stable nonblank id, statement and candidate_input_id. Every fact
+Return facts with only statement and candidate_input_id; never return id.
+Fact identity is assigned by the system, not the provider. Every fact
 must be supported by that exact supplied original input, not another input or fact.
 Never use an interpretation as new source material. Keep input and fact IDs distinct.
 One input may support multiple facts. Return no facts when no professional fact is
-supported; do not invent facts to fill the result. Preserve IDs for unchanged facts.
+supported; do not invent facts to fill the result.
 """
+
+
+def professional_fact_id(candidate_input_id: str, statement: str) -> str:
+    """Versioned lexical identity, not semantic equivalence; source ID is exact."""
+    for value in (candidate_input_id, statement):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Source identity and statement must be nonblank strings.")
+    normalized = " ".join(unicodedata.normalize("NFKC", statement).casefold().split())
+    encoded = json.dumps(["professional-fact-v1", candidate_input_id, normalized],
+                         ensure_ascii=True, separators=(",", ":"))
+    return "professional-fact-v1:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -79,4 +92,6 @@ def validate_response(
             raise ValueError("Fact must reference a supplied original CandidateInput.")
         if fact.id in input_ids:
             raise ValueError("Fact IDs must be distinct from input IDs.")
+        if fact.id != professional_fact_id(fact.candidate_input_id, fact.statement):
+            raise ValueError("ProfessionalFact identity must be system-generated.")
     return response

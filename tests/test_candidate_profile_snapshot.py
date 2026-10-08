@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from models.candidate_past import CandidateInput, CandidatePast, Experience, ProfessionalFact
+from models.candidate_past import CandidateInput, CandidatePast, Education, Experience, ProfessionalFact
 from models.candidate_present import CandidatePresent, CandidateSkill, ProfessionalFactRef
 from models.candidate_future import CandidateFuture
 from models.candidate_priorities import CandidatePriorities, Priority, PriorityEffect
@@ -25,6 +25,24 @@ def test_identity_and_first_version_preserved():
     snapshot = _snapshot(candidate_id=" Candidate-1 ")
     assert snapshot.candidate_id == " Candidate-1 "
     assert snapshot.version == 1
+
+
+@pytest.mark.parametrize("include_education", [False, True])
+def test_skill_evidence_resolves_across_past_entities(include_education):
+    first = Experience("e1", "Company", "Role", inputs=(CandidateInput("i1", "SQL"),),
+                       facts=(ProfessionalFact("f1", "Used SQL", "i1"),))
+    values = dict(inputs=(CandidateInput("i2", "More SQL"),), facts=(ProfessionalFact("f2", "Used SQL", "i2"),))
+    second = Education("e2", "College", "Diploma", "Data", **values) if include_education else Experience("e2", "Other", "Role", **values)
+    past = CandidatePast((first,), (second,)) if include_education else CandidatePast((first, second))
+    skill = CandidateSkill(Skill("sql", "SQL", "Data"), SkillLevel.UNKNOWN,
+                           (ProfessionalFactRef("f1"), ProfessionalFactRef("f2")))
+    assert _snapshot(past=past, present=CandidatePresent((skill,))).present.skills == (skill,)
+    assert _snapshot(past=past).present.skills == ()
+    dangling = replace(skill, evidence_refs=(ProfessionalFactRef("f1"), ProfessionalFactRef("missing")))
+    with pytest.raises(ValueError, match="resolve"):
+        _snapshot(past=past, present=CandidatePresent((dangling,)))
+    with pytest.raises(ValueError, match="resolve"):
+        _snapshot(present=CandidatePresent((skill,)))
 
 
 @pytest.mark.parametrize("version", [0, -1, 1.0, "1", True, False, None])

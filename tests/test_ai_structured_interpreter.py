@@ -13,7 +13,7 @@ from models.interpretation_boundary import InterpretationRequest, Interpretation
 from services.ai_structured_interpreter import AIStructuredInterpreter, InterpretationExecutionError
 from services.interpretation_operation_spec import InterpretationOperationSpec
 from services.professional_facts_operation import (
-    INSTRUCTIONS, ProfessionalFactsInput, ProfessionalFactsOutput, build_request, validate_response,
+    INSTRUCTIONS, ProfessionalFactsInput, ProfessionalFactsOutput, build_request, validate_response, professional_fact_id,
 )
 from services.professional_facts_spec import PROFESSIONAL_FACTS_SPEC, ProfessionalFactsStructuredOutput
 
@@ -36,7 +36,7 @@ def _request():
 
 
 def _raw():
-    return {"facts": [{"id": "fact-1", "statement": "Used SQL.", "candidate_input_id": "input-1"}]}
+    return {"facts": [{"statement": "Used SQL.", "candidate_input_id": "input-1"}]}
 
 
 def test_professional_facts_through_generic_verb():
@@ -48,7 +48,7 @@ def test_professional_facts_through_generic_verb():
     response = interpreter.interpret(request)
     assert response.operation == request.operation
     assert response.input_signature == request.input_signature
-    assert response.output_payload == ProfessionalFactsOutput((ProfessionalFact("fact-1", "Used SQL.", "input-1"),))
+    assert response.output_payload == ProfessionalFactsOutput((ProfessionalFact(professional_fact_id("input-1", "Used SQL."), "Used SQL.", "input-1"),))
     assert validate_response(request, response) is response
     assert len(provider.calls) == 1
     prompt, schema = provider.calls[0]
@@ -66,10 +66,10 @@ def test_empty_facts_are_valid_not_fabricated():
 
 @pytest.mark.parametrize("raw", [
     None, '{"facts": []}', [], {}, {"facts": "text"}, {"facts": [], "extra": True},
-    {"facts": [{"id": "f", "statement": "x"}]},
+    {"facts": [{"statement": "x"}]},
     {"facts": [{"id": 1, "statement": "x", "candidate_input_id": "input-1"}]},
-    {"facts": [{"id": "f", "statement": " ", "candidate_input_id": "input-1"}]},
-    {"facts": [{"id": "f", "statement": "x", "candidate_input_id": "input-1", "extra": True}]},
+    {"facts": [{"statement": " ", "candidate_input_id": "input-1"}]},
+    {"facts": [{"statement": "x", "candidate_input_id": "input-1", "extra": True}]},
 ])
 def test_invalid_structured_output_fails_explicitly(raw):
     provider = FakeProvider(raw)
@@ -78,10 +78,10 @@ def test_invalid_structured_output_fails_explicitly(raw):
     assert len(provider.calls) == 1
 
 
-@pytest.mark.parametrize("source", ["unknown", "fact-1"])
+@pytest.mark.parametrize("source", ["unknown", professional_fact_id("input-1", "Used SQL.")])
 def test_operation_rejects_unknown_or_fact_to_fact_provenance(source):
     raw = _raw()
-    raw["facts"][0]["candidate_input_id"] = source
+    raw["facts"].append({"statement": "Second fact.", "candidate_input_id": source})
     with pytest.raises(InterpretationExecutionError, match="^invalid_output$"):
         AIStructuredInterpreter(FakeProvider(raw), PROFESSIONAL_FACTS_SPEC).interpret(_request())
 
@@ -165,7 +165,7 @@ def test_existing_openai_structured_transport_with_fake_sdk():
     provider.model = "offline-test"
     provider.client = SimpleNamespace(responses=SimpleNamespace(parse=parse))
     response = AIStructuredInterpreter(provider, PROFESSIONAL_FACTS_SPEC).interpret(_request())
-    assert response.output_payload.facts[0].id == "fact-1"
+    assert response.output_payload.facts[0].id == professional_fact_id("input-1", "Used SQL.")
     assert len(calls) == 1
     assert calls[0]["text_format"] is ProfessionalFactsStructuredOutput
 
@@ -204,3 +204,12 @@ assert AIStructuredInterpreter(Provider(), PROFESSIONAL_FACTS_SPEC).interpret(re
         capture_output=True, text=True, timeout=30, check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_provider_fact_identity_is_forbidden_even_if_canonical():
+    raw = _raw()
+    raw["facts"][0]["id"] = professional_fact_id("input-1", "Used SQL.")
+    with pytest.raises(InterpretationExecutionError, match="invalid_output"):
+        AIStructuredInterpreter(FakeProvider(raw), PROFESSIONAL_FACTS_SPEC).interpret(_request())
+    schema = ProfessionalFactsStructuredOutput.model_json_schema()
+    assert set(schema["$defs"]["_FactOutput"]["properties"]) == {"statement", "candidate_input_id"}

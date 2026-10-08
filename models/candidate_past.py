@@ -128,3 +128,12 @@ class CandidatePast:
         _collection(self.experiences, Experience)
         _collection(self.education, Education)
         _collection(self.certifications, Certification)
+        entities = (*self.experiences, *self.education)
+        input_ids = [item.id for entity in entities for item in entity.inputs]
+        fact_ids = [item.id for entity in entities for item in entity.facts]
+        if len(set(input_ids)) != len(input_ids):
+            raise ValueError("Duplicate CandidateInput identities across Past.")
+        if len(set(fact_ids)) != len(fact_ids):
+            raise ValueError("Duplicate ProfessionalFact identities across Past.")
+        if set(input_ids) & set(fact_ids):
+            raise ValueError("Input and fact identities must be globally disjoint in Past.")
