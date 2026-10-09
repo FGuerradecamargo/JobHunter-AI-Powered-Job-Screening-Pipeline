@@ -3,7 +3,7 @@ from streamlit.testing.v1 import AppTest
 APP = '''
 import streamlit as st
 from types import SimpleNamespace
-from components.onboarding import render_onboarding
+from components.company_interview import render_company_interview
 from components.voice_text_input import VoiceTextInputs, bind_scope
 from models.app_user import AppUser
 from services.ai.voice_transcription import VoiceConfig
@@ -29,17 +29,16 @@ class Repo:
         self.add_work_experience(candidate_id=kw['candidate_id'], company=kw['company'],
             start_date=kw['start_date'], end_date=kw['end_date'], career_story='',
             day_to_day_narrative=' '.join(a.confirmed_text for a in kw['answers']))
-class Generator:
-    def create_initial_profile(self, **kw): st.session_state.generated = True
 u = AppUser('u','private@example.test','Private', 'c')
 scope = bind_scope(st.session_state, 'u','u','c')
 inputs = VoiceTextInputs(scope, config=VoiceConfig(), provider=object(), events=None)
-if not st.session_state.get('generated'):
-    from unittest.mock import patch
-    from services.company_interview import start_interview as legacy_start
-    with patch('components.onboarding.start_interview', lambda *args, **kw: legacy_start(*args, **dict(kw, version='company-interview-v2'))):
-        render_onboarding(candidate_id='c', candidate_name='Private', onboarding_repository=Repo(),
-        profile_gateway=Generator(), authenticated_user=u, active_user=u, voice_inputs=inputs,
+from services.company_interview import start_interview
+key = '_voice_company_draft_' + scope
+if 'saved_experiences' not in st.session_state:
+    if key not in st.session_state:
+        st.session_state[key] = start_interview(scope, 'c', 'Synthetic Co', '2020-01', None,
+            version='company-interview-v2')
+    render_company_interview(st.session_state[key], scope, Repo(), inputs,
         reflection_provider=FakeReflection())
 '''
 
@@ -48,19 +47,9 @@ def button(at, label):
     return next(b for b in at.button if b.label == label)
 
 
-def test_entire_text_onboarding_reruns_back_review_and_generation():
+def test_legacy_text_interview_remains_available_without_profile_generation():
     at = AppTest.from_string(APP, default_timeout=15).run()
     assert not at.exception
-    at.text_input[0].set_value('Ireland')
-    at.multiselect[0].set_value(['English'])
-    button(at,'Continue →').click().run()
-    assert not at.exception
-    assert len(at.text_area) == 0
-    at.text_input[0].set_value('Synthetic Co')
-    at.selectbox[0].set_value(1)
-    at.selectbox[1].set_value(2020)
-    at.checkbox[0].check()
-    button(at,'Start company interview').click().run()
     for i in range(8):
         assert len(at.text_area) == 1
         at.text_area[0].set_value('Helped customers ' + str(i))
@@ -71,59 +60,18 @@ def test_entire_text_onboarding_reruns_back_review_and_generation():
     button(at,'This looks right').click().run()
     assert not at.exception
     assert at.session_state['saved_experiences'][0].career_story == ''
-    button(at,'Continue →').click().run()
-    assert not at.exception and len(at.text_area) == 4
-    at.text_area[0].set_value('Support work')
-    at.text_area[1].set_value('Helping people')
-    button(at,'Back').click().run()
-    button(at,'Continue →').click().run()
-    assert at.text_area[0].value == 'Support work'
-    button(at,'Review profile →').click().run()
-    assert not at.exception
-    assert at.session_state['saved_onboarding'].desired_next_work == 'Support work'
-    button(at,'Build my Career Profile').click().run()
-    assert not at.exception and at.session_state['generated'] is True
+    assert 'generated' not in at.session_state
 
 
 def test_component_rejects_foreign_candidate():
-    app = APP.replace("candidate_id='c', candidate_name", "candidate_id='foreign', candidate_name")
+    from tests.test_onboarding_v4_ui import APP as V4_APP
+    app = V4_APP.replace('candidate_id="a", candidate_name', 'candidate_id="foreign", candidate_name')
     at = AppTest.from_string(app).run()
     assert not at.exception and at.error[0].value == 'Access denied.'
 
 
-def test_interview_reruns_do_not_reload_onboarding_or_experiences():
-    app = APP.replace('class Repo:', '''class Repo:
-    def __getattribute__(self, name):
-        if name in ('get_onboarding', 'list_work_experiences'):
-            assert not st.session_state.get('_voice_company_draft_' + scope)
-        return object.__getattribute__(self, name)
-''')
-    at = AppTest.from_string(app).run()
-    at.text_input[0].set_value('Ireland')
-    at.multiselect[0].set_value(['English'])
-    button(at, 'Continue →').click().run()
-    at.text_input[0].set_value('Synthetic Co')
-    at.selectbox[0].set_value(1)
-    at.selectbox[1].set_value(2020)
-    at.checkbox[0].check()
-    button(at, 'Start company interview').click().run()
-    for index in range(8):
-        assert not at.exception
-        at.text_area[0].set_value('Source ' + str(index))
-        button(at, 'Continue').click().run()
-    assert not at.exception
-
-
 def test_pending_transcript_blocks_save_until_explicit_acceptance():
     at = AppTest.from_string(APP, default_timeout=15).run()
-    at.text_input[0].set_value('Ireland')
-    at.multiselect[0].set_value(['English'])
-    button(at,'Continue →').click().run()
-    at.text_input[0].set_value('Synthetic Co')
-    at.selectbox[0].set_value(1)
-    at.selectbox[1].set_value(2020)
-    at.checkbox[0].check()
-    button(at,'Start company interview').click().run()
     at.text_area[0].set_value('Original typed answer')
     button(at,'Continue').click().run()
     for _ in range(7):
@@ -138,21 +86,13 @@ def test_pending_transcript_blocks_save_until_explicit_acceptance():
     assert not at.exception
     saved = at.session_state['saved_experiences'][0]
     assert saved.day_to_day_narrative.strip() == 'User corrected Portuguese answer'
-    assert at.text_input[0].value == ''
+    assert not at.text_area
 
 
 def test_v2_reflection_correction_adaptive_final_and_editable_sources():
     from models.company_interview import QUESTIONS, FINAL_QUESTION, ADAPTIVE_QUESTIONS
     at = AppTest.from_string(APP.replace('reflection_provider=FakeReflection()',
         "reflection_provider=FakeReflection('concrete_evidence')"), default_timeout=15).run()
-    at.text_input[0].set_value('Ireland')
-    at.multiselect[0].set_value(['English'])
-    button(at, 'Continue →').click().run()
-    at.text_input[0].set_value('Synthetic Operations Co')
-    at.selectbox[0].set_value(1)
-    at.selectbox[1].set_value(2020)
-    at.checkbox[0].check()
-    button(at, 'Start company interview').click().run()
     for index, question in enumerate(QUESTIONS):
         visible = [m.value for m in at.markdown]
         assert question in visible

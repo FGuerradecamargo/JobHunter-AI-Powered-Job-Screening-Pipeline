@@ -1,7 +1,6 @@
-import logging
 import calendar
+from dataclasses import replace
 from datetime import date
-from textwrap import dedent
 
 import streamlit as st
 
@@ -9,10 +8,20 @@ from models.candidate_onboarding import CandidateOnboarding
 from components.voice_text_input import VoiceTextInputs, bind_scope
 from services.onboarding_events import OnboardingEventRepository
 from services.access_policy import AccessPolicy
-from services.profile_gateway import ProfileGateway
+from models.company_interview import V4_VERSION
+from components.country_names import COUNTRY_NAMES
 
 
-logger = logging.getLogger(__name__)
+QUALIFICATION_OPTIONS = (
+    "Secondary school diploma",
+    "Certificate",
+    "Diploma",
+    "Associate degree",
+    "Bachelor's degree",
+    "Master's degree",
+    "Doctorate",
+    "Other",
+)
 
 
 LANGUAGE_OPTIONS = [
@@ -61,22 +70,8 @@ def _format_month_year(value):
         return value
 
 
-PRIORITY_OPTIONS = [
-    "Salary",
-    "Career growth",
-    "Learning",
-    "Stability",
-    "Flexibility",
-    "Remote work",
-    "Leadership",
-    "Purpose / meaningful work",
-    "Work-life balance",
-]
-
-
-
 # =========================================================
-# WORKPILOT ONBOARDING V2
+# WORKPILOT RAW ONBOARDING V4
 # =========================================================
 
 WORKPILOT_ONBOARDING_CSS = """
@@ -95,7 +90,9 @@ WORKPILOT_ONBOARDING_CSS = """
     }
 
     .wp-step-item {
-        width: 22%;
+        width: 19%;
+        min-width: 0;
+        overflow-wrap: anywhere;
         text-align: center;
         position: relative;
         z-index: 2;
@@ -419,10 +416,11 @@ WORKPILOT_ONBOARDING_CSS = """
 
 def _render_workpilot_stepper(step):
     labels = [
-        "About you",
-        "Your experience",
-        "Your direction",
-        "Build profile",
+        "About You",
+        "Experience",
+        "Education",
+        "Certifications",
+        "Priorities",
     ]
 
     items = []
@@ -444,7 +442,7 @@ def _render_workpilot_stepper(step):
             """
         )
 
-    percentage = step * 25
+    percentage = min(max(step - 1, 0), 5) * 20
 
     html = WORKPILOT_ONBOARDING_CSS + f"""
     <div class="wp-onboarding-shell">
@@ -472,10 +470,11 @@ def _render_workpilot_stepper(step):
 
 def _render_workpilot_side_panel(step):
     labels = [
-        "About you",
-        "Your experience",
-        "Your direction",
-        "Build profile",
+        "About You",
+        "Experience",
+        "Education",
+        "Certifications",
+        "Priorities",
     ]
 
     rows = []
@@ -498,22 +497,12 @@ def _render_workpilot_side_panel(step):
         )
 
     reasons = {
-        1: (
-            "This helps us find better matches and show you "
-            "realistic opportunities that fit your situation."
-        ),
-        2: (
-            "Your real experience gives WorkPilot evidence of "
-            "what you can already do beyond job titles."
-        ),
-        3: (
-            "Your past should inform your next move, not decide it. "
-            "This tells WorkPilot where you actually want to go."
-        ),
-        4: (
-            "WorkPilot combines your evidence and direction into "
-            "one profile used throughout your career system."
-        ),
+        1: "Your declared location and languages provide personal context.",
+        2: "Your confirmed answers preserve your own account of your work.",
+        3: "Your education records preserve the qualifications you declare.",
+        4: "Your certification records preserve what you earned and when.",
+        5: "Your declaration records what matters when choosing opportunities.",
+        6: "Your source information is saved. Profile construction is a separate next step.",
     }
 
     html = f"""
@@ -540,7 +529,7 @@ def _render_workpilot_side_panel(step):
 
         <div class="wp-private">
             <span>▣</span>
-            <span>Your profile data is private.</span>
+            <span>Your information is private.</span>
         </div>
     </div>
     """
@@ -557,654 +546,192 @@ def render_onboarding(
     candidate_id,
     candidate_name,
     onboarding_repository,
-    profile_gateway: ProfileGateway,
+    profile_gateway,
     authenticated_user,
     active_user,
     voice_inputs=None,
     reflection_provider=None,
 ):
+    # profile_gateway is intentionally unused until RAW -> V1 is connected.
     if active_user.candidate_id != candidate_id or not AccessPolicy.can_access_candidate(authenticated_user, candidate_id):
         st.error("Access denied.")
         return
     scope = bind_scope(st.session_state, authenticated_user.id, active_user.id, candidate_id)
-    inputs = voice_inputs or VoiceTextInputs(scope, events=OnboardingEventRepository(
-        authenticated_user.id, active_user.id, candidate_id))
+    prefix = "_voice_onboarding_v4_" + scope + "_"
     step_key = f"onboarding_step_{candidate_id}"
+    draft_key = "_voice_company_draft_" + scope
+    recovered = resume_interview(scope, candidate_id, onboarding_repository)
+    draft = st.session_state.get(draft_key)
+    if recovered is not None:
+        if draft is None or draft.get("id") != recovered["id"]:
+            draft = recovered
+            st.session_state[draft_key] = draft
+    elif draft is not None:
+        st.session_state.pop(draft_key, None)
+        draft = None
+    if draft is not None and (draft.get("candidate_id") != candidate_id or draft.get("scope") != scope):
+        st.error("Access denied.")
+        return
 
-    if step_key not in st.session_state:
-        st.session_state[step_key] = 1
-        recovered = resume_interview(scope, candidate_id, onboarding_repository)
-        if recovered is not None:
-            st.session_state['_voice_company_draft_' + scope] = recovered
-            st.session_state[step_key] = 2
+    existing = (onboarding_repository.get_onboarding(candidate_id) if draft is None else None) or CandidateOnboarding(candidate_id)
+    experiences = onboarding_repository.list_work_experiences(candidate_id) if draft is None else []
+    about_ready = bool(existing.country.strip() and existing.city.strip() and existing.spoken_languages)
+    current = st.session_state.get(step_key)
+    if draft is not None:
+        step = 2
+    elif not about_ready:
+        step = 1
+    elif not experiences:
+        step = 1 if current == 1 else 2
+    else:
+        step = current if type(current) is int and 1 <= current <= 6 else 3
+    st.session_state[step_key] = step
 
-    step = st.session_state[step_key]
+    def go(destination):
+        st.session_state[step_key] = destination
+        st.rerun()
 
-    interviewing = step == 2 and st.session_state.get('_voice_company_draft_' + scope) is not None
-    existing_onboarding = None if interviewing else (
-        onboarding_repository.get_onboarding(
-            candidate_id
-        )
-    )
+    def back():
+        if st.button("Back", key=prefix + "back"):
+            go(step - 1)
 
-    experiences = [] if interviewing else (
-        onboarding_repository.list_work_experiences(
-            candidate_id
-        )
-    )
-
-    if existing_onboarding and step == 1 and not st.session_state.get('_voice_resumed_' + scope):
-        step = 4 if existing_onboarding.desired_next_work and experiences else (3 if experiences else 2)
-        st.session_state[step_key] = step
-    st.session_state['_voice_resumed_' + scope] = True
-    inputs.step = step
-    inputs.event('onboarding_started', once=True)
-    if st.session_state.get('_voice_viewed_' + scope) != step:
-        inputs.event('onboarding_step_viewed')
-        st.session_state['_voice_viewed_' + scope] = step
-    st.write("This takes about 5 minutes. Answer naturally and honestly; you don't need CV language or perfect wording. "
-        "You can speak or type in any language. WorkPilot will organize what you share, and you'll review it before it becomes part of your profile. "
-        "You can stop and continue later.")
     _render_workpilot_stepper(step)
-
-    main_col, side_col = st.columns(
-        [3.25, 1.15],
-        gap="large",
-    )
-
-    with main_col:
-        with st.container(border=True):
-            # ---------------------------------------------------------
-            # STEP 1 — ABOUT YOU
-            # ---------------------------------------------------------
-
-            if step == 1:
-                st.subheader("ABOUT YOU")
-
-                st.write(
-                    "Start with the basics that affect which "
-                    "opportunities are realistic for you."
-                )
-
-                location = inputs.text_input(
-                    'location',
-                    "Where are you based?",
-                    value=(
-                        existing_onboarding.location
-                        if existing_onboarding
-                        else ""
-                    ),
-                    placeholder="Example: Limerick, Ireland",
-                )
-
-                work_authorisation = inputs.text_input(
-                    'work_authorisation',
-                    "Where are you legally allowed to work?",
-                    value=(
-                        existing_onboarding.work_authorisation
-                        if existing_onboarding
-                        else ""
-                    ),
-                    placeholder=(
-                        "Example: Ireland and EU without sponsorship"
-                    ),
-                )
-
-                saved_languages = (
-                    existing_onboarding.spoken_languages
-                    if existing_onboarding
-                    else []
-                )
-
-                valid_languages = [
-                    language
-                    for language in saved_languages
-                    if language in LANGUAGE_OPTIONS
-                ]
-
-                spoken_languages = st.multiselect(
-                    "Which languages do you speak?",
-                    options=LANGUAGE_OPTIONS,
-                    default=valid_languages,
-                    key='_voice_languages_' + scope,
-                )
-
-                if st.button(
-                    "Continue →",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    if not location.strip():
-                        st.warning(
-                            "Add your location before continuing."
-                        )
-                        return
-
-                    if not spoken_languages:
-                        st.warning(
-                            "Select at least one language."
-                        )
-                        return
-
-                    onboarding = CandidateOnboarding(
-                        candidate_id=candidate_id,
-                        location=location.strip(),
-                        work_authorisation=(
-                            work_authorisation.strip()
-                        ),
-                        spoken_languages=spoken_languages,
-                        desired_next_work=(
-                            existing_onboarding.desired_next_work
-                            if existing_onboarding
-                            else ""
-                        ),
-                        enjoyed_work=(
-                            existing_onboarding.enjoyed_work
-                            if existing_onboarding
-                            else ""
-                        ),
-                        avoid_work=(
-                            existing_onboarding.avoid_work
-                            if existing_onboarding
-                            else ""
-                        ),
-                        development_interests=(
-                            existing_onboarding.development_interests
-                            if existing_onboarding
-                            else ""
-                        ),
-                        career_priorities=(
-                            existing_onboarding.career_priorities
-                            if existing_onboarding
-                            else []
-                        ),
-                    )
-
-                    onboarding_repository.save_onboarding(
-                        onboarding
-                    )
-
-                    inputs.event('first_answer_completed', 'text', once=True)
-                    inputs.event('onboarding_step_completed')
-                    st.session_state[step_key] = 2
-                    st.rerun()
-
-            # ---------------------------------------------------------
-            # STEP 2 — WORK HISTORY
-            # ---------------------------------------------------------
-
-            elif step == 2:
-                st.subheader("YOUR EXPERIENCE")
-
-                draft = st.session_state.get('_voice_company_draft_' + scope)
-                if draft:
-                    if draft['candidate_id'] != candidate_id:
-                        st.error('Access denied.')
-                        return
-                    st.write(f"Imagine I\u2019m starting tomorrow in the same job you had at {draft['company']}. "
-                        "Just tell me how it really was. You don\u2019t need to make it sound professional "
-                        "or organize your answer. Just answer what comes to mind.")
-                    render_company_interview(draft, scope, onboarding_repository, inputs,
-                        reflection_provider=reflection_provider)
-                    return
-
-                st.write(
-                    "Tell us what you actually did. Do not worry "
-                    "about writing it like a CV."
-                )
-
-                if experiences:
-                    st.markdown("**Experiences added**")
-
-                    for experience in experiences:
-                        with st.container(border=True):
-                            st.markdown(
-                                f"**{experience.company}**"
-                            )
-
-                            period = _format_month_year(
-                                experience.start_date
-                            )
-
-                            if experience.end_date:
-                                period += (
-                                    " → "
-                                    + _format_month_year(
-                                        experience.end_date
-                                    )
-                                )
-                            else:
-                                period += " → Present"
-
-                            st.caption(period)
-
-                            if st.button(
-                                "Remove",
-                                key=(
-                                    "onboarding_remove_"
-                                    f"{experience.id}"
-                                ),
-                            ):
-                                onboarding_repository.delete_work_experience(
-                                    experience.id,
-                                    candidate_id,
-                                )
-                                st.rerun()
-
-                    st.divider()
-
-                month_options = list(
-                    range(1, 13)
-                )
-
-                month_labels = {
-                    month: calendar.month_name[month]
-                    for month in month_options
-                }
-
-                current_year = date.today().year
-                year_options = list(
-                    range(current_year, 1969, -1)
-                )
-
-                with st.form(
-                    key=f"company_metadata_{candidate_id}",
-                    clear_on_submit=False,
-                ):
-                    company = st.text_input(
-                        "Company",
-                        key=f"company_{candidate_id}",
-                    )
-
-                    st.markdown("**When did you start?**")
-
-                    start_month_col, start_year_col = st.columns(2)
-
-                    with start_month_col:
-                        start_month = st.selectbox(
-                            "Start month",
-                            options=month_options,
-                            index=None,
-                            format_func=lambda value: (
-                                month_labels[value]
-                            ),
-                            placeholder="Month",
-                            label_visibility="collapsed",
-                            key=f"start_month_{candidate_id}",
-                        )
-
-                    with start_year_col:
-                        start_year = st.selectbox(
-                            "Start year",
-                            options=year_options,
-                            index=None,
-                            placeholder="Year",
-                            label_visibility="collapsed",
-                            key=f"start_year_{candidate_id}",
-                        )
-
-                    currently_here = st.checkbox(
-                        "I currently work here",
-                        key=f"current_role_{candidate_id}",
-                    )
-
-                    st.markdown("**When did you leave?**")
-                    st.caption(
-                        "Leave these blank if you currently work here."
-                    )
-
-                    end_month_col, end_year_col = st.columns(2)
-
-                    with end_month_col:
-                        end_month = st.selectbox(
-                            "End month",
-                            options=month_options,
-                            index=None,
-                            format_func=lambda value: (
-                                month_labels[value]
-                            ),
-                            placeholder="Month",
-                            label_visibility="collapsed",
-                            key=f"end_month_{candidate_id}",
-                        )
-
-                    with end_year_col:
-                        end_year = st.selectbox(
-                            "End year",
-                            options=year_options,
-                            index=None,
-                            placeholder="Year",
-                            label_visibility="collapsed",
-                            key=f"end_year_{candidate_id}",
-                        )
-
-                    begin = st.form_submit_button(
-                        "Start company interview",
-                        type="primary",
-                        use_container_width=True,
-                    )
-
-                if begin:
-                    if (
-                        not company.strip()
-                        or start_month is None
-                        or start_year is None
-                        or (
-                            not currently_here
-                            and (
-                                end_month is None
-                                or end_year is None
-                            )
-                        )
-                    ):
-                        st.warning(
-                            "Add company and dates before continuing."
-                        )
-                    else:
-                        try:
-                            st.session_state[
-                                '_voice_company_draft_' + scope
-                            ] = start_interview(
-                                scope,
-                                candidate_id,
-                                company,
-                                f'{start_year:04d}-{start_month:02d}',
-                                (
-                                    None
-                                    if currently_here
-                                    else f'{end_year:04d}-{end_month:02d}'
-                                ),
-                                repository=onboarding_repository,
-                                version='company-interview-v3',
-                            )
-                        except ValueError:
-                            st.warning(
-                                "Check company and dates."
-                            )
-                        else:
-                            st.rerun()
-
-                st.divider()
-
-                col_back, col_next = st.columns(2)
-
-                with col_back:
-                    if st.button(
-                        "Back",
-                        use_container_width=True,
-                    ):
-                        st.session_state[step_key] = 1
-                        st.rerun()
-
-                with col_next:
-                    if st.button(
-                        "Continue →",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        if not experiences:
-                            st.warning(
-                                "Add at least one work "
-                                "experience before continuing."
-                            )
-                            return
-
-                        inputs.event('onboarding_step_completed')
-                        st.session_state[step_key] = 3
-                        st.rerun()
-
-            # ---------------------------------------------------------
-            # STEP 3 — CAREER DIRECTION
-            # ---------------------------------------------------------
-
-            elif step == 3:
-                st.subheader("YOUR DIRECTION")
-
-                st.write(
-                    "Your history tells us what you have done. "
-                    "Now tell us where you want to go."
-                )
-
-                desired_next_work = inputs.render(
-                    'desired_next_work',
-                    "What kind of work would you like to do next?",
-                    value=(
-                        existing_onboarding.desired_next_work
-                        if existing_onboarding
-                        else ""
-                    ),
-                    height=120,
-                )
-
-                enjoyed_work = inputs.render(
-                    'enjoyed_work',
-                    "What parts of your previous jobs did you enjoy most?",
-                    value=(
-                        existing_onboarding.enjoyed_work
-                        if existing_onboarding
-                        else ""
-                    ),
-                    height=120,
-                )
-
-                avoid_work = inputs.render(
-                    'avoid_work',
-                    "What would you prefer not to do again?",
-                    value=(
-                        existing_onboarding.avoid_work
-                        if existing_onboarding
-                        else ""
-                    ),
-                    height=120,
-                )
-
-                development_interests = inputs.render(
-                    'development_interests',
-                    "What would you like to learn or do more of?",
-                    value=(
-                        existing_onboarding.development_interests
-                        if existing_onboarding
-                        else ""
-                    ),
-                    height=120,
-                )
-
-                career_priorities = st.multiselect(
-                    "What matters most in your next job?",
-                    key='_voice_priorities_' + scope,
-                    options=PRIORITY_OPTIONS,
-                    default=(
-                        existing_onboarding.career_priorities
-                        if existing_onboarding
-                        else []
-                    ),
-                )
-
-                col_back, col_next = st.columns(2)
-
-                with col_back:
-                    if st.button(
-                        "Back",
-                        use_container_width=True,
-                    ):
-                        st.session_state[step_key] = 2
-                        st.rerun()
-
-                with col_next:
-                    if st.button(
-                        "Review profile →",
-                        type="primary",
-                        use_container_width=True,
-                        disabled=inputs.pending(('desired_next_work', 'enjoyed_work', 'avoid_work', 'development_interests')),
-                    ):
-                        if inputs.pending(('desired_next_work', 'enjoyed_work', 'avoid_work', 'development_interests')):
-                            st.warning('Accept or discard the transcript before saving.')
-                            return
-                        if not desired_next_work.strip():
-                            st.warning(
-                                "Tell us what kind of work "
-                                "you would like to do next."
-                            )
-                            return
-
-                        onboarding = CandidateOnboarding(
-                            candidate_id=candidate_id,
-                            location=(
-                                existing_onboarding.location
-                                if existing_onboarding
-                                else ""
-                            ),
-                            work_authorisation=(
-                                existing_onboarding.work_authorisation
-                                if existing_onboarding
-                                else ""
-                            ),
-                            spoken_languages=(
-                                existing_onboarding.spoken_languages
-                                if existing_onboarding
-                                else []
-                            ),
-                            desired_next_work=(
-                                desired_next_work.strip()
-                            ),
-                            enjoyed_work=(
-                                enjoyed_work.strip()
-                            ),
-                            avoid_work=(
-                                avoid_work.strip()
-                            ),
-                            development_interests=(
-                                development_interests.strip()
-                            ),
-                            career_priorities=career_priorities,
-                        )
-
-                        onboarding_repository.save_onboarding(
-                            onboarding
-                        )
-
-                        inputs.event('first_answer_completed', once=True)
-                        inputs.event('onboarding_step_completed')
-                        st.session_state[step_key] = 4
-                        st.rerun()
-
-            # ---------------------------------------------------------
-            # STEP 4 — BUILD PROFILE
-            # ---------------------------------------------------------
-
-            elif step == 4:
-                onboarding = existing_onboarding
-
-                st.subheader("BUILD YOUR PROFILE")
-
-                st.write(
-                    "Everything is ready. WorkPilot will now "
-                    "turn your history and career direction into "
-                    "a structured Career Profile."
-                )
-
-                if onboarding:
-                    with st.container(border=True):
-                        st.markdown("**About you**")
-                        st.write(
-                            onboarding.location
-                            or "Location not provided"
-                        )
-
-                        if onboarding.work_authorisation:
-                            st.caption(
-                                onboarding.work_authorisation
-                            )
-
-                        if onboarding.spoken_languages:
-                            st.caption(
-                                ", ".join(
-                                    onboarding.spoken_languages
-                                )
-                            )
-
-                    with st.container(border=True):
-                        st.markdown("**Career direction**")
-                        st.write(
-                            onboarding.desired_next_work
-                            or "Not provided"
-                        )
-
-                        if onboarding.career_priorities:
-                            st.caption(
-                                "Priorities: "
-                                + ", ".join(
-                                    onboarding.career_priorities
-                                )
-                            )
-
-                with st.container(border=True):
-                    st.markdown("**Work history**")
-
-                    for experience in experiences:
-                        st.write(
-                            f"• {experience.company} "
-                            f"({_format_month_year(experience.start_date)})"
-                        )
-
-                st.info(
-                    "Your professional history will be treated "
-                    "as evidence of what you can do — not as a "
-                    "limit on where your career can go."
-                )
-
-                col_back, col_generate = st.columns(
-                    [1, 2]
-                )
-
-                with col_back:
-                    if st.button(
-                        "Back",
-                        use_container_width=True,
-                    ):
-                        st.session_state[step_key] = 3
-                        st.rerun()
-
-                with col_generate:
-                    if st.button(
-                        "Build my Career Profile",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        try:
-                            with st.spinner(
-                                "Building your Career Profile..."
-                            ):
-                                profile_gateway.create_initial_profile(
-                                    candidate_id=candidate_id,
-                                    candidate_name=candidate_name,
-                                )
-
-                            st.session_state.pop(
-                                step_key,
-                                None,
-                            )
-
-                            inputs.event('onboarding_step_completed')
-                            inputs.event('onboarding_completed', once=True)
-                            inputs.event('candidate_profile_created', once=True)
-                            st.success(
-                                "Your Career Profile is ready."
-                            )
-
-                            st.rerun()
-
-                        except Exception:
-                            logger.error(
-                                "Could not generate "
-                                "initial Career Profile."
-                            )
-
-                            st.error(
-                                "We could not build your Career "
-                                "Profile. Please try again."
-                            )
-
-
+    main_col, side_col = st.columns([3.25, 1.15], gap="large")
     with side_col:
         _render_workpilot_side_panel(step)
+    with main_col:
+        if step == 1:
+            st.subheader("About You")
+            countries = list(COUNTRY_NAMES)
+            if existing.country and existing.country not in countries:
+                countries.append(existing.country)
+            country = st.selectbox("Country", countries,
+                index=countries.index(existing.country) if existing.country else None,
+                key=prefix + "country")
+            city = st.text_input("City", value=existing.city, key=prefix + "city") if country else ""
+            language_options = list(dict.fromkeys(LANGUAGE_OPTIONS + existing.spoken_languages))
+            languages = st.multiselect("Languages", language_options, default=existing.spoken_languages,
+                accept_new_options=True, key=prefix + "languages")
+            if st.button("Continue", type="primary", key=prefix + "continue"):
+                if not country or not city.strip() or not languages:
+                    st.warning("Add country, city and at least one language before continuing.")
+                else:
+                    onboarding_repository.save_onboarding(replace(existing, country=country,
+                        city=city.strip(), spoken_languages=languages))
+                    go(2)
+        elif step == 2:
+            st.subheader("Professional Experience")
+            if draft is not None:
+                inputs = voice_inputs or VoiceTextInputs(scope, events=OnboardingEventRepository(
+                    authenticated_user.id, active_user.id, candidate_id))
+                render_company_interview(draft, scope, onboarding_repository, inputs,
+                    reflection_provider=reflection_provider)
+                return
+            for experience in experiences:
+                st.write(experience.company)
+                st.write(experience.role or "Role not provided")
+                st.caption(_format_month_year(experience.start_date) + " - " +
+                           (_format_month_year(experience.end_date) if experience.end_date else "Present"))
+                if st.button("Remove", key=prefix + "remove_experience_" + experience.id):
+                    onboarding_repository.delete_work_experience(experience.id, candidate_id)
+                    st.rerun()
+            with st.form(prefix + "company_metadata"):
+                company = st.text_input("Company", key=prefix + "company")
+                role = st.text_input("Role", key=prefix + "role")
+                months = list(range(1, 13))
+                years = list(range(date.today().year, 1899, -1))
+                start_month = st.selectbox("Start month", months, index=None,
+                    format_func=lambda m: calendar.month_name[m], key=prefix + "start_month")
+                start_year = st.selectbox("Start year", years, index=None, key=prefix + "start_year")
+                current_role = st.checkbox("I currently work here", key=prefix + "current_role")
+                end_month = st.selectbox("End month", months, index=None,
+                    format_func=lambda m: calendar.month_name[m], key=prefix + "end_month")
+                end_year = st.selectbox("End year", years, index=None, key=prefix + "end_year")
+                begin = st.form_submit_button("Start company interview", type="primary")
+            if begin:
+                if (not company.strip() or not role.strip() or not start_month or not start_year
+                        or (not current_role and (not end_month or not end_year))):
+                    st.warning("Add company, role and dates before continuing.")
+                else:
+                    try:
+                        st.session_state[draft_key] = start_interview(
+                            scope, candidate_id, company.strip(), f"{start_year:04d}-{start_month:02d}",
+                            None if current_role else f"{end_year:04d}-{end_month:02d}",
+                            role=role.strip(), version=V4_VERSION, repository=onboarding_repository)
+                    except ValueError:
+                        st.warning("Check company, role and dates.")
+                    else:
+                        st.rerun()
+            back()
+            if st.button("Continue", type="primary", key=prefix + "continue"):
+                if not experiences:
+                    st.warning("Add at least one completed experience before continuing.")
+                else:
+                    go(3)
+        elif step == 3:
+            st.subheader("Education")
+            for record in onboarding_repository.list_education(candidate_id):
+                st.write(f"{record.institution} - {record.qualification} - {record.field}")
+                if st.button("Remove", key=prefix + "remove_education_" + record.id):
+                    onboarding_repository.delete_education(record.id, candidate_id)
+                    st.rerun()
+            # Outside the form so selecting Other reveals its input immediately.
+            qualification_choice = st.selectbox("Qualification", QUALIFICATION_OPTIONS,
+                index=None, key=prefix + "qualification_choice")
+            with st.form(prefix + "education", clear_on_submit=True):
+                institution = st.text_input("Institution", key=prefix + "institution")
+                qualification = (st.text_input("Other qualification", key=prefix + "qualification_other")
+                    if qualification_choice == "Other" else qualification_choice or "")
+                field = st.text_input("Field", key=prefix + "field")
+                add = st.form_submit_button("Add education")
+            if add:
+                try:
+                    if not qualification.strip():
+                        raise ValueError("Qualification is required.")
+                    onboarding_repository.add_education(candidate_id=candidate_id, institution=institution.strip(),
+                        qualification=qualification.strip(), field=field.strip())
+                except ValueError:
+                    st.warning("Add institution, qualification and field.")
+                else:
+                    st.rerun()
+            back()
+            if st.button("Continue", type="primary", key=prefix + "continue"):
+                go(4)
+        elif step == 4:
+            st.subheader("Certifications")
+            for record in onboarding_repository.list_certifications(candidate_id):
+                st.write(f"{record.name} - {record.issuer} - {record.year_obtained}")
+                if st.button("Remove", key=prefix + "remove_certification_" + record.id):
+                    onboarding_repository.delete_certification(record.id, candidate_id)
+                    st.rerun()
+            with st.form(prefix + "certification", clear_on_submit=True):
+                name = st.text_input("Certification name", key=prefix + "cert_name")
+                issuer = st.text_input("Issuer", key=prefix + "issuer")
+                year = st.number_input("Year obtained", min_value=1, max_value=9999, value=date.today().year, step=1,
+                    key=prefix + "year_obtained")
+                add = st.form_submit_button("Add certification")
+            if add:
+                try:
+                    onboarding_repository.add_certification(candidate_id=candidate_id, name=name.strip(),
+                        issuer=issuer.strip(), year_obtained=year)
+                except ValueError:
+                    st.warning("Add certification name, issuer and an integer year.")
+                else:
+                    st.rerun()
+            back()
+            if st.button("Continue", type="primary", key=prefix + "continue"):
+                go(5)
+        elif step == 5:
+            st.subheader("Priorities")
+            st.caption("What matters when choosing opportunities, such as salary, remote work, location or weekends.")
+            declaration = st.text_area("What matters to you when choosing your next opportunity?",
+                value=existing.priority_declaration, key=prefix + "priority_declaration")
+            back()
+            if st.button("Continue", type="primary", key=prefix + "continue"):
+                onboarding_repository.save_onboarding(replace(existing, priority_declaration=declaration.strip()))
+                go(6)
+            if st.button("I'll add these later", key=prefix + "skip_priorities"):
+                go(6)
+        elif step == 6:
+            st.success("Your information is saved and ready for profile construction.")
+            back()
