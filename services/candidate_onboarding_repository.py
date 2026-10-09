@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
+from models.onboarding_records import OnboardingEducationRecord, OnboardingCertificationRecord
 from models.company_interview import ConfirmedCompanyAnswer, validate_answers, validate_single_answer, V3_VERSION
 from services.database import (
     get_connection,
@@ -16,24 +17,26 @@ class CandidateOnboardingRepository:
         initialize_database()
 
     def begin_company_interview(self, *, candidate_id, company, start_date, end_date,
-                                experience_id, interview_version=V3_VERSION):
+                                experience_id, interview_version=V3_VERSION, role=""):
         from models.company_interview import V1_VERSION, V2_VERSION
         if (not candidate_id or not experience_id or not company.strip() or not start_date
                 or (end_date and end_date < start_date)
+                or not isinstance(role, str)
                 or interview_version not in (V1_VERSION, V2_VERSION, V3_VERSION)):
             raise ValueError('Invalid company metadata.')
         now = utc_now()
         with get_connection() as connection:
             connection.execute('''INSERT INTO candidate_work_experiences
                 (id, candidate_id, company, start_date, end_date, career_story, day_to_day_narrative,
-                 onboarding_status, onboarding_interview_version, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, '', '', 'draft', ?, ?, ?) ON CONFLICT(id) DO NOTHING''',
-                (experience_id, candidate_id, company.strip(), start_date, end_date, interview_version, now, now))
+                 onboarding_status, onboarding_interview_version, created_at, updated_at, role)
+                VALUES (?, ?, ?, ?, ?, '', '', 'draft', ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING''',
+                (experience_id, candidate_id, company.strip(), start_date, end_date, interview_version, now, now, role))
             row = connection.execute('SELECT * FROM candidate_work_experiences WHERE id = ? AND candidate_id = ?',
                                      (experience_id, candidate_id)).fetchone()
             if (row is None or row['onboarding_status'] != 'draft'
                     or (row['company'], row['start_date'], row['end_date'], row['onboarding_interview_version'])
-                    != (company.strip(), start_date, end_date, interview_version)):
+                    != (company.strip(), start_date, end_date, interview_version)
+                    or row['role'] != role):
                 raise ValueError('Work experience was not found for candidate or draft changed.')
         return experience_id
 
@@ -121,7 +124,7 @@ class CandidateOnboardingRepository:
                 WHERE id = ? AND candidate_id = ? AND onboarding_status = 'draft' ''',
                 (projection, utc_now(), experience_id, candidate_id))
 
-    def confirm_company_interview(self, *, candidate_id, company, start_date, end_date, answers, experience_id):
+    def confirm_company_interview(self, *, candidate_id, company, start_date, end_date, answers, experience_id, role=""):
         validate_answers(answers)
         if self.get_company_draft(candidate_id, experience_id) is not None:
             return self.finalize_company_interview(candidate_id=candidate_id, experience_id=experience_id, answers=answers)
@@ -138,9 +141,9 @@ class CandidateOnboardingRepository:
                     raise ValueError('Work experience was not found for candidate.')
                 return  # Idempotent confirmation after a successful save/rerun.
             connection.execute('''INSERT INTO candidate_work_experiences
-                (id, candidate_id, company, start_date, end_date, career_story, day_to_day_narrative, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (experience_id, candidate_id, company.strip(), start_date, end_date, '', projection, now, now))
+                (id, candidate_id, company, start_date, end_date, career_story, day_to_day_narrative, created_at, updated_at, role)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (experience_id, candidate_id, company.strip(), start_date, end_date, '', projection, now, now, role))
             for a in answers:
                 connection.execute('''INSERT INTO company_interview_answers
                     (candidate_id, work_experience_id, interview_version, question_id, question_version,
@@ -216,6 +219,7 @@ class CandidateOnboardingRepository:
         self,
         onboarding: CandidateOnboarding,
     ) -> None:
+        onboarding.__post_init__()
         now = utc_now()
 
         with get_connection() as connection:
@@ -231,12 +235,15 @@ class CandidateOnboardingRepository:
                     avoid_work,
                     development_interests,
                     career_priorities_json,
+                    country,
+                    city,
+                    priority_declaration,
                     created_at,
                     updated_at
                 )
                 VALUES (
                     ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?
                 )
 
                 ON CONFLICT(candidate_id) DO UPDATE SET
@@ -248,6 +255,9 @@ class CandidateOnboardingRepository:
                     avoid_work = excluded.avoid_work,
                     development_interests = excluded.development_interests,
                     career_priorities_json = excluded.career_priorities_json,
+                    country = excluded.country,
+                    city = excluded.city,
+                    priority_declaration = excluded.priority_declaration,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -266,6 +276,9 @@ class CandidateOnboardingRepository:
                         onboarding.career_priorities,
                         ensure_ascii=False,
                     ),
+                    onboarding.country,
+                    onboarding.city,
+                    onboarding.priority_declaration,
                     now,
                     now,
                 ),
@@ -290,6 +303,9 @@ class CandidateOnboardingRepository:
 
         return CandidateOnboarding(
             candidate_id=row["candidate_id"],
+            country=row["country"],
+            city=row["city"],
+            priority_declaration=row["priority_declaration"],
             location=row["location"],
             work_authorisation=row["work_authorisation"],
             spoken_languages=json.loads(
@@ -314,11 +330,13 @@ class CandidateOnboardingRepository:
         end_date: str | None,
         career_story: str,
         day_to_day_narrative: str,
+        role: str = "",
     ) -> WorkExperience:
         experience = WorkExperience(
             id=uuid4().hex,
             candidate_id=candidate_id,
             company=company.strip(),
+            role=role,
             start_date=start_date,
             end_date=end_date,
             career_story=career_story.strip(),
@@ -340,12 +358,13 @@ class CandidateOnboardingRepository:
                     end_date,
                     career_story,
                     day_to_day_narrative,
+                    role,
                     created_at,
                     updated_at
                 )
                 VALUES (
                     ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?
+                    ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -356,12 +375,55 @@ class CandidateOnboardingRepository:
                     experience.end_date,
                     experience.career_story,
                     experience.day_to_day_narrative,
+                    experience.role,
                     now,
                     now,
                 ),
             )
 
         return experience
+
+    def add_education(self, *, candidate_id, institution, qualification, field):
+        record = OnboardingEducationRecord(uuid4().hex, candidate_id, institution, qualification, field)
+        with get_connection() as connection:
+            connection.execute("""INSERT INTO candidate_onboarding_education
+                (id, candidate_id, institution, qualification, field) VALUES (?, ?, ?, ?, ?)""",
+                (record.id, record.candidate_id, record.institution, record.qualification, record.field))
+        return record
+
+    def list_education(self, candidate_id):
+        with get_connection() as connection:
+            rows = connection.execute("""SELECT * FROM candidate_onboarding_education
+                WHERE candidate_id = ? ORDER BY id""", (candidate_id,)).fetchall()
+        return [OnboardingEducationRecord(**dict(row)) for row in rows]
+
+    def delete_education(self, id, candidate_id):
+        with get_connection() as connection:
+            cursor = connection.execute("""DELETE FROM candidate_onboarding_education
+                WHERE id = ? AND candidate_id = ?""", (id, candidate_id))
+            if cursor.rowcount != 1:
+                raise ValueError("Education was not found for candidate.")
+
+    def add_certification(self, *, candidate_id, name, issuer, year_obtained):
+        record = OnboardingCertificationRecord(uuid4().hex, candidate_id, name, issuer, year_obtained)
+        with get_connection() as connection:
+            connection.execute("""INSERT INTO candidate_onboarding_certifications
+                (id, candidate_id, name, issuer, year_obtained) VALUES (?, ?, ?, ?, ?)""",
+                (record.id, record.candidate_id, record.name, record.issuer, record.year_obtained))
+        return record
+
+    def list_certifications(self, candidate_id):
+        with get_connection() as connection:
+            rows = connection.execute("""SELECT * FROM candidate_onboarding_certifications
+                WHERE candidate_id = ? ORDER BY id""", (candidate_id,)).fetchall()
+        return [OnboardingCertificationRecord(**dict(row)) for row in rows]
+
+    def delete_certification(self, id, candidate_id):
+        with get_connection() as connection:
+            cursor = connection.execute("""DELETE FROM candidate_onboarding_certifications
+                WHERE id = ? AND candidate_id = ?""", (id, candidate_id))
+            if cursor.rowcount != 1:
+                raise ValueError("Certification was not found for candidate.")
 
     def list_work_experiences(
         self,
@@ -409,6 +471,7 @@ class CandidateOnboardingRepository:
                 id=row["id"],
                 candidate_id=row["candidate_id"],
                 company=row["company"],
+                role=row["role"],
                 start_date=row["start_date"],
                 end_date=row["end_date"],
                 career_story=row["career_story"],
@@ -455,6 +518,7 @@ class CandidateOnboardingRepository:
                 UPDATE candidate_work_experiences
                 SET
                     company = ?,
+                    role = ?,
                     start_date = ?,
                     end_date = ?,
                     career_story = ?,
@@ -466,6 +530,7 @@ class CandidateOnboardingRepository:
                 """,
                 (
                     experience.company.strip(),
+                    experience.role,
                     experience.start_date,
                     experience.end_date,
                     experience.career_story.strip(),

@@ -694,6 +694,8 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "candidate_interview_rounds",
         "candidate_interview_round_feedback",
         "company_interview_answers",
+        "candidate_onboarding_education",
+        "candidate_onboarding_certifications",
         "candidate_product_state",
         "candidate_product_state_events",
         "job_observations",
@@ -2802,9 +2804,48 @@ def initialize_database() -> None:
         initialize_sqlite_database()
     with get_connection() as connection:
         create_company_interview_schema(connection)
+        create_onboarding_v4_schema(connection)
         create_interview_round_schema(connection)
         create_product_state_schema(connection)
         create_job_observation_schema(connection)
+
+
+def create_onboarding_v4_schema(connection) -> None:
+    """Add source storage without inferring or backfilling candidate declarations."""
+    for table, names in (
+        ("candidate_onboarding", ("country", "city", "priority_declaration")),
+        ("candidate_work_experiences", ("role",)),
+    ):
+        existing = set() if is_postgres() else {
+            row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        for name in names:
+            if is_postgres():
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {name} TEXT NOT NULL DEFAULT ''")
+            elif name not in existing:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_onboarding_education (
+        id TEXT PRIMARY KEY,
+        candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+        institution TEXT NOT NULL, qualification TEXT NOT NULL, field TEXT NOT NULL
+    )""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_onboarding_certifications (
+        id TEXT PRIMARY KEY,
+        candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+        name TEXT NOT NULL, issuer TEXT NOT NULL,
+        year_obtained INTEGER NOT NULL CHECK (year_obtained BETWEEN 1 AND 9999)
+    )""")
+    for table in ("candidate_onboarding_education", "candidate_onboarding_certifications"):
+        connection.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_candidate ON {table}(candidate_id)")
+        _enable_server_only_row_level_security(connection, table)
+        if is_postgres():
+            connection.execute(f"REVOKE ALL ON TABLE {table} FROM PUBLIC")
+            for role in ("anon", "authenticated"):
+                connection.execute(f"""DO $$ BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+                        REVOKE ALL ON TABLE {table} FROM {role};
+                    END IF;
+                END $$""")
 
 
 def create_job_observation_schema(connection) -> None:

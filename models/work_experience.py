@@ -14,3 +14,4 @@ class WorkExperience:
     career_story: str
     day_to_day_narrative: str
     confirmed_interview_answers: list = field(default_factory=list)
+    role: str = ""
