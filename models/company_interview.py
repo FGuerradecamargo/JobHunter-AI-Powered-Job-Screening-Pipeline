@@ -5,6 +5,18 @@ V1_VERSION = 'company-interview-v1'
 VERSION = 'company-interview-v2'
 V2_VERSION = VERSION
 V3_VERSION = 'company-interview-v3'
+V4_VERSION = 'company-interview-v4'
+V4_QUESTIONS = (
+    'Imagine I start tomorrow in your role. What would I actually be doing day to day?',
+    'What kinds of problems were you responsible for solving, and what decisions could you make yourself?',
+    'Can you give me an example of something you handled particularly well, improved, solved, or helped achieve in this role?',
+)
+V4_ADAPTIVE_QUESTIONS = {
+    'core_work': 'Which part of that work could you describe in more detail?',
+    'judgment_responsibility': 'Which decisions in that situation were yours to make?',
+    'evidence_contribution': 'What did you personally contribute in that example?',
+    'tools_resources': 'What tools, systems or technologies did you use to do that?',
+}
 V3_QUESTIONS = (
     'Imagine I start tomorrow in your role. What would I actually be doing?',
     'What kinds of problems did you deal with, and what decisions were you responsible for?',
@@ -94,13 +106,15 @@ def _validate_historical_answers(answers):
 def validate_single_answer(answer):
     if not isinstance(answer, ConfirmedCompanyAnswer):
         raise ValueError('Invalid confirmed answer.')
-    questions = {V1_VERSION: V1_QUESTIONS, V2_VERSION: QUESTIONS, V3_VERSION: V3_QUESTIONS}
+    questions = {V1_VERSION: V1_QUESTIONS, V2_VERSION: QUESTIONS, V3_VERSION: V3_QUESTIONS,
+                 V4_VERSION: V4_QUESTIONS}
     if answer.interview_version not in questions:
         raise ValueError('Invalid interview version.')
     expected = {f'q{i + 1}': (text, 'FIXED_QUESTION')
                 for i, text in enumerate(questions[answer.interview_version])}
     if answer.interview_version != V1_VERSION:
-        expected.update({'adaptive_' + key: (text, 'ADAPTIVE_QUESTION') for key, text in ADAPTIVE_QUESTIONS.items()})
+        adaptive = V4_ADAPTIVE_QUESTIONS if answer.interview_version == V4_VERSION else ADAPTIVE_QUESTIONS
+        expected.update({'adaptive_' + key: (text, 'ADAPTIVE_QUESTION') for key, text in adaptive.items()})
         expected['correction'] = (CORRECTION_QUESTION, 'REVIEW_CORRECTION')
     if answer.interview_version == V2_VERSION:
         expected['final'] = (FINAL_QUESTION, 'FINAL_OPEN')
@@ -119,6 +133,11 @@ def validate_answers(answers):
         raise ValueError('Incomplete interview.')
     for answer in answers:
         validate_single_answer(answer)
+    if answers[0].interview_version == V4_VERSION:
+        validate_v4_partial_answers(answers)
+        if not {'q1', 'q2', 'q3'}.issubset(a.question_id for a in answers):
+            raise ValueError('Incomplete interview.')
+        return
     if answers[0].interview_version != V3_VERSION:
         return _validate_historical_answers(answers)
     ids = [answer.question_id for answer in answers]
@@ -127,3 +146,17 @@ def validate_answers(answers):
             or not {'q1', 'q2', 'q3', 'q4'}.issubset(ids)
             or sum(qid.startswith('adaptive_') for qid in ids) > 2):
         raise ValueError('Incomplete interview.')
+
+
+def validate_v4_partial_answers(answers):
+    """Validate durable V4 sources, including unfinished interviews."""
+    for answer in answers:
+        validate_single_answer(answer)
+        if answer.interview_version != V4_VERSION:
+            raise ValueError('Invalid interview version.')
+    ids = [a.question_id for a in answers]
+    if len(ids) != len(set(ids)) or sum(qid.startswith('adaptive_') for qid in ids) > 2:
+        raise ValueError('Invalid V4 answer collection.')
+    if any(qid.startswith('adaptive_') or qid == 'correction' for qid in ids):
+        if not {'q1', 'q2', 'q3'}.issubset(ids):
+            raise ValueError('Incomplete interview.')

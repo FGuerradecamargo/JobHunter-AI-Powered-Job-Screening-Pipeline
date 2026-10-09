@@ -4,9 +4,19 @@ from models.company_interview import (QUESTIONS, VERSION, FINAL_QUESTION, CORREC
     ADAPTIVE_QUESTIONS, ConfirmedCompanyAnswer, validate_answers, V1_VERSION, V1_QUESTIONS)
 from services.ai.voice_transcription import audio_duration
 from models.company_interview import V3_VERSION, V3_QUESTIONS, validate_single_answer
+from models.company_interview import V4_VERSION, V4_QUESTIONS, V4_ADAPTIVE_QUESTIONS, validate_v4_partial_answers
 
 
-def start_interview(scope, candidate_id, company, start_date, end_date, *, repository=None, version=VERSION):
+def start_interview(scope, candidate_id, company, start_date, end_date, *, repository=None, version=VERSION, role=""):
+    if version == V4_VERSION:
+        draft = start_v4_interview(scope, candidate_id, company, role, start_date, end_date)
+        if repository is not None:
+            if repository.get_company_draft(candidate_id) is not None:
+                return resume_interview(scope, candidate_id, repository)
+            repository.begin_company_interview(candidate_id=candidate_id, company=company, role=role,
+                start_date=start_date, end_date=end_date, experience_id=draft['id'], interview_version=V4_VERSION)
+            draft['durable'] = True
+        return draft
     if not scope or not candidate_id or not company.strip() or (end_date and end_date < start_date):
         raise ValueError('Check company and dates.')
     draft = dict(id=uuid4().hex, scope=scope, candidate_id=candidate_id, company=company.strip(),
@@ -27,6 +37,8 @@ def resume_interview(scope, candidate_id, repository):
     row = repository.get_company_draft(candidate_id)
     if row is None:
         return None
+    if row['onboarding_interview_version'] == V4_VERSION:
+        return _resume_v4_interview(scope, row)
     if row['onboarding_interview_version'] == V3_VERSION:
         return _resume_v3_interview(scope, row)
     saved = row['answers']
@@ -46,6 +58,8 @@ def resume_interview(scope, candidate_id, repository):
 
 
 def current_question(draft):
+    if draft['version'] == V4_VERSION:
+        return current_v4_question(draft)
     if draft['version'] == V3_VERSION:
         return current_v3_question(draft)
     if draft['stage'] == 'memory':
@@ -242,18 +256,20 @@ def _persist(
     mode,
     text="",
 ):
-    if draft["scope"] != scope:
+    if draft["version"] not in (V3_VERSION, V4_VERSION) or draft["scope"] != scope:
         raise ValueError("Invalid interview state.")
 
-    qid, question, kind = current_v3_question(draft)
+    qid, question, kind = (
+        current_v3_question(draft) if draft["version"] == V3_VERSION else current_v4_question(draft)
+    )
     answer = ConfirmedCompanyAnswer(
         question_id=qid,
         question_text=question,
         answer_mode=mode,
         confirmed_text=text.strip() if mode != "skip" else "",
         skipped=(mode == "skip"),
-        interview_version=V3_VERSION,
-        question_version=V3_VERSION,
+        interview_version=draft["version"],
+        question_version=draft["version"],
         source_kind=kind,
     )
     validate_single_answer(answer)
@@ -265,6 +281,11 @@ def _persist(
         answer=answer,
     )
     draft["answers"].append(answer)
+
+    if draft["version"] == V4_VERSION:
+        _advance_v4(draft)
+        draft["typing"] = False
+        return answer
 
     if kind == "FIXED_QUESTION":
         ids = {item.question_id for item in draft["answers"]}
@@ -317,7 +338,8 @@ def transcribe_voice(
     authorized=False,
 ):
     if (
-        draft["scope"] != scope
+        draft["version"] not in (V3_VERSION, V4_VERSION)
+        or draft["scope"] != scope
         or draft["stage"] != "question"
         or authorized is not True
     ):
@@ -325,7 +347,9 @@ def transcribe_voice(
             "Voice transcription requires explicit confirmation."
         )
 
-    qid, question, kind = current_v3_question(draft)
+    qid, question, kind = (
+        current_v3_question(draft) if draft["version"] == V3_VERSION else current_v4_question(draft)
+    )
     audio_duration(audio)
 
     if not config.transcription_enabled or not config.model:
@@ -366,7 +390,8 @@ def confirm_voice_transcript(
     text,
 ):
     if (
-        draft["scope"] != scope
+        draft["version"] not in (V3_VERSION, V4_VERSION)
+        or draft["scope"] != scope
         or draft["stage"] != "voice_review"
         or not draft.get("pending_voice")
     ):
@@ -377,7 +402,9 @@ def confirm_voice_transcript(
     pending = draft["pending_voice"]
     # Restore the question stage solely for the shared persistence boundary.
     draft["stage"] = "question"
-    qid, question, kind = current_v3_question(draft)
+    qid, question, kind = (
+        current_v3_question(draft) if draft["version"] == V3_VERSION else current_v4_question(draft)
+    )
     if (
         qid != pending["question_id"]
         or question != pending["question_text"]
@@ -403,6 +430,8 @@ def discard_voice(draft, scope):
 
 
 def set_adaptive_dimensions(draft, scope, dimensions):
+    if draft["version"] == V4_VERSION:
+        raise ValueError("V4 requires one coverage decision at a time.")
     if draft["scope"] != scope or draft["stage"] != "reflection_pending":
         raise ValueError("Adaptive questions are not expected now.")
 
@@ -432,7 +461,8 @@ def set_adaptive_dimensions(draft, scope, dimensions):
 
 
 def save_correction(draft, scope, repository, text):
-    if draft["scope"] != scope or draft["stage"] != "review":
+    if (draft["version"] not in (V3_VERSION, V4_VERSION)
+            or draft["scope"] != scope or draft["stage"] != "review"):
         raise ValueError("Review is required.")
     if not isinstance(text, str) or len(text) > 20000:
         raise ValueError("Invalid correction.")
@@ -445,8 +475,8 @@ def save_correction(draft, scope, repository, text):
         "text",
         text.strip(),
         False,
-        V3_VERSION,
-        V3_VERSION,
+        draft["version"],
+        draft["version"],
         "REVIEW_CORRECTION",
     )
     validate_single_answer(answer)
@@ -475,3 +505,52 @@ def finalize(draft, scope, repository):
         expected_answers=draft['answers'],
     )
     draft["stage"] = "complete"
+
+
+def start_v4_interview(scope, candidate_id, company, role, start_date, end_date, *, experience_id=None):
+    if (any(not isinstance(value, str) or not value.strip()
+            for value in (scope, candidate_id, company, role, start_date))
+            or (end_date is not None and (not isinstance(end_date, str) or end_date < start_date))):
+        raise ValueError("V4 requires company, role and valid dates.")
+    return dict(id=experience_id or uuid4().hex, scope=scope, candidate_id=candidate_id,
+        company=company.strip(), role=role, start_date=start_date, end_date=end_date,
+        version=V4_VERSION, answers=[], stage="question", pending_voice=None,
+        adaptive_dimension=None, reflection=None, typing=False)
+
+
+def _advance_v4(draft):
+    validate_v4_partial_answers(draft["answers"])
+    ids = {a.question_id for a in draft["answers"]}
+    draft["adaptive_dimension"] = None
+    draft["reflection"] = None
+    if not {"q1", "q2", "q3"}.issubset(ids):
+        draft["stage"] = "question"
+    elif sum(qid.startswith("adaptive_") for qid in ids) >= 2:
+        draft["stage"] = "review"
+    else:
+        draft["stage"] = "reflection_pending"
+
+
+def _resume_v4_interview(scope, record):
+    draft = start_v4_interview(scope, record["candidate_id"], record["company"], record["role"],
+        record["start_date"], record["end_date"], experience_id=record["id"])
+    draft["answers"] = list(record["answers"])
+    draft["durable"] = True
+    _advance_v4(draft)
+    return draft
+
+
+def current_v4_question(draft):
+    if draft["stage"] != "question":
+        raise ValueError("Not in a question stage.")
+    validate_v4_partial_answers(draft["answers"])
+    ids = {a.question_id for a in draft["answers"]}
+    for index, text in enumerate(V4_QUESTIONS, 1):
+        if f"q{index}" not in ids:
+            return f"q{index}", text, "FIXED_QUESTION"
+    dimension = draft.get("adaptive_dimension")
+    if (isinstance(dimension, str) and dimension in V4_ADAPTIVE_QUESTIONS
+            and "adaptive_" + dimension not in ids
+            and sum(qid.startswith("adaptive_") for qid in ids) < 2):
+        return "adaptive_" + dimension, V4_ADAPTIVE_QUESTIONS[dimension], "ADAPTIVE_QUESTION"
+    raise ValueError("No question is pending.")

@@ -4,7 +4,8 @@ from uuid import uuid4
 from models.candidate_onboarding import CandidateOnboarding
 from models.work_experience import WorkExperience
 from models.onboarding_records import OnboardingEducationRecord, OnboardingCertificationRecord
-from models.company_interview import ConfirmedCompanyAnswer, validate_answers, validate_single_answer, V3_VERSION
+from models.company_interview import (ConfirmedCompanyAnswer, validate_answers, validate_single_answer,
+                                     V3_VERSION, V4_VERSION, validate_v4_partial_answers)
 from services.database import (
     get_connection,
     initialize_database,
@@ -22,7 +23,8 @@ class CandidateOnboardingRepository:
         if (not candidate_id or not experience_id or not company.strip() or not start_date
                 or (end_date and end_date < start_date)
                 or not isinstance(role, str)
-                or interview_version not in (V1_VERSION, V2_VERSION, V3_VERSION)):
+                or (interview_version == V4_VERSION and not role.strip())
+                or interview_version not in (V1_VERSION, V2_VERSION, V3_VERSION, V4_VERSION)):
             raise ValueError('Invalid company metadata.')
         now = utc_now()
         with get_connection() as connection:
@@ -80,6 +82,8 @@ class CandidateOnboardingRepository:
                 raise ValueError('Invalid interview version.')
             existing = self._read_answers(connection, candidate_id, experience_id)
             prior = next((a for a in existing if a.question_id == answer.question_id), None)
+            if answer.interview_version == V4_VERSION:
+                validate_v4_partial_answers([a for a in existing if a.question_id != answer.question_id] + [answer])
             if prior is not None and prior != answer and prior != expected_answer:
                 raise ValueError('Answer already confirmed. Reload the draft before editing.')
             self._write_answer(connection, candidate_id, experience_id, answer)
@@ -126,6 +130,8 @@ class CandidateOnboardingRepository:
 
     def confirm_company_interview(self, *, candidate_id, company, start_date, end_date, answers, experience_id, role=""):
         validate_answers(answers)
+        if answers[0].interview_version == V4_VERSION and (not isinstance(role, str) or not role.strip()):
+            raise ValueError('V4 requires role.')
         if self.get_company_draft(candidate_id, experience_id) is not None:
             return self.finalize_company_interview(candidate_id=candidate_id, experience_id=experience_id, answers=answers)
         if not candidate_id or not experience_id or not company.strip() or (end_date and end_date < start_date):
