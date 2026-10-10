@@ -688,6 +688,7 @@ _SERVER_ONLY_INTERVIEW_TABLES = frozenset(
         "source_ingestion_state",
         "source_ingestion_runs",
         "candidate_profile_snapshots",
+        "candidate_profile_v2_snapshots",
         "job_profile_snapshots",
         "market_profile_snapshots",
         "company_profile_snapshots",
@@ -2808,6 +2809,30 @@ def initialize_database() -> None:
         create_interview_round_schema(connection)
         create_product_state_schema(connection)
         create_job_observation_schema(connection)
+        create_candidate_profile_schema(connection)
+
+
+def create_candidate_profile_schema(connection) -> None:
+    """Isolated CPV2 snapshots; currentness is the highest persisted version."""
+    connection.execute("""CREATE TABLE IF NOT EXISTS candidate_profile_v2_snapshots (
+        candidate_id TEXT NOT NULL,
+        version INTEGER NOT NULL CHECK (version > 0),
+        profile_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (candidate_id, version),
+        FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
+    )""")
+    connection.execute("""CREATE INDEX IF NOT EXISTS idx_candidate_profile_v2_current
+        ON candidate_profile_v2_snapshots(candidate_id, version DESC)""")
+    _enable_server_only_row_level_security(connection, "candidate_profile_v2_snapshots")
+    if is_postgres():
+        connection.execute("REVOKE ALL ON TABLE candidate_profile_v2_snapshots FROM PUBLIC")
+        for role in ("anon", "authenticated"):
+            connection.execute(f"""DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+                    REVOKE ALL ON TABLE candidate_profile_v2_snapshots FROM {role};
+                END IF;
+            END $$""")
 
 
 def create_onboarding_v4_schema(connection) -> None:
